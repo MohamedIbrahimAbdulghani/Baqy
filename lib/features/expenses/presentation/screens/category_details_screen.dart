@@ -9,6 +9,7 @@ import '../../../../core/utils/number_formatter.dart';
 import '../../domain/models/category_details_args.dart';
 import '../../domain/models/transaction_item.dart';
 import '../providers/expense_providers.dart';
+import '../widgets/transaction_actions_sheet.dart';
 
 class CategoryDetailsScreen extends ConsumerWidget {
   const CategoryDetailsScreen({
@@ -20,24 +21,60 @@ class CategoryDetailsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<List<TransactionItem>> transactionsAsync = args.isMonthMode
+    final normalizedDay = args.day != null
+        ? DateTime(args.day!.year, args.day!.month, args.day!.day)
+        : null;
+
+    final txProvider = args.isMonthMode
+        ? categoryTransactionsForMonthProvider((
+            categoryId: args.category.id,
+            yearMonth: args.yearMonth,
+          ))
+        : (normalizedDay != null
+            ? categoryTransactionsForDayProvider((
+                categoryId: args.category.id,
+                day: normalizedDay,
+              ))
+            : null);
+
+    // Auto-pop if category becomes empty after deletions
+    if (txProvider != null) {
+      ref.listen<AsyncValue<List<TransactionItem>>>(txProvider, (prev, next) {
+        if (next.hasValue &&
+            next.value!.isEmpty &&
+            (prev?.value?.isNotEmpty ?? false)) {
+          if (context.mounted) {
+            context.pop();
+          }
+        }
+      });
+    }
+
+    final AsyncValue<List<TransactionItem>> transactionsAsync =
+        txProvider != null
+            ? ref.watch(txProvider)
+            : const AsyncValue.data([]);
+
+    final AsyncValue<int> categoryTotalAsync = args.isMonthMode
         ? ref.watch(
-            categoryTransactionsForMonthProvider((
+            categoryTotalForMonthProvider((
               categoryId: args.category.id,
               yearMonth: args.yearMonth,
             )),
           )
-        : ref.watch(
-            categoryTransactionsForDayProvider((
-              categoryId: args.category.id,
-              day: args.day ?? DateTime.now(),
-            )),
-          );
+        : (normalizedDay != null
+            ? ref.watch(
+                categoryTotalForDayProvider((
+                  categoryId: args.category.id,
+                  day: normalizedDay,
+                )),
+              )
+            : const AsyncValue.data(0));
 
     final String dateSubtitle = args.isMonthMode
         ? ArabicDateHelper.formatYearMonthKeyToDisplay(args.yearMonth)
-        : (args.day != null
-            ? ArabicDateHelper.formatWeekdayDayMonth(args.day!)
+        : (normalizedDay != null
+            ? ArabicDateHelper.formatWeekdayDayMonth(normalizedDay)
             : '');
 
     return Directionality(
@@ -79,42 +116,67 @@ class CategoryDetailsScreen extends ConsumerWidget {
                             color: AppColors.text,
                           ),
                         ),
-                        if (dateSubtitle.isNotEmpty)
+                        if (dateSubtitle.isNotEmpty) ...[
+                          const SizedBox(height: 2.0),
                           Text(
                             dateSubtitle,
                             style: const TextStyle(
                               fontFamily: AppTheme.fontFamily,
-                              fontSize: 13.0,
+                              fontSize: 14.0,
                               fontWeight: FontWeight.w400,
                               color: AppColors.secondaryText,
                             ),
                           ),
+                        ],
                       ],
                     ),
                   ],
                 ),
               ),
 
-              // Content
+              const SizedBox(height: 8.0),
+
               Expanded(
                 child: transactionsAsync.when(
                   loading: () => const Center(
                     child: CircularProgressIndicator(color: AppColors.mainGreen),
                   ),
-                  error: (_, _) => const Center(
-                    child: Text(
-                      'خطأ في تحميل البيانات',
-                      style: TextStyle(
-                        fontFamily: AppTheme.fontFamily,
-                        color: Colors.red,
-                      ),
+                  error: (error, _) => Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'حدث خطأ في تحميل البيانات',
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            color: Colors.red,
+                          ),
+                        ),
+                        const SizedBox(height: 8.0),
+                        TextButton.icon(
+                          onPressed: () {
+                            if (txProvider != null) {
+                              ref.invalidate(txProvider);
+                            }
+                          },
+                          icon: const Icon(Icons.refresh, color: AppColors.mainGreen),
+                          label: const Text(
+                            'إعادة المحاولة',
+                            style: TextStyle(
+                              fontFamily: AppTheme.fontFamily,
+                              color: AppColors.mainGreen,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   data: (transactions) {
-                    final int totalPiastres = transactions.fold<int>(
-                      0,
-                      (sum, item) => sum + item.amount,
-                    );
+                    final int totalPiastres = categoryTotalAsync.value ??
+                        transactions.fold<int>(
+                          0,
+                          (sum, item) => sum + item.amount,
+                        );
                     final int totalEgp = totalPiastres ~/ 100;
 
                     return ListView(
@@ -160,63 +222,106 @@ class CategoryDetailsScreen extends ConsumerWidget {
                               ? ArabicDateHelper.formatDateTime(tx.createdAt)
                               : ArabicDateHelper.formatTime(tx.createdAt);
 
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12.0),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16.0,
-                              vertical: 14.0,
+                          return InkWell(
+                            onTap: () => TransactionActionsHelper.showEditSheet(
+                              context: context,
+                              ref: ref,
+                              transaction: tx,
                             ),
-                            decoration: BoxDecoration(
-                              color: AppColors.card,
-                              borderRadius:
-                                  BorderRadius.circular(AppDimensions.cardRadius),
-                              boxShadow: AppDimensions.cardShadow,
+                            onLongPress: () =>
+                                TransactionActionsHelper.showActionsBottomSheet(
+                              context: context,
+                              ref: ref,
+                              transaction: tx,
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                // Right: Description and Time
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        tx.description,
-                                        style: const TextStyle(
-                                          fontFamily: AppTheme.fontFamily,
-                                          fontSize: 16.0,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.text,
+                            borderRadius: BorderRadius.circular(
+                                AppDimensions.cardRadius),
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 12.0),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                                vertical: 14.0,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.card,
+                                borderRadius: BorderRadius.circular(
+                                    AppDimensions.cardRadius),
+                                boxShadow: AppDimensions.cardShadow,
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  // Right: Description, Notes, Time & Foreign reference
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          tx.description,
+                                          style: const TextStyle(
+                                            fontFamily: AppTheme.fontFamily,
+                                            fontSize: 16.0,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.text,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(height: 4.0),
-                                      Text(
-                                        timeText,
-                                        style: const TextStyle(
-                                          fontFamily: AppTheme.fontFamily,
-                                          fontSize: 13.0,
-                                          fontWeight: FontWeight.w400,
-                                          color: AppColors.secondaryText,
+                                        if (tx.note != null &&
+                                            tx.note!.isNotEmpty) ...[
+                                          const SizedBox(height: 2.0),
+                                          Text(
+                                            tx.note!,
+                                            style: const TextStyle(
+                                              fontFamily: AppTheme.fontFamily,
+                                              fontSize: 12.0,
+                                              fontWeight: FontWeight.w400,
+                                              color: AppColors.secondaryText,
+                                            ),
+                                          ),
+                                        ],
+                                        if (tx.foreignAmount != null &&
+                                            tx.foreignCurrency != null) ...[
+                                          const SizedBox(height: 2.0),
+                                          Text(
+                                            '≈ ${tx.foreignAmount} ${tx.foreignCurrency}',
+                                            style: const TextStyle(
+                                              fontFamily: AppTheme.fontFamily,
+                                              fontSize: 12.0,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.mainGreen,
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 4.0),
+                                        Text(
+                                          timeText,
+                                          style: const TextStyle(
+                                            fontFamily: AppTheme.fontFamily,
+                                            fontSize: 13.0,
+                                            fontWeight: FontWeight.w400,
+                                            color: AppColors.secondaryText,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                ),
 
-                                const SizedBox(width: 12.0),
+                                  const SizedBox(width: 12.0),
 
-                                // Left: Amount
-                                Text(
-                                  '${NumberFormatter.formatCurrency(txAmountEgp)} جنيه',
-                                  style: const TextStyle(
-                                    fontFamily: AppTheme.fontFamily,
-                                    fontSize: 16.0,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.text,
+                                  // Left: Amount
+                                  Text(
+                                    '${NumberFormatter.formatCurrency(txAmountEgp)} جنيه',
+                                    style: const TextStyle(
+                                      fontFamily: AppTheme.fontFamily,
+                                      fontSize: 16.0,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.text,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           );
                         }),

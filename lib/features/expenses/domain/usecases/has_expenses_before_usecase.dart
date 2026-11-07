@@ -8,5 +8,9 @@ class HasExpensesBeforeUseCase {
   Future<bool> call(DateTime day) {
     return _repository.hasExpensesBefore(day);
   }
+
+  Stream<bool> watch(DateTime day) {
+    return _repository.watchHasExpensesBefore(day);
+  }
 }
 

@@ -263,6 +263,50 @@ class _CategoryFormScreenState extends ConsumerState<CategoryFormScreen> {
                       // 6 color dots
                       _buildColorsRow(),
 
+                      if (widget.categoryToEdit != null) ...[
+                        const SizedBox(height: 28.0),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final id = widget.categoryToEdit!.id;
+                            if (widget.categoryToEdit!.isArchived) {
+                              await ref
+                                  .read(archiveCategoryUseCaseProvider)
+                                  .unarchive(id);
+                            } else {
+                              await ref
+                                  .read(archiveCategoryUseCaseProvider)
+                                  .archive(id);
+                            }
+                            ref.invalidate(categoriesProvider);
+                            if (context.mounted) {
+                              context.pop();
+                            }
+                          },
+                          icon: Icon(
+                            widget.categoryToEdit!.isArchived
+                                ? Icons.unarchive_outlined
+                                : Icons.archive_outlined,
+                            color: AppColors.secondaryText,
+                          ),
+                          label: Text(
+                            widget.categoryToEdit!.isArchived
+                                ? 'إلغاء أرشفة التصنيف'
+                                : 'أرشفة التصنيف (إخفاءه من القوائم)',
+                            style: const TextStyle(
+                              fontFamily: AppTheme.fontFamily,
+                              color: AppColors.secondaryText,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12.0),
+                            side: const BorderSide(color: AppColors.dividers),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                          ),
+                        ),
+                      ],
+
                       const SizedBox(height: 32.0),
                     ],
                   ),

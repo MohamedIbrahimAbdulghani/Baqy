@@ -8,5 +8,9 @@ class GetYearsWithDataUseCase {
   Future<List<int>> call({int? currentYear}) {
     return _repository.getYearsWithData(currentYear: currentYear);
   }
+
+  Stream<List<int>> watch({int? currentYear}) {
+    return _repository.watchYearsWithData(currentYear: currentYear);
+  }
 }
 

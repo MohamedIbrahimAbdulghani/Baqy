@@ -15,5 +15,15 @@ class GetCategoryTransactionsForDayUseCase {
       day: day,
     );
   }
+
+  Stream<List<TransactionItem>> watch({
+    required int categoryId,
+    required DateTime day,
+  }) {
+    return _repository.watchCategoryTransactionsForDay(
+      categoryId: categoryId,
+      day: day,
+    );
+  }
 }
 

@@ -9,5 +9,9 @@ class GetCategoriesUseCase {
   Future<List<CategoryItem>> call() {
     return _repository.getCategories();
   }
+
+  Stream<List<CategoryItem>> watch() {
+    return _repository.watchCategories();
+  }
 }
 

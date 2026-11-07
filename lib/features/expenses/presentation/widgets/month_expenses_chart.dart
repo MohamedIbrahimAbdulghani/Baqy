@@ -22,8 +22,53 @@ class MonthExpensesChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Sort columns by category ID (matching order in Screenshots 1 and 2: أكل, مواصلات, فواتير, صدقات)
-    final sortedTotals = [...categoryTotals]
+    final totalSum =
+        categoryTotals.fold<int>(0, (sum, e) => sum + e.totalAmount);
+
+    final List<CategoryTotal> displayTotals = [];
+    int otherSum = 0;
+    int otherCount = 0;
+
+    for (final item in categoryTotals) {
+      final double ratio = totalSum > 0 ? (item.totalAmount / totalSum) : 0.0;
+      // Group categories that are very small (< 4% of total) under 'أخرى' when there are > 5 categories
+      if (categoryTotals.length > 5 &&
+          ratio < 0.04 &&
+          item.category.name != 'أخرى') {
+        otherSum += item.totalAmount;
+        otherCount += item.transactionCount;
+      } else {
+        displayTotals.add(item);
+      }
+    }
+
+    if (otherSum > 0) {
+      final existingOtherIndex =
+          displayTotals.indexWhere((e) => e.category.name == 'أخرى');
+      if (existingOtherIndex >= 0) {
+        final existing = displayTotals[existingOtherIndex];
+        displayTotals[existingOtherIndex] = CategoryTotal(
+          category: existing.category,
+          totalAmount: existing.totalAmount + otherSum,
+          transactionCount: existing.transactionCount + otherCount,
+        );
+      } else {
+        displayTotals.add(
+          CategoryTotal(
+            category: const CategoryItem(
+              id: 999999,
+              name: 'أخرى',
+              icon: 'other',
+              color: '#9A9488',
+            ),
+            totalAmount: otherSum,
+            transactionCount: otherCount,
+          ),
+        );
+      }
+    }
+
+    final sortedTotals = [...displayTotals]
       ..sort((a, b) => a.category.id.compareTo(b.category.id));
 
     return Container(

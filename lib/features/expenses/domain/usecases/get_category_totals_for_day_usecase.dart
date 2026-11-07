@@ -9,5 +9,9 @@ class GetCategoryTotalsForDayUseCase {
   Future<List<CategoryTotal>> call(DateTime day) {
     return _repository.getCategoryTotalsForDay(day);
   }
+
+  Stream<List<CategoryTotal>> watch(DateTime day) {
+    return _repository.watchCategoryTotalsForDay(day);
+  }
 }
 

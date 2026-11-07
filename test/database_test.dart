@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:baqy/core/database/app_database.dart';
+import 'package:baqy/core/utils/category_icon_helper.dart';
 import 'package:baqy/features/expenses/data/repositories/expense_repository_impl.dart';
 
 void main() {
@@ -25,15 +26,31 @@ void main() {
     test('Default categories are seeded once on creation', () async {
       final categories = await repository.getCategories();
 
-      expect(categories.length, equals(7));
+      expect(categories.length, equals(23));
 
       final expectedNames = [
         'أكل',
+        'مشروبات وكافيهات',
+        'سوبر ماركت',
         'مواصلات',
-        'فواتير',
-        'صدقات',
+        'سيارة',
+        'ملابس',
+        'إلكترونيات',
+        'بيت وأثاث',
+        'إيجار',
+        'فواتير واتصالات',
         'اشتراكات',
-        'ديون',
+        'صحة',
+        'عناية شخصية',
+        'تعليم',
+        'ترفيه',
+        'سفر',
+        'أطفال',
+        'حيوانات أليفة',
+        'هدايا ومناسبات',
+        'صدقات',
+        'استثمار وادخار',
+        'ديون وأقساط',
         'أخرى',
       ];
 
@@ -48,6 +65,10 @@ void main() {
 
       final transport = categories.firstWhere((c) => c.name == 'مواصلات');
       expect(transport.color, equals('#E8A83A'));
+
+      final entertainment = categories.firstWhere((c) => c.name == 'ترفيه');
+      expect(entertainment.color, equals('#5BA3B8'));
+      expect(entertainment.icon, equals(CategoryIconHelper.customIconKeys.first));
     });
 
     test('Money Rules: month money = budget + income, remaining = month money - expenses (in piastres)', () async {
@@ -146,7 +167,7 @@ void main() {
       const yearMonth = '2026-11';
       final categories = await repository.getCategories();
       final foodId = categories.firstWhere((c) => c.name == 'أكل').id;
-      final billsId = categories.firstWhere((c) => c.name == 'فواتير').id;
+      final billsId = categories.firstWhere((c) => c.name == 'فواتير واتصالات').id;
       final charityId = categories.firstWhere((c) => c.name == 'صدقات').id;
 
       // Food: 200 + 300 = 500 (50,000 piastres)
@@ -402,6 +423,39 @@ void main() {
       // Close and clean up
       await db2.close();
       tempDir.deleteSync(recursive: true);
+    });
+
+    test('Transaction with note: saves note, strips control chars, caps at 40 chars', () async {
+      final categories = await repository.getCategories();
+      final foodId = categories.firstWhere((c) => c.name == 'أكل').id;
+
+      // Note with control characters and > 40 chars
+      const rawNote = 'كشري بركات في وسط البلد\x00\x1F - فرع التحرير الجديد الشهير جدا جدا';
+      await repository.addTransaction(
+        amount: 5000,
+        description: 'كشري',
+        categoryId: foodId,
+        kind: 'expense',
+        source: 'voice',
+        note: rawNote,
+        createdAt: DateTime.utc(2026, 11, 5, 12, 0),
+      );
+
+      final lastTxs = await repository.getLast3Transactions();
+      expect(lastTxs.length, equals(1));
+      expect(lastTxs.first.note != null, isTrue);
+      expect(lastTxs.first.note!.length, lessThanOrEqualTo(40));
+      expect(lastTxs.first.note!.contains('\x00'), isFalse);
+      expect(lastTxs.first.note!.contains('\x1F'), isFalse);
+    });
+
+    test('Drift migration v1 to v2 adds note column and seeds ترفيه if missing', () async {
+      final mDb = AppDatabase(NativeDatabase.memory());
+      // Check schemaVersion is 2
+      expect(mDb.schemaVersion, equals(2));
+      final cats = await ExpenseRepositoryImpl(mDb).getCategories();
+      expect(cats.any((c) => c.name == 'ترفيه'), isTrue);
+      await mDb.close();
     });
   });
 }

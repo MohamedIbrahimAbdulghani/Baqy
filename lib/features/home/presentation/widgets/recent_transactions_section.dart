@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_dimensions.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/category_icon_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../expenses/domain/models/transaction_item.dart';
+import '../../../expenses/presentation/widgets/transaction_actions_sheet.dart';
 
 class RecentTransactionsSection extends StatelessWidget {
   const RecentTransactionsSection({
@@ -53,70 +55,121 @@ class RecentTransactionsSection extends StatelessWidget {
   }
 }
 
-class _TransactionCard extends StatelessWidget {
+class _TransactionCard extends ConsumerWidget {
   const _TransactionCard({required this.transaction});
 
   final TransactionItem transaction;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final int amountEgp = transaction.amount ~/ 100;
     final iconData = CategoryIconHelper.getIcon(transaction.category?.icon);
+    final categoryColor =
+        CategoryIconHelper.parseColor(transaction.category?.color);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12.0),
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
-        boxShadow: AppDimensions.cardShadow,
+    return InkWell(
+      onTap: () => TransactionActionsHelper.showEditSheet(
+        context: context,
+        ref: ref,
+        transaction: transaction,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Left: Amount (e.g. "١٥٠ جنيه")
-          Text(
-            '${NumberFormatter.formatCurrency(amountEgp)} جنيه',
-            style: const TextStyle(
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 16.0,
-              fontWeight: FontWeight.w700,
-              color: AppColors.text,
+      onLongPress: () => TransactionActionsHelper.showActionsBottomSheet(
+        context: context,
+        ref: ref,
+        transaction: transaction,
+      ),
+      borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
+          boxShadow: AppDimensions.cardShadow,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Left: Amount & foreign reference
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${NumberFormatter.formatCurrency(amountEgp)} جنيه',
+                  style: const TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 16.0,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.text,
+                  ),
+                ),
+                if (transaction.foreignAmount != null &&
+                    transaction.foreignCurrency != null) ...[
+                  const SizedBox(height: 2.0),
+                  Text(
+                    '≈ ${transaction.foreignAmount} ${transaction.foreignCurrency}',
+                    style: const TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: 12.0,
+                      color: AppColors.mainGreen,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ),
 
-          // Right: Description & Category chip
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                transaction.description,
-                style: const TextStyle(
-                  fontFamily: AppTheme.fontFamily,
-                  fontSize: 16.0,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.text,
+            // Right: Description & Category chip
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      transaction.description,
+                      style: const TextStyle(
+                        fontFamily: AppTheme.fontFamily,
+                        fontSize: 16.0,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.text,
+                      ),
+                    ),
+                    if (transaction.note != null &&
+                        transaction.note!.isNotEmpty) ...[
+                      const SizedBox(height: 2.0),
+                      Text(
+                        transaction.note!,
+                        style: const TextStyle(
+                          fontFamily: AppTheme.fontFamily,
+                          fontSize: 12.0,
+                          color: AppColors.secondaryText,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-              ),
-              const SizedBox(width: 12.0),
-              Container(
-                width: 44.0,
-                height: 44.0,
-                decoration: BoxDecoration(
-                  color: AppColors.lightGreen,
-                  borderRadius: BorderRadius.circular(12.0),
+                const SizedBox(width: 12.0),
+                Container(
+                  width: 44.0,
+                  height: 44.0,
+                  decoration: BoxDecoration(
+                    color: categoryColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                  child: Icon(
+                    iconData,
+                    color: categoryColor,
+                    size: 24.0,
+                  ),
                 ),
-                child: Icon(
-                  iconData,
-                  color: AppColors.mainGreen,
-                  size: 22.0,
-                ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 }
-

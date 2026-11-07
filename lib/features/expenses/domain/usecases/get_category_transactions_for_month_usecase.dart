@@ -15,5 +15,15 @@ class GetCategoryTransactionsForMonthUseCase {
       yearMonth: yearMonth,
     );
   }
+
+  Stream<List<TransactionItem>> watch({
+    required int categoryId,
+    required String yearMonth,
+  }) {
+    return _repository.watchCategoryTransactionsForMonth(
+      categoryId: categoryId,
+      yearMonth: yearMonth,
+    );
+  }
 }
 

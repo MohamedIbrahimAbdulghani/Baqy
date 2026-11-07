@@ -221,13 +221,30 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                           borderRadius:
                               BorderRadius.circular(AppDimensions.cardRadius),
                         ),
-                        child: const Center(
-                          child: Text(
-                            'خطأ في تحميل مصاريف الشهر',
-                            style: TextStyle(
-                              fontFamily: AppTheme.fontFamily,
-                              color: Colors.red,
-                            ),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'خطأ في تحميل مصاريف الشهر',
+                                style: TextStyle(
+                                  fontFamily: AppTheme.fontFamily,
+                                  color: Colors.red,
+                                ),
+                              ),
+                              const SizedBox(height: 8.0),
+                              TextButton.icon(
+                                onPressed: () => ref.invalidate(monthCategoryTotalsProvider(_currentYearMonth)),
+                                icon: const Icon(Icons.refresh, color: AppColors.mainGreen),
+                                label: const Text(
+                                  'إعادة المحاولة',
+                                  style: TextStyle(
+                                    fontFamily: AppTheme.fontFamily,
+                                    color: AppColors.mainGreen,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -332,13 +349,30 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                           ),
                         ),
                       ),
-                      error: (_, _) => const Center(
-                        child: Text(
-                          'خطأ في تحميل مصاريف اليوم',
-                          style: TextStyle(
-                            fontFamily: AppTheme.fontFamily,
-                            color: Colors.red,
-                          ),
+                      error: (_, _) => Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'خطأ في تحميل مصاريف اليوم',
+                              style: TextStyle(
+                                fontFamily: AppTheme.fontFamily,
+                                color: Colors.red,
+                              ),
+                            ),
+                            const SizedBox(height: 8.0),
+                            TextButton.icon(
+                              onPressed: () => ref.invalidate(dayCategoryTotalsProvider(_selectedDay)),
+                              icon: const Icon(Icons.refresh, color: AppColors.mainGreen),
+                              label: const Text(
+                                'إعادة المحاولة',
+                                style: TextStyle(
+                                  fontFamily: AppTheme.fontFamily,
+                                  color: AppColors.mainGreen,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       data: (dayTotals) {

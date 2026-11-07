@@ -8,5 +8,9 @@ class GetMonthsWithDataUseCase {
   Future<Set<int>> call(int year) {
     return _repository.getMonthsWithData(year);
   }
+
+  Stream<Set<int>> watch(int year) {
+    return _repository.watchMonthsWithData(year);
+  }
 }
 

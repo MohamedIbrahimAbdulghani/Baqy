@@ -21,15 +21,35 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _isMonthPopupOpen = false;
 
-  void _checkAutoOpenBudget(String yearMonth, int monthNumber, MonthRemaining remaining) {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref
+            .read(voiceRecordingProvider.notifier)
+            .preInitialize(onlyIfPermissionGranted: true);
+      }
+    });
+  }
+
+  void _checkAutoOpenBudget(
+    String yearMonth,
+    int monthNumber,
+    MonthRemaining remaining,
+  ) {
     if (remaining.budget <= 0) {
       final promptedMonths = ref.read(hasAutoOpenedBudgetForMonthProvider);
       if (!promptedMonths.contains(yearMonth)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            final currentPrompted = ref.read(hasAutoOpenedBudgetForMonthProvider);
+            final currentPrompted = ref.read(
+              hasAutoOpenedBudgetForMonthProvider,
+            );
             if (!currentPrompted.contains(yearMonth)) {
-              ref.read(hasAutoOpenedBudgetForMonthProvider.notifier).markOpened(yearMonth);
+              ref
+                  .read(hasAutoOpenedBudgetForMonthProvider.notifier)
+                  .markOpened(yearMonth);
               _openBudgetSheet(yearMonth, monthNumber, 0);
             }
           }
@@ -50,7 +70,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     } else {
       // At the start of a new month, pre-fill with last month's budget
       final prevYm = ArabicDateHelper.getPreviousYearMonth(yearMonth);
-      final prevBudgetPiastres = await ref.read(getMonthBudgetUseCaseProvider)(prevYm);
+      final prevBudgetPiastres = await ref.read(getMonthBudgetUseCaseProvider)(
+        prevYm,
+      );
       if (prevBudgetPiastres != null && prevBudgetPiastres > 0) {
         initialBudgetEgp = prevBudgetPiastres ~/ 100;
       }
@@ -102,7 +124,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             bottom: false,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.only(bottom: 90.0),
+              padding: const EdgeInsets.only(bottom: 150.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -124,21 +146,61 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       remainingPiastres: remaining.remaining,
                       spentPiastres: remaining.expenses,
                       monthMoneyPiastres: remaining.monthMoney,
-                      onTap: () => _openBudgetSheet(selectedYm, month, remaining.budget),
+                      onTap: () =>
+                          _openBudgetSheet(selectedYm, month, remaining.budget),
                     ),
                     loading: () => const Center(
                       child: SizedBox(
                         height: 250.0,
                         child: Center(
-                          child: CircularProgressIndicator(color: AppColors.mainGreen),
+                          child: CircularProgressIndicator(
+                            color: AppColors.mainGreen,
+                          ),
                         ),
                       ),
                     ),
-                    error: (error, stack) => BudgetRing(
-                      remainingPiastres: 0,
-                      spentPiastres: 0,
-                      monthMoneyPiastres: 0,
-                      onTap: () => _openBudgetSheet(selectedYm, month, 0),
+                    error: (error, stack) => Container(
+                      height: 250.0,
+                      margin: const EdgeInsets.symmetric(horizontal: 20.0),
+                      padding: const EdgeInsets.all(16.0),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16.0),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.error_outline, color: Colors.red, size: 36.0),
+                            const SizedBox(height: 8.0),
+                            const Text(
+                              'تعذر تحميل بيانات الميزانية',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                fontSize: 16.0,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.text,
+                              ),
+                            ),
+                            const SizedBox(height: 12.0),
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                ref.invalidate(currentMonthRemainingProvider);
+                              },
+                              icon: const Icon(Icons.refresh, size: 18.0),
+                              label: const Text(
+                                'إعادة المحاولة',
+                                style: TextStyle(fontFamily: 'Cairo'),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.mainGreen,
+                                side: const BorderSide(color: AppColors.mainGreen),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
 
@@ -146,17 +208,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                   // Below: "آخر المصاريف" and the last 3 transactions
                   recentTransactionsAsync.when(
-                    data: (transactions) => RecentTransactionsSection(
-                      transactions: transactions,
-                    ),
+                    data: (transactions) =>
+                        RecentTransactionsSection(transactions: transactions),
                     loading: () => const Padding(
                       padding: EdgeInsets.symmetric(vertical: 20.0),
                       child: Center(
-                        child: CircularProgressIndicator(color: AppColors.mainGreen),
+                        child: CircularProgressIndicator(
+                          color: AppColors.mainGreen,
+                        ),
                       ),
                     ),
-                    error: (error, stack) => const RecentTransactionsSection(
-                      transactions: [],
+                    error: (error, stack) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+                      child: Container(
+                        padding: const EdgeInsets.all(16.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'تعذر تحميل آخر العمليات',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                color: AppColors.secondaryText,
+                              ),
+                            ),
+                            const SizedBox(height: 8.0),
+                            TextButton.icon(
+                              onPressed: () {
+                                ref.invalidate(recentTransactionsProvider);
+                              },
+                              icon: const Icon(Icons.refresh, size: 18.0, color: AppColors.mainGreen),
+                              label: const Text(
+                                'إعادة المحاولة',
+                                style: TextStyle(
+                                  fontFamily: 'Cairo',
+                                  color: AppColors.mainGreen,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -190,9 +286,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   });
                 },
                 onSelectMonth: (selectedNewYear, selectedNewMonth) {
-                  final newYm =
-                      ArabicDateHelper.formatYearMonthKey(selectedNewYear, selectedNewMonth);
-                  ref.read(selectedYearMonthProvider.notifier).selectYearMonth(newYm);
+                  final newYm = ArabicDateHelper.formatYearMonthKey(
+                    selectedNewYear,
+                    selectedNewMonth,
+                  );
+                  ref
+                      .read(selectedYearMonthProvider.notifier)
+                      .selectYearMonth(newYm);
 
                   setState(() {
                     _isMonthPopupOpen = false;

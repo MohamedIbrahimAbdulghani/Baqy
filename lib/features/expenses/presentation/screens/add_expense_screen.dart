@@ -181,12 +181,29 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     child: CircularProgressIndicator(color: AppColors.mainGreen),
                   ),
                   error: (error, _) => Center(
-                    child: Text(
-                      'خطأ في تحميل الفئات',
-                      style: const TextStyle(
-                        fontFamily: AppTheme.fontFamily,
-                        color: Colors.red,
-                      ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'تعذر تحميل التصنيفات',
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            color: Colors.red,
+                          ),
+                        ),
+                        const SizedBox(height: 8.0),
+                        TextButton.icon(
+                          onPressed: () => ref.invalidate(categoriesProvider),
+                          icon: const Icon(Icons.refresh, color: AppColors.mainGreen),
+                          label: const Text(
+                            'إعادة المحاولة',
+                            style: TextStyle(
+                              fontFamily: AppTheme.fontFamily,
+                              color: AppColors.mainGreen,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   data: (categories) {

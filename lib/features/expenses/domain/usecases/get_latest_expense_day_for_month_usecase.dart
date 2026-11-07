@@ -8,5 +8,9 @@ class GetLatestExpenseDayForMonthUseCase {
   Future<DateTime?> call(String yearMonth) {
     return _repository.getLatestExpenseDayForMonth(yearMonth);
   }
+
+  Stream<DateTime?> watch(String yearMonth) {
+    return _repository.watchLatestExpenseDayForMonth(yearMonth);
+  }
 }
 

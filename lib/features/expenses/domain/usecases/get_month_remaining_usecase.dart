@@ -9,5 +9,9 @@ class GetMonthRemainingUseCase {
   Future<MonthRemaining> call(String yearMonth) {
     return _repository.getRemainingOfMonth(yearMonth);
   }
+
+  Stream<MonthRemaining> watch(String yearMonth) {
+    return _repository.watchRemainingOfMonth(yearMonth);
+  }
 }
 

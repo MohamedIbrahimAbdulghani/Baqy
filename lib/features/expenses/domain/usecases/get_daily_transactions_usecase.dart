@@ -9,5 +9,9 @@ class GetDailyTransactionsUseCase {
   Future<List<DayTransactions>> call(String yearMonth) {
     return _repository.getTransactionsPerDay(yearMonth);
   }
+
+  Stream<List<DayTransactions>> watch(String yearMonth) {
+    return _repository.watchTransactionsPerDay(yearMonth);
+  }
 }
 

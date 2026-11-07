@@ -9,5 +9,9 @@ class GetCategoryTotalsUseCase {
   Future<List<CategoryTotal>> call(String yearMonth) {
     return _repository.getTotalsPerCategoryPerMonth(yearMonth);
   }
+
+  Stream<List<CategoryTotal>> watch(String yearMonth) {
+    return _repository.watchTotalsPerCategoryPerMonth(yearMonth);
+  }
 }
 

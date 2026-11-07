@@ -9,5 +9,9 @@ class GetLastTransactionsForMonthUseCase {
   Future<List<TransactionItem>> call(String yearMonth, {int limit = 3}) {
     return _repository.getLastTransactionsForMonth(yearMonth, limit: limit);
   }
+
+  Stream<List<TransactionItem>> watch(String yearMonth, {int limit = 3}) {
+    return _repository.watchLastTransactionsForMonth(yearMonth, limit: limit);
+  }
 }
 

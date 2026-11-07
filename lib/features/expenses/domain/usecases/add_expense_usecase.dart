@@ -9,7 +9,11 @@ class AddExpenseUseCase {
     required int amountInPiastres,
     required String description,
     required int categoryId,
+    String source = 'text',
     DateTime? createdAt,
+    String? note,
+    double? foreignAmount,
+    String? foreignCurrency,
   }) {
     if (amountInPiastres <= 0) {
       throw ArgumentError('Amount must be positive.');
@@ -32,12 +36,25 @@ class AddExpenseUseCase {
         ? sanitizedDescription.substring(0, 60)
         : sanitizedDescription;
 
+    String? sanitizedNote;
+    if (note != null) {
+      final stripped = note
+          .replaceAll(RegExp(r'[\x00-\x1F\x7F-\x9F]'), '')
+          .trim();
+      if (stripped.isNotEmpty) {
+        sanitizedNote = stripped.length > 40 ? stripped.substring(0, 40) : stripped;
+      }
+    }
+
     return _repository.addTransaction(
       amount: amountInPiastres,
       description: finalDescription,
       categoryId: categoryId,
       kind: 'expense',
-      source: 'text',
+      source: source,
+      note: sanitizedNote,
+      foreignAmount: foreignAmount,
+      foreignCurrency: foreignCurrency,
       createdAt: createdAt ?? DateTime.now().toUtc(),
     );
   }
