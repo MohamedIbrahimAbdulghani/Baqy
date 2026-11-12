@@ -32,9 +32,11 @@ class MonthExpensesChartCard extends StatelessWidget {
     for (final item in categoryTotals) {
       final double ratio = totalSum > 0 ? (item.totalAmount / totalSum) : 0.0;
       // Group categories that are very small (< 4% of total) under 'أخرى' when there are > 5 categories
+      // "تحويش" is a virtual category that is never grouped under 'أخرى'
       if (categoryTotals.length > 5 &&
           ratio < 0.04 &&
-          item.category.name != 'أخرى') {
+          item.category.name != 'أخرى' &&
+          item.category.name != 'تحويش') {
         otherSum += item.totalAmount;
         otherCount += item.transactionCount;
       } else {

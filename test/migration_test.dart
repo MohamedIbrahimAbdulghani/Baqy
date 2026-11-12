@@ -70,7 +70,7 @@ void main() {
 
       // Check categories: 'قهوة وكافيهات' -> 'مشروبات وكافيهات' with same id=2
       final cats = await v3Db.select(v3Db.categories).get();
-      expect(cats.length, equals(23), reason: 'All 23 default categories should exist');
+      expect(cats.length, equals(24), reason: 'All 24 default categories should exist');
 
       final coffeeCat = cats.firstWhere((c) => c.id == 2);
       expect(coffeeCat.name, equals('مشروبات وكافيهات'));
@@ -105,7 +105,7 @@ void main() {
       // 3. Test Idempotency: Open the same database again
       final v3DbAgain = AppDatabase(NativeDatabase(dbFile));
       final catsAgain = await v3DbAgain.select(v3DbAgain.categories).get();
-      expect(catsAgain.length, equals(23), reason: 'Re-opening must not duplicate categories');
+      expect(catsAgain.length, equals(24), reason: 'Re-opening must not duplicate categories');
 
       final txsAgain = await v3DbAgain.select(v3DbAgain.transactions).get();
       expect(txsAgain.length, equals(3), reason: 'Re-opening must not duplicate or lose transactions');

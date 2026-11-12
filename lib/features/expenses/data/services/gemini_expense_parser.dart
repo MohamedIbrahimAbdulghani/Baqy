@@ -262,6 +262,16 @@ class GeminiExpenseParser {
     return modelName;
   }
 
+  /// Pre-warms the HTTP connection and DNS cache for Gemini in advance
+  Future<void> warmUp() async {
+    try {
+      final key = apiKey;
+      if (key == null || key.isEmpty) return;
+      final url = Uri.parse('$baseUrl/$activeModelName?key=$key');
+      unawaited(_client.get(url).catchError((_) => http.Response('', 500)));
+    } catch (_) {}
+  }
+
   /// Builds the resolved system prompt using [geminiSystemPromptTemplate]
   static String buildAudioSystemPrompt({
     required List<String> categories,
@@ -393,7 +403,7 @@ class GeminiExpenseParser {
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode(requestPayload),
             )
-            .timeout(const Duration(seconds: 40));
+            .timeout(const Duration(seconds: 4));
 
         stopwatch.stop();
         final latencyMs = stopwatch.elapsedMilliseconds;
@@ -407,14 +417,40 @@ class GeminiExpenseParser {
         }
 
         if (response.statusCode != 200) {
+          String errCategory = 'unknown';
+          String errCode = '${response.statusCode}';
+          try {
+            final errBody = jsonDecode(response.body);
+            if (errBody is Map && errBody.containsKey('error')) {
+              final errMap = errBody['error'];
+              errCategory = errMap['status']?.toString() ?? 'unknown';
+              errCode = errMap['code']?.toString() ?? '${response.statusCode}';
+            }
+          } catch (_) {}
+
+          if (response.statusCode == 429) {
+            lastAudioError = GeminiAudioErrorType.rateLimited;
+          } else if (response.statusCode == 503 ||
+              (response.statusCode >= 500 && response.statusCode < 600)) {
+            lastAudioError = GeminiAudioErrorType.serverError;
+          } else if (response.statusCode == 404) {
+            lastAudioError = GeminiAudioErrorType.modelNotFound;
+          } else if (response.statusCode == 401 ||
+              response.statusCode == 403) {
+            lastAudioError = GeminiAudioErrorType.invalidKey;
+          } else if (response.statusCode == 400) {
+            lastAudioError = GeminiAudioErrorType.badRequest;
+          } else {
+            lastAudioError = GeminiAudioErrorType.unknown;
+          }
+
           if (kDebugMode) {
             debugPrint(
-              '[AUDIO_DEBUG] [ERROR] Model $currentModel HTTP ${response.statusCode}: ${response.body}',
+              '[AUDIO_DEBUG] ErrorType: $lastAudioError, HTTP: ${response.statusCode}, GeminiError: $errCategory ($errCode)',
             );
           }
 
           if (response.statusCode == 429) {
-            lastAudioError = GeminiAudioErrorType.rateLimited;
             // Never send more than 1 request per button press on the same model if 429.
             // Try next model immediately.
             final hasNext = mIndex + 1 < candidateModels.length;
@@ -429,7 +465,6 @@ class GeminiExpenseParser {
             break;
           } else if (response.statusCode == 503 ||
               (response.statusCode >= 500 && response.statusCode < 600)) {
-            lastAudioError = GeminiAudioErrorType.serverError;
             // On 503 / 5xx: Try next model in sequence
             final hasNext = mIndex + 1 < candidateModels.length;
             if (hasNext) {
@@ -442,7 +477,6 @@ class GeminiExpenseParser {
             }
             break;
           } else if (response.statusCode == 404) {
-            lastAudioError = GeminiAudioErrorType.modelNotFound;
             final hasNext = mIndex + 1 < candidateModels.length;
             if (hasNext) {
               continue;
@@ -450,13 +484,14 @@ class GeminiExpenseParser {
             break;
           } else if (response.statusCode == 401 ||
               response.statusCode == 403) {
-            lastAudioError = GeminiAudioErrorType.invalidKey;
             break;
           } else if (response.statusCode == 400) {
-            lastAudioError = GeminiAudioErrorType.badRequest;
+            final hasNext = mIndex + 1 < candidateModels.length;
+            if (hasNext) {
+              continue;
+            }
             break;
           } else {
-            lastAudioError = GeminiAudioErrorType.unknown;
             break;
           }
         }

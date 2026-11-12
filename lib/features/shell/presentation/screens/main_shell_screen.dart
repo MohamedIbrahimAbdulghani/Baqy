@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../goals/presentation/widgets/goals_speed_dial_fab.dart';
 import '../../../home/presentation/widgets/home_speed_dial_fab.dart';
 import '../providers/tab_provider.dart';
 import '../widgets/custom_bottom_nav_bar.dart';
@@ -48,7 +49,9 @@ class MainShellScreen extends ConsumerWidget {
         index: selectedIndex,
         children: _tabs,
       ),
-      floatingActionButton: selectedIndex == 0 ? const HomeSpeedDialFab() : null,
+      floatingActionButton: selectedIndex == 0
+          ? const HomeSpeedDialFab()
+          : (selectedIndex == 1 ? const GoalsSpeedDialFab() : null),
       floatingActionButtonLocation: const AboveBottomBarFabLocation(gap: 14.0),
       bottomNavigationBar: CustomBottomNavBar(
         currentIndex: selectedIndex,

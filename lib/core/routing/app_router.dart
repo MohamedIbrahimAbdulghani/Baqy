@@ -6,6 +6,9 @@ import '../../features/expenses/presentation/screens/add_expense_screen.dart';
 import '../../features/expenses/presentation/screens/category_details_screen.dart';
 import '../../features/expenses/presentation/screens/category_form_screen.dart';
 import '../../features/expenses/presentation/screens/month_details_screen.dart';
+import '../../features/goals/domain/models/goal_item.dart';
+import '../../features/goals/presentation/screens/add_goal_screen.dart';
+import '../../features/goals/presentation/screens/goal_details_screen.dart';
 import '../../features/shell/presentation/screens/main_shell_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
 
@@ -51,6 +54,20 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) {
         final category = state.extra as CategoryItem?;
         return CategoryFormScreen(categoryToEdit: category);
+      },
+    ),
+    GoRoute(
+      path: '/add-goal',
+      builder: (context, state) {
+        final goalToEdit = state.extra as GoalItem?;
+        return AddGoalScreen(goalToEdit: goalToEdit);
+      },
+    ),
+    GoRoute(
+      path: '/goal-details',
+      builder: (context, state) {
+        final goalId = state.extra as int;
+        return GoalDetailsScreen(goalId: goalId);
       },
     ),
   ],

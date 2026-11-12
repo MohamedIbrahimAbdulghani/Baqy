@@ -1,4 +1,11 @@
 class CategoryItem {
+  static const virtualSavings = CategoryItem(
+    id: -1,
+    name: 'تحويش',
+    icon: 'savings',
+    color: '#B5883E',
+  );
+
   const CategoryItem({
     required this.id,
     required this.name,

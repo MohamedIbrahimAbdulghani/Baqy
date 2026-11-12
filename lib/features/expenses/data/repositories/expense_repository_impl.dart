@@ -123,15 +123,38 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     final countExp = _db.transactions.id.count();
     final query = _monthCategoryTotalsQuery(yearMonth, totalAmountExp, countExp);
     final rows = await query.get();
-    return _mapCategoryTotalRows(rows, totalAmountExp, countExp);
+    final results = _mapCategoryTotalRows(rows, totalAmountExp, countExp);
+
+    // Goal savings as virtual category "تحويش" (shown only if net saved > 0)
+    final (start, end) = _getMonthRange(yearMonth);
+    final savingsRows = await (_db.select(_db.goalSavings)
+          ..where((s) =>
+              s.savedAt.isBiggerOrEqualValue(start) &
+              s.savedAt.isSmallerThanValue(end)))
+        .get();
+    final netSavings = savingsRows.fold<int>(0, (sum, s) => sum + s.amount);
+    if (netSavings > 0) {
+      results.add(
+        CategoryTotal(
+          category: CategoryItem.virtualSavings,
+          totalAmount: netSavings,
+          transactionCount: savingsRows.length,
+        ),
+      );
+    }
+
+    return results;
   }
 
   @override
   Stream<List<CategoryTotal>> watchTotalsPerCategoryPerMonth(String yearMonth) {
-    final totalAmountExp = _db.transactions.amount.sum();
-    final countExp = _db.transactions.id.count();
-    final query = _monthCategoryTotalsQuery(yearMonth, totalAmountExp, countExp);
-    return query.watch().map((rows) => _mapCategoryTotalRows(rows, totalAmountExp, countExp));
+    return _db
+        .customSelect(
+          'SELECT 1',
+          readsFrom: {_db.transactions, _db.categories, _db.goalSavings},
+        )
+        .watch()
+        .asyncMap((_) => getTotalsPerCategoryPerMonth(yearMonth));
   }
 
   JoinedSelectStatement _dayCategoryTotalsQuery(
@@ -168,15 +191,39 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     final countExp = _db.transactions.id.count();
     final query = _dayCategoryTotalsQuery(day, totalAmountExp, countExp);
     final rows = await query.get();
-    return _mapCategoryTotalRows(rows, totalAmountExp, countExp);
+    final results = _mapCategoryTotalRows(rows, totalAmountExp, countExp);
+
+    // Goal savings on this day (net of savings and withdrawals)
+    final (start, end) = _getDayRange(day);
+    final savingsRows = await (_db.select(_db.goalSavings)
+          ..where((s) =>
+              s.savedAt.isBiggerOrEqualValue(start) &
+              s.savedAt.isSmallerThanValue(end)))
+        .get();
+    if (savingsRows.isNotEmpty) {
+      final netDaySavings =
+          savingsRows.fold<int>(0, (sum, s) => sum + s.amount);
+      results.add(
+        CategoryTotal(
+          category: CategoryItem.virtualSavings,
+          totalAmount: netDaySavings,
+          transactionCount: savingsRows.length,
+        ),
+      );
+    }
+
+    return results;
   }
 
   @override
   Stream<List<CategoryTotal>> watchCategoryTotalsForDay(DateTime day) {
-    final totalAmountExp = _db.transactions.amount.sum();
-    final countExp = _db.transactions.id.count();
-    final query = _dayCategoryTotalsQuery(day, totalAmountExp, countExp);
-    return query.watch().map((rows) => _mapCategoryTotalRows(rows, totalAmountExp, countExp));
+    return _db
+        .customSelect(
+          'SELECT 1',
+          readsFrom: {_db.transactions, _db.categories, _db.goalSavings},
+        )
+        .watch()
+        .asyncMap((_) => getCategoryTotalsForDay(day));
   }
 
   JoinedSelectStatement _categoryTransactionsForDayQuery(
@@ -204,6 +251,31 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     required int categoryId,
     required DateTime day,
   }) async {
+    if (categoryId == CategoryItem.virtualSavings.id) {
+      final (start, end) = _getDayRange(day);
+      final query = _db.select(_db.goalSavings).join([
+        innerJoin(_db.goals, _db.goals.id.equalsExp(_db.goalSavings.goalId)),
+      ])
+        ..where(_db.goalSavings.savedAt.isBiggerOrEqualValue(start) &
+            _db.goalSavings.savedAt.isSmallerThanValue(end))
+        ..orderBy([OrderingTerm.desc(_db.goalSavings.savedAt)]);
+      final rows = await query.get();
+      return rows.map((row) {
+        final saving = row.readTable(_db.goalSavings);
+        final goal = row.readTable(_db.goals);
+        return TransactionItem(
+          id: -saving.id,
+          amount: saving.amount,
+          description: goal.name,
+          categoryId: CategoryItem.virtualSavings.id,
+          kind: 'saving',
+          source: 'goal',
+          note: saving.amount < 0 ? 'سحب من الهدف' : null,
+          createdAt: saving.savedAt,
+          category: CategoryItem.virtualSavings,
+        );
+      }).toList();
+    }
     final query = _categoryTransactionsForDayQuery(categoryId, day);
     final rows = await query.get();
     return rows.map(_mapTransactionRow).toList();
@@ -214,6 +286,18 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     required int categoryId,
     required DateTime day,
   }) {
+    if (categoryId == CategoryItem.virtualSavings.id) {
+      return _db
+          .customSelect(
+            'SELECT 1',
+            readsFrom: {_db.goalSavings, _db.goals},
+          )
+          .watch()
+          .asyncMap((_) => getCategoryTransactionsForDay(
+                categoryId: categoryId,
+                day: day,
+              ));
+    }
     final query = _categoryTransactionsForDayQuery(categoryId, day);
     return query.watch().map((rows) => rows.map(_mapTransactionRow).toList());
   }
@@ -243,6 +327,31 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     required int categoryId,
     required String yearMonth,
   }) async {
+    if (categoryId == CategoryItem.virtualSavings.id) {
+      final (start, end) = _getMonthRange(yearMonth);
+      final query = _db.select(_db.goalSavings).join([
+        innerJoin(_db.goals, _db.goals.id.equalsExp(_db.goalSavings.goalId)),
+      ])
+        ..where(_db.goalSavings.savedAt.isBiggerOrEqualValue(start) &
+            _db.goalSavings.savedAt.isSmallerThanValue(end))
+        ..orderBy([OrderingTerm.desc(_db.goalSavings.savedAt)]);
+      final rows = await query.get();
+      return rows.map((row) {
+        final saving = row.readTable(_db.goalSavings);
+        final goal = row.readTable(_db.goals);
+        return TransactionItem(
+          id: -saving.id,
+          amount: saving.amount,
+          description: goal.name,
+          categoryId: CategoryItem.virtualSavings.id,
+          kind: 'saving',
+          source: 'goal',
+          note: saving.amount < 0 ? 'سحب من الهدف' : null,
+          createdAt: saving.savedAt,
+          category: CategoryItem.virtualSavings,
+        );
+      }).toList();
+    }
     final query = _categoryTransactionsForMonthQuery(categoryId, yearMonth);
     final rows = await query.get();
     return rows.map(_mapTransactionRow).toList();
@@ -253,6 +362,18 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     required int categoryId,
     required String yearMonth,
   }) {
+    if (categoryId == CategoryItem.virtualSavings.id) {
+      return _db
+          .customSelect(
+            'SELECT 1',
+            readsFrom: {_db.goalSavings, _db.goals},
+          )
+          .watch()
+          .asyncMap((_) => getCategoryTransactionsForMonth(
+                categoryId: categoryId,
+                yearMonth: yearMonth,
+              ));
+    }
     final query = _categoryTransactionsForMonthQuery(categoryId, yearMonth);
     return query.watch().map((rows) => rows.map(_mapTransactionRow).toList());
   }
@@ -364,9 +485,47 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     String yearMonth, {
     int limit = 3,
   }) async {
+    final (start, end) = _getMonthRange(yearMonth);
+
+    // 1. Regular transactions
     final query = _lastTransactionsForMonthQuery(yearMonth, limit);
     final rows = await query.get();
-    return rows.map(_mapTransactionRow).toList();
+    final txList = rows.map(_mapTransactionRow).toList();
+
+    // 2. Goal savings in the month
+    final savingsQuery = _db.select(_db.goalSavings).join([
+      innerJoin(_db.goals, _db.goals.id.equalsExp(_db.goalSavings.goalId)),
+    ])
+      ..where(_db.goalSavings.savedAt.isBiggerOrEqualValue(start) &
+          _db.goalSavings.savedAt.isSmallerThanValue(end))
+      ..orderBy([OrderingTerm.desc(_db.goalSavings.savedAt)])
+      ..limit(limit);
+
+    final savingsRows = await savingsQuery.get();
+    final savingsList = savingsRows.map((row) {
+      final saving = row.readTable(_db.goalSavings);
+      final goal = row.readTable(_db.goals);
+      return TransactionItem(
+        id: -saving.id,
+        amount: saving.amount,
+        description: goal.name,
+        categoryId: CategoryItem.virtualSavings.id,
+        kind: 'saving',
+        source: 'goal',
+        note: saving.amount < 0 ? 'سحب من الهدف' : null,
+        createdAt: saving.savedAt,
+        category: CategoryItem.virtualSavings,
+      );
+    }).toList();
+
+    // 3. Merge and sort newest first
+    final combined = [...txList, ...savingsList]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    if (combined.length > limit) {
+      return combined.sublist(0, limit);
+    }
+    return combined;
   }
 
   @override
@@ -374,8 +533,13 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     String yearMonth, {
     int limit = 3,
   }) {
-    final query = _lastTransactionsForMonthQuery(yearMonth, limit);
-    return query.watch().map((rows) => rows.map(_mapTransactionRow).toList());
+    return _db
+        .customSelect(
+          'SELECT 1',
+          readsFrom: {_db.transactions, _db.categories, _db.goalSavings, _db.goals},
+        )
+        .watch()
+        .asyncMap((_) => getLastTransactionsForMonth(yearMonth, limit: limit));
   }
 
   @override
@@ -575,7 +739,8 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
           'SELECT '
           '(SELECT amount FROM month_budgets WHERE year_month = ?1) AS budget, '
           '(SELECT SUM(amount) FROM transactions WHERE kind = ?2 AND created_at >= ?3 AND created_at < ?4) AS income, '
-          '(SELECT SUM(amount) FROM transactions WHERE kind = ?5 AND created_at >= ?3 AND created_at < ?4) AS expenses',
+          '(SELECT SUM(amount) FROM transactions WHERE kind = ?5 AND created_at >= ?3 AND created_at < ?4) AS expenses, '
+          '(SELECT SUM(amount) FROM goal_savings WHERE saved_at >= ?3 AND saved_at < ?4) AS goal_savings',
           variables: [
             Variable<String>(yearMonth),
             Variable<String>('income'),
@@ -583,15 +748,16 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
             Variable<DateTime>(end),
             Variable<String>('expense'),
           ],
-          readsFrom: {_db.transactions, _db.monthBudgets},
+          readsFrom: {_db.transactions, _db.monthBudgets, _db.goalSavings},
         )
         .getSingle();
 
     final int budget = row.read<int?>('budget') ?? 0;
     final int income = row.read<int?>('income') ?? 0;
     final int expenses = row.read<int?>('expenses') ?? 0;
+    final int goalSavings = row.read<int?>('goal_savings') ?? 0;
     final int monthMoney = budget + income;
-    final int remaining = monthMoney - expenses;
+    final int remaining = monthMoney - expenses - goalSavings;
 
     return MonthRemaining(
       yearMonth: yearMonth,
@@ -600,6 +766,7 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
       monthMoney: monthMoney,
       expenses: expenses,
       remaining: remaining,
+      goalSavings: goalSavings,
     );
   }
 
@@ -612,7 +779,8 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
           'SELECT '
           '(SELECT amount FROM month_budgets WHERE year_month = ?1) AS budget, '
           '(SELECT SUM(amount) FROM transactions WHERE kind = ?2 AND created_at >= ?3 AND created_at < ?4) AS income, '
-          '(SELECT SUM(amount) FROM transactions WHERE kind = ?5 AND created_at >= ?3 AND created_at < ?4) AS expenses',
+          '(SELECT SUM(amount) FROM transactions WHERE kind = ?5 AND created_at >= ?3 AND created_at < ?4) AS expenses, '
+          '(SELECT SUM(amount) FROM goal_savings WHERE saved_at >= ?3 AND saved_at < ?4) AS goal_savings',
           variables: [
             Variable<String>(yearMonth),
             Variable<String>('income'),
@@ -620,15 +788,16 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
             Variable<DateTime>(end),
             Variable<String>('expense'),
           ],
-          readsFrom: {_db.transactions, _db.monthBudgets},
+          readsFrom: {_db.transactions, _db.monthBudgets, _db.goalSavings},
         )
         .watchSingle()
         .map((row) {
           final int budget = row.read<int?>('budget') ?? 0;
           final int income = row.read<int?>('income') ?? 0;
           final int expenses = row.read<int?>('expenses') ?? 0;
+          final int goalSavings = row.read<int?>('goal_savings') ?? 0;
           final int monthMoney = budget + income;
-          final int remaining = monthMoney - expenses;
+          final int remaining = monthMoney - expenses - goalSavings;
 
           return MonthRemaining(
             yearMonth: yearMonth,
@@ -637,6 +806,7 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
             monthMoney: monthMoney,
             expenses: expenses,
             remaining: remaining,
+            goalSavings: goalSavings,
           );
         });
   }

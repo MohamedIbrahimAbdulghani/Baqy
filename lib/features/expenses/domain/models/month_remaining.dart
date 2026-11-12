@@ -5,7 +5,8 @@ class MonthRemaining {
     required this.income, // integer piastres
     required this.monthMoney, // integer piastres: budget + income
     required this.expenses, // integer piastres
-    required this.remaining, // integer piastres: monthMoney - expenses
+    required this.remaining, // integer piastres: monthMoney - expenses - goalSavings
+    this.goalSavings = 0, // integer piastres
   });
 
   final String yearMonth;
@@ -14,5 +15,6 @@ class MonthRemaining {
   final int monthMoney;
   final int expenses;
   final int remaining;
+  final int goalSavings;
 }
 

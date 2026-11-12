@@ -11,6 +11,7 @@ part 'app_database.g.dart';
   UserRules,
   MonthBudgets,
   Goals,
+  GoalSavings,
   Reminders,
   Debts,
   DebtPayments,
@@ -19,7 +20,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? openEncryptedConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   static const List<({String name, String icon, String color, int sortOrder})>
       defaultCategoryDefinitions = [
@@ -233,6 +234,13 @@ class AppDatabase extends _$AppDatabase {
           }
         }
 
+        if (from < 5) {
+          if (kDebugMode) {
+            debugPrint('[DB_DEBUG] onUpgrade (v4->v5): creating goal_savings table');
+          }
+          await m.createTable(goalSavings);
+        }
+
         if (kDebugMode) {
           debugPrint('[DB_DEBUG] onUpgrade: finished migration successfully in ${sw.elapsedMilliseconds}ms');
         }
@@ -289,6 +297,7 @@ class AppDatabase extends _$AppDatabase {
       await delete(monthBudgets).go();
       await delete(debtPayments).go();
       await delete(debts).go();
+      await delete(goalSavings).go();
       await delete(goals).go();
       await delete(reminders).go();
       await delete(userRules).go();

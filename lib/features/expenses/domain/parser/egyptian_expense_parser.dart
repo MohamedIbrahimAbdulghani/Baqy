@@ -649,8 +649,15 @@ class EgyptianExpenseParser {
               if (afterNext == 'تلاف' ||
                   afterNext == 'الاف' ||
                   afterNext == 'الف') {
-                finalAndVal = finalAndVal * 1000;
-                addedConsumed = 2;
+                if (currentVal < 100 && andVal < 100) {
+                  // e.g. "خمسة وتلاتين الف" -> (5 + 30) * 1000 = 35000
+                  currentVal = (currentVal + andVal) * 1000;
+                  consumed += 2;
+                  return NumberParseResult(currentVal, consumed);
+                } else {
+                  finalAndVal = finalAndVal * 1000;
+                  addedConsumed = 2;
+                }
               }
             }
 

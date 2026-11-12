@@ -56,6 +56,16 @@ class Goals extends Table {
   DateTimeColumn get createdAt => dateTime()(); // UTC
 }
 
+@DataClassName('GoalSavingData')
+@TableIndex(name: 'idx_goal_savings_goal_id', columns: {#goalId})
+@TableIndex(name: 'idx_goal_savings_saved_at', columns: {#savedAt})
+class GoalSavings extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get goalId => integer().references(Goals, #id)();
+  IntColumn get amount => integer()(); // piastres
+  DateTimeColumn get savedAt => dateTime()(); // UTC
+}
+
 @DataClassName('ReminderData')
 class Reminders extends Table {
   IntColumn get id => integer().autoIncrement()();

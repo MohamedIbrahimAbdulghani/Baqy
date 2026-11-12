@@ -221,6 +221,11 @@ abstract final class CategoryIconHelper {
       case 'camera_alt':
         return Icons.camera_alt_outlined;
 
+      // Savings & Goals (Virtual category)
+      case 'savings':
+      case 'savings_outlined':
+        return Icons.savings_outlined;
+
       case 'other':
       case 'more_horiz':
       default:

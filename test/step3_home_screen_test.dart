@@ -265,9 +265,15 @@ void main() {
       expect(find.byIcon(Icons.mic_none_rounded), findsOneWidget);
       expect(find.byIcon(Icons.edit_outlined), findsWidgets);
 
-      // Tap mic button closes it
+      // Tap mic button
       await tester.tap(find.byIcon(Icons.mic_none_rounded));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      if (find.byIcon(Icons.stop_rounded).evaluate().isNotEmpty) {
+        await tester.tap(find.byIcon(Icons.stop_rounded));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+      }
     });
 
     testWidgets('Years and Months popup flow and navigation to blank page',

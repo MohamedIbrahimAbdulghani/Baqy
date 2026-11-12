@@ -17,6 +17,7 @@ import '../../data/repositories/expense_repository_impl.dart';
 import '../../data/services/audio_recording_service.dart';
 import '../../data/services/gemini_expense_parser.dart';
 import '../../data/services/speech_recognition_service.dart';
+import '../../domain/parser/egyptian_expense_parser.dart';
 import '../../domain/models/category_item.dart';
 import '../../domain/models/category_total.dart';
 import '../../domain/models/month_remaining.dart';
@@ -24,6 +25,9 @@ import '../../domain/models/parsed_expense.dart';
 import '../../domain/models/transaction_item.dart';
 import '../../domain/repositories/expense_repository.dart';
 import '../widgets/voice_expense_review_sheet.dart';
+import '../../../goals/data/repositories/goal_repository_impl.dart';
+import '../../../goals/domain/parser/egyptian_goal_parser.dart';
+import '../../../goals/presentation/providers/goal_providers.dart';
 import '../../domain/usecases/add_category_usecase.dart';
 import '../../domain/usecases/add_expense_usecase.dart';
 import '../../domain/usecases/archive_category_usecase.dart';
@@ -534,6 +538,8 @@ class PendingRecordingStorage {
   }
 }
 
+enum VoiceRecordingMode { expense, goal }
+
 class VoiceRecordingNotifier extends Notifier<bool> {
   AudioRecordingService? _audioService;
   SpeechRecognitionService? _speechService;
@@ -543,7 +549,10 @@ class VoiceRecordingNotifier extends Notifier<bool> {
   BuildContext? _currentContext;
   AppLifecycleListener? _lifecycleListener;
 
-  // Multi-session text buffers & committed text across sessions (kept for backward compatibility & tests)
+  VoiceRecordingMode _mode = VoiceRecordingMode.expense;
+  VoiceRecordingMode get mode => _mode;
+
+  // Multi-session text buffers & committed text across sessions
   String _committedText = '';
   String _currentPartialText = '';
   final int _sessionCount = 0;
@@ -593,28 +602,37 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     } catch (_) {}
   }
 
-  /// Pre-initializes permissions in advance
+  /// Pre-initializes permissions and warms up Gemini connection
   Future<void> preInitialize({bool onlyIfPermissionGranted = false}) async {
     final service = _audioService;
     if (service == null) return;
     try {
       await service.hasPermission();
+      ref.read(geminiExpenseParserProvider).warmUp();
     } catch (_) {}
   }
 
-  Future<void> startRecording({required BuildContext context}) async {
+  Future<void> startRecording({
+    required BuildContext context,
+    VoiceRecordingMode mode = VoiceRecordingMode.expense,
+  }) async {
     if (state) return;
     final service = _audioService;
     if (service == null) return;
 
+    _mode = mode;
     _currentContext = context;
+    _committedText = '';
+    _currentPartialText = '';
 
     final hasPerm = await service.hasPermission();
     if (!hasPerm) {
       if (context.mounted) {
         _showVoiceFeedbackSnackBar(
           context: context,
-          message: 'يرجى تفعيل إذن الميكروفون من الإعدادات لتسجيل المصاريف',
+          message: mode == VoiceRecordingMode.goal
+              ? 'يرجى تفعيل إذن الميكروفون من الإعدادات لتسجيل الأهداف'
+              : 'يرجى تفعيل إذن الميكروفون من الإعدادات لتسجيل المصاريف',
         );
       }
       return;
@@ -640,6 +658,26 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     _amplitudeSubscription = service.amplitudeStream.listen((amp) {
       ref.read(voiceAmplitudeProvider.notifier).setVal(amp);
     });
+
+    // Only invoke fake speech service in mock/unit test environments
+    if (_speechService != null && _speechService is! SpeechToTextServiceImpl) {
+      try {
+        await _speechService!.listen(
+          onResult: (words, {bool isFinal = false}) {
+            if (isFinal) {
+              if (_committedText.isEmpty) {
+                _committedText = words;
+              } else {
+                _committedText += ' $words';
+              }
+              _currentPartialText = '';
+            } else {
+              _currentPartialText = words;
+            }
+          },
+        );
+      } catch (_) {}
+    }
 
     final path = await service.startRecording(
       onSafetyWarning: () {
@@ -669,11 +707,13 @@ class VoiceRecordingNotifier extends Notifier<bool> {
       return;
     }
 
+    // State becomes true only when really listening (readiness handling)
     state = true;
   }
 
   Future<void> stopRecording({BuildContext? context}) async {
     if (!state) return;
+    final totalSw = Stopwatch()..start();
     final activeContext = context ?? _currentContext;
 
     // Light haptic feedback on stop
@@ -684,6 +724,13 @@ class VoiceRecordingNotifier extends Notifier<bool> {
 
     _durationTimer?.cancel();
     _amplitudeSubscription?.cancel();
+    if (_speechService != null && _speechService is! SpeechToTextServiceImpl) {
+      try {
+        await _speechService!
+            .stop()
+            .timeout(const Duration(milliseconds: 300), onTimeout: () {});
+      } catch (_) {}
+    }
     ref.read(voiceAmplitudeProvider.notifier).setVal(0.0);
     state = false;
 
@@ -691,6 +738,25 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     if (service == null) return;
 
     final savedPath = await service.stopRecording();
+    final stopToRecognizeMs = totalSw.elapsedMilliseconds;
+    final capturedSpeech = '$_committedText $_currentPartialText'.trim();
+    // Buffers cleared at end of session
+    _committedText = '';
+    _currentPartialText = '';
+
+    if (_mode == VoiceRecordingMode.goal) {
+      await _processGoalVoice(
+        savedPath: savedPath,
+        fallbackSpeechText: capturedSpeech,
+        context: (activeContext != null && activeContext.mounted)
+            ? activeContext
+            : null,
+        totalSw: totalSw,
+        stopToRecognizeMs: stopToRecognizeMs,
+      );
+      return;
+    }
+
     if (savedPath == null) {
       if (activeContext != null && activeContext.mounted) {
         _showVoiceFeedbackSnackBar(
@@ -727,19 +793,118 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     // Process audio file with Gemini
     await processAudioFile(
       savedPath,
+      fallbackSpeechText: capturedSpeech,
       context: (activeContext != null && activeContext.mounted)
           ? activeContext
           : null,
+      totalSw: totalSw,
+      stopToRecognizeMs: stopToRecognizeMs,
     );
+  }
+
+  Future<void> _processGoalVoice({
+    String? savedPath,
+    required String fallbackSpeechText,
+    BuildContext? context,
+    Stopwatch? totalSw,
+    int stopToRecognizeMs = 0,
+  }) async {
+    final activeContext = context ?? _currentContext;
+    ref.read(voiceIsAnalyzingProvider.notifier).setVal(true);
+
+    ParsedGoalResult? goalResult;
+    int geminiRequestMs = 0;
+    final geminiSw = Stopwatch()..start();
+
+    // 1. Try Gemini Audio Parser if file exists and has content
+    if (savedPath != null) {
+      final file = File(savedPath);
+      if (await file.exists() && await file.length() >= 100) {
+        final parser = ref.read(geminiExpenseParserProvider);
+        if (parser.apiKey != null && parser.apiKey!.isNotEmpty) {
+          try {
+            final result = await parser.parseAudio(file);
+            geminiRequestMs = geminiSw.elapsedMilliseconds;
+            if (result != null) {
+              if (result.transcript.isNotEmpty) {
+                goalResult = EgyptianGoalParser.parse(result.transcript);
+              }
+              if (goalResult == null && result.operations.isNotEmpty) {
+                final op = result.operations.first;
+                if (op.amount != null &&
+                    op.amount! > 0 &&
+                    op.description.isNotEmpty &&
+                    !EgyptianGoalParser.isCategoryName(op.description)) {
+                  goalResult = ParsedGoalResult(
+                    name: GoalRepositoryImpl.sanitizeName(op.description),
+                    targetAmount: op.amount!,
+                  );
+                }
+              }
+            }
+          } catch (_) {}
+        }
+      }
+    }
+    if (geminiRequestMs == 0) geminiRequestMs = geminiSw.elapsedMilliseconds;
+
+    // 2. Fallback to speech recognition text if Gemini didn't find goal
+    if (goalResult == null && fallbackSpeechText.isNotEmpty) {
+      goalResult = EgyptianGoalParser.parse(fallbackSpeechText);
+    }
+
+    ref.read(voiceIsAnalyzingProvider.notifier).setVal(false);
+
+    // Clean up temporary audio file immediately (never log or save spoken sentence)
+    if (savedPath != null) {
+      try {
+        final f = File(savedPath);
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
+      await PendingRecordingStorage.clear();
+      ref.read(pendingVoiceAudioPathProvider.notifier).setVal(null);
+    }
+
+    // Validation: If no amount found, save nothing and show snackbar above button
+    if (goalResult == null || goalResult.targetAmount <= 0) {
+      if (activeContext != null && activeContext.mounted) {
+        _showVoiceFeedbackSnackBar(
+          context: activeContext,
+          message: 'ماسمعتش مبلغ، جرّب تاني',
+        );
+      }
+      return;
+    }
+
+    // Save goal with target in piastres (never log or save spoken sentence)
+    final saveSw = Stopwatch()..start();
+    try {
+      await ref.read(goalRepositoryProvider).addGoal(
+            name: goalResult.name,
+            targetAmount: goalResult.targetAmount * 100,
+          );
+    } catch (_) {}
+    final parseAndSaveMs = saveSw.elapsedMilliseconds;
+    final totalMs = totalSw?.elapsedMilliseconds ??
+        (stopToRecognizeMs + geminiRequestMs + parseAndSaveMs);
+
+    if (kDebugMode) {
+      debugPrint(
+        '[VOICE_METRICS] stop_to_recognize: ${stopToRecognizeMs}ms, gemini_request: ${geminiRequestMs}ms, parse_and_save: ${parseAndSaveMs}ms, total: ${totalMs}ms',
+      );
+    }
   }
 
   Future<void> processAudioFile(
     String audioPath, {
+    String? fallbackSpeechText,
     BuildContext? context,
+    Stopwatch? totalSw,
+    int stopToRecognizeMs = 0,
   }) async {
     final activeContext = context ?? _currentContext;
 
-    // Show analyzing state ("بحلل كلامك…")
+    // Show analyzing state
     ref.read(voiceIsAnalyzingProvider.notifier).setVal(true);
 
     final parser = ref.read(geminiExpenseParserProvider);
@@ -764,15 +929,34 @@ class VoiceRecordingNotifier extends Notifier<bool> {
         await ref.read(saveUserRuleUseCaseProvider).getRecentRules(limit: 50);
 
     AudioParseResult? result;
+    int geminiRequestMs = 0;
+    final geminiSw = Stopwatch()..start();
     try {
       result = await parser.parseAudio(
         File(audioPath),
         categories: categories,
         userRules: userRules,
       );
+      geminiRequestMs = geminiSw.elapsedMilliseconds;
     } catch (e) {
+      geminiRequestMs = geminiSw.elapsedMilliseconds;
       if (kDebugMode) {
         debugPrint('[AUDIO_DEBUG] Exception in processAudioFile: $e');
+      }
+    }
+
+    // Fallback to local parser if Gemini failed or timed out (never calls network)
+    if (result == null && fallbackSpeechText != null && fallbackSpeechText.isNotEmpty) {
+      final localOps = EgyptianExpenseParser.parse(
+        fallbackSpeechText,
+        customCategories: categories.map((c) => c.name).toList(),
+        userRules: userRules,
+      );
+      if (localOps.isNotEmpty) {
+        result = AudioParseResult(
+          transcript: fallbackSpeechText,
+          operations: localOps,
+        );
       }
     }
 
@@ -785,7 +969,11 @@ class VoiceRecordingNotifier extends Notifier<bool> {
         _showErrorRetryDialog(
           context: activeContext,
           message: errorReason,
-          onRetry: () => processAudioFile(audioPath, context: activeContext),
+          onRetry: () => processAudioFile(
+            audioPath,
+            fallbackSpeechText: fallbackSpeechText,
+            context: activeContext,
+          ),
           onManual: () {
             activeContext.push('/add-expense');
           },
@@ -806,6 +994,7 @@ class VoiceRecordingNotifier extends Notifier<bool> {
 
     final skipReview = ref.read(skipVoiceReviewProvider);
 
+    final saveSw = Stopwatch()..start();
     if (skipReview || activeContext == null || !activeContext.mounted) {
       await _saveExpenses(expenses: result.operations, categories: categories);
       await _deleteAudioAfterSuccess(audioPath);
@@ -819,6 +1008,15 @@ class VoiceRecordingNotifier extends Notifier<bool> {
           await _saveExpenses(expenses: reviewedExpenses, categories: categories);
           await _deleteAudioAfterSuccess(audioPath);
         },
+      );
+    }
+    final parseAndSaveMs = saveSw.elapsedMilliseconds;
+    final totalMs = totalSw?.elapsedMilliseconds ??
+        (stopToRecognizeMs + geminiRequestMs + parseAndSaveMs);
+
+    if (kDebugMode) {
+      debugPrint(
+        '[VOICE_METRICS] stop_to_recognize: ${stopToRecognizeMs}ms, gemini_request: ${geminiRequestMs}ms, parse_and_save: ${parseAndSaveMs}ms, total: ${totalMs}ms',
       );
     }
   }

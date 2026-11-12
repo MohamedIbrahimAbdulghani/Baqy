@@ -146,6 +146,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       remainingPiastres: remaining.remaining,
                       spentPiastres: remaining.expenses,
                       monthMoneyPiastres: remaining.monthMoney,
+                      savedPiastres: remaining.goalSavings,
                       onTap: () =>
                           _openBudgetSheet(selectedYm, month, remaining.budget),
                     ),

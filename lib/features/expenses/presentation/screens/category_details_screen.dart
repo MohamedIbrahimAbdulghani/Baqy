@@ -221,19 +221,30 @@ class CategoryDetailsScreen extends ConsumerWidget {
                           final String timeText = args.isMonthMode
                               ? ArabicDateHelper.formatDateTime(tx.createdAt)
                               : ArabicDateHelper.formatTime(tx.createdAt);
+                          final isVirtualSavings = args.category.id == -1 ||
+                              args.category.name == 'تحويش' ||
+                              tx.categoryId == -1;
+
+                          final String txAmountText = txAmountEgp < 0
+                              ? '-${NumberFormatter.formatCurrency(txAmountEgp.abs())} جنيه'
+                              : '${NumberFormatter.formatCurrency(txAmountEgp)} جنيه';
 
                           return InkWell(
-                            onTap: () => TransactionActionsHelper.showEditSheet(
-                              context: context,
-                              ref: ref,
-                              transaction: tx,
-                            ),
-                            onLongPress: () =>
-                                TransactionActionsHelper.showActionsBottomSheet(
-                              context: context,
-                              ref: ref,
-                              transaction: tx,
-                            ),
+                            onTap: isVirtualSavings
+                                ? null
+                                : () => TransactionActionsHelper.showEditSheet(
+                                      context: context,
+                                      ref: ref,
+                                      transaction: tx,
+                                    ),
+                            onLongPress: isVirtualSavings
+                                ? null
+                                : () => TransactionActionsHelper
+                                    .showActionsBottomSheet(
+                                    context: context,
+                                    ref: ref,
+                                    transaction: tx,
+                                  ),
                             borderRadius: BorderRadius.circular(
                                 AppDimensions.cardRadius),
                             child: Container(
@@ -312,7 +323,7 @@ class CategoryDetailsScreen extends ConsumerWidget {
 
                                   // Left: Amount
                                   Text(
-                                    '${NumberFormatter.formatCurrency(txAmountEgp)} جنيه',
+                                    txAmountText,
                                     style: const TextStyle(
                                       fontFamily: AppTheme.fontFamily,
                                       fontSize: 16.0,

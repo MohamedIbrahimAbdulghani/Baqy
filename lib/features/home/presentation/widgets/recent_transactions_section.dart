@@ -66,18 +66,29 @@ class _TransactionCard extends ConsumerWidget {
     final iconData = CategoryIconHelper.getIcon(transaction.category?.icon);
     final categoryColor =
         CategoryIconHelper.parseColor(transaction.category?.color);
+    final isVirtualSavings = transaction.categoryId == -1 ||
+        transaction.category?.id == -1 ||
+        transaction.category?.name == 'تحويش';
+
+    final String amountText = amountEgp < 0
+        ? '-${NumberFormatter.formatCurrency(amountEgp.abs())} جنيه'
+        : '${NumberFormatter.formatCurrency(amountEgp)} جنيه';
 
     return InkWell(
-      onTap: () => TransactionActionsHelper.showEditSheet(
-        context: context,
-        ref: ref,
-        transaction: transaction,
-      ),
-      onLongPress: () => TransactionActionsHelper.showActionsBottomSheet(
-        context: context,
-        ref: ref,
-        transaction: transaction,
-      ),
+      onTap: isVirtualSavings
+          ? null
+          : () => TransactionActionsHelper.showEditSheet(
+                context: context,
+                ref: ref,
+                transaction: transaction,
+              ),
+      onLongPress: isVirtualSavings
+          ? null
+          : () => TransactionActionsHelper.showActionsBottomSheet(
+                context: context,
+                ref: ref,
+                transaction: transaction,
+              ),
       borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12.0),
@@ -96,7 +107,7 @@ class _TransactionCard extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '${NumberFormatter.formatCurrency(amountEgp)} جنيه',
+                  amountText,
                   style: const TextStyle(
                     fontFamily: AppTheme.fontFamily,
                     fontSize: 16.0,

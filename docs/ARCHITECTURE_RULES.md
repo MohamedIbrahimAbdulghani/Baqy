@@ -6,8 +6,15 @@
 - **Data**: Repositories, Database (Drift), external services. Handles mapping and data persistence.
 
 ## 2. Single Repository & Reactive Data Flow
-- All writes (insert/update/delete) must go through `ExpenseRepository` so that `appDatabase.tableUpdates()` fires.
-- Every screen and widget watching providers (like `databaseChangesProvider`, `recentTransactionsProvider`, `currentMonthRemainingProvider`) updates instantly without manual state synchronization.
+- All writes (insert/update/delete) must go through `ExpenseRepository` or `GoalRepository` so that `appDatabase.tableUpdates()` fires.
+- Every screen and widget watching providers (like `databaseChangesProvider`, `recentTransactionsProvider`, `currentMonthRemainingProvider`, `goalsStreamProvider`) updates instantly without manual state synchronization.
+- **Money Rule**: `remaining = month money - month expenses - net goal savings of that month`.
+  - Month money = budget + month income.
+  - Goal savings are treated as a virtual category named "تحويش" (color `#B5883E`, icon `Icons.savings_outlined`). Withdrawals are shown as "سحب من الهدف" with a minus sign.
+  - Savings and withdrawals appear in "آخر المصاريف", Month details chart (if net saved in month > 0), Day list, and Category details for "تحويش".
+  - Home screen line: when the month has net savings Z > 0, show "صرفت X وحوّشت Z من Y" (X = expenses only). When Z is zero keep "صرفت X من Y".
+  - Consistency rule: chart column = month total = category-details total.
+  - Deleting a goal with savings removes its savings and returns the money to the remaining immediately.
 
 ## 3. Privacy & Security
 - Financial data remains strictly on-device in the encrypted local database.

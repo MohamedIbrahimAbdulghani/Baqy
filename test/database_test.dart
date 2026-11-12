@@ -3,7 +3,6 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:baqy/core/database/app_database.dart';
-import 'package:baqy/core/utils/category_icon_helper.dart';
 import 'package:baqy/features/expenses/data/repositories/expense_repository_impl.dart';
 
 void main() {
@@ -68,7 +67,7 @@ void main() {
 
       final entertainment = categories.firstWhere((c) => c.name == 'ترفيه');
       expect(entertainment.color, equals('#5BA3B8'));
-      expect(entertainment.icon, equals(CategoryIconHelper.customIconKeys.first));
+      expect(entertainment.icon, equals('entertainment'));
     });
 
     test('Money Rules: month money = budget + income, remaining = month money - expenses (in piastres)', () async {
@@ -212,7 +211,7 @@ void main() {
 
       expect(totals.length, equals(3));
       // First is bills (150,000)
-      expect(totals[0].category.name, equals('فواتير'));
+      expect(totals[0].category.name, equals('فواتير واتصالات'));
       expect(totals[0].totalAmount, equals(150000));
 
       // Second is food (50,000)
@@ -451,8 +450,8 @@ void main() {
 
     test('Drift migration v1 to v2 adds note column and seeds ترفيه if missing', () async {
       final mDb = AppDatabase(NativeDatabase.memory());
-      // Check schemaVersion is 2
-      expect(mDb.schemaVersion, equals(2));
+      // Check schemaVersion is 5
+      expect(mDb.schemaVersion, equals(5));
       final cats = await ExpenseRepositoryImpl(mDb).getCategories();
       expect(cats.any((c) => c.name == 'ترفيه'), isTrue);
       await mDb.close();

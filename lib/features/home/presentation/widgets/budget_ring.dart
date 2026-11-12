@@ -10,12 +10,14 @@ class BudgetRing extends StatelessWidget {
     required this.remainingPiastres,
     required this.spentPiastres,
     required this.monthMoneyPiastres,
+    this.savedPiastres = 0,
     required this.onTap,
   });
 
   final int remainingPiastres;
   final int spentPiastres;
   final int monthMoneyPiastres;
+  final int savedPiastres;
   final VoidCallback onTap;
 
   @override
@@ -23,6 +25,11 @@ class BudgetRing extends StatelessWidget {
     final int remainingEgp = remainingPiastres ~/ 100;
     final int spentEgp = spentPiastres ~/ 100;
     final int monthMoneyEgp = monthMoneyPiastres ~/ 100;
+    final int savedEgp = savedPiastres ~/ 100;
+
+    final String spentSummaryText = savedPiastres > 0
+        ? 'صرفت ${NumberFormatter.formatCurrency(spentEgp)} وحوّشت ${NumberFormatter.formatCurrency(savedEgp)} من ${NumberFormatter.formatCurrency(monthMoneyEgp)}'
+        : 'صرفت ${NumberFormatter.formatCurrency(spentEgp)} من ${NumberFormatter.formatCurrency(monthMoneyEgp)}';
 
     // Ring progress = remaining / month money (limited between 0 and 1)
     final double progress = monthMoneyPiastres > 0
@@ -86,7 +93,7 @@ class BudgetRing extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            'صرفت ${NumberFormatter.formatCurrency(spentEgp)} من ${NumberFormatter.formatCurrency(monthMoneyEgp)}',
+                            spentSummaryText,
                             style: const TextStyle(
                               fontFamily: AppTheme.fontFamily,
                               fontSize: 13.0,

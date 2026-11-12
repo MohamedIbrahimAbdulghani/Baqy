@@ -65,14 +65,13 @@ class _HomeSpeedDialFabState extends ConsumerState<HomeSpeedDialFab>
     final isAnalyzing = ref.watch(voiceIsAnalyzingProvider);
     final pendingAudio = ref.watch(pendingVoiceAudioPathProvider);
 
-    if (isAnalyzing) {
-      return const _VoiceAnalyzingCard();
-    }
-
-    if (isRecording) {
-      return _VoiceRecordingStopButton(
+    if (isRecording || isAnalyzing) {
+      return VoiceRecordingStopButton(
+        isAnalyzing: isAnalyzing,
         onStop: () {
-          ref.read(voiceRecordingProvider.notifier).stopRecording(context: context);
+          if (!isAnalyzing) {
+            ref.read(voiceRecordingProvider.notifier).stopRecording(context: context);
+          }
         },
       );
     }
@@ -238,17 +237,24 @@ class _HomeSpeedDialFabState extends ConsumerState<HomeSpeedDialFab>
   }
 }
 
-class _VoiceRecordingStopButton extends StatefulWidget {
-  const _VoiceRecordingStopButton({required this.onStop});
+class VoiceRecordingStopButton extends StatefulWidget {
+  const VoiceRecordingStopButton({
+    super.key,
+    required this.onStop,
+    this.subtitle,
+    this.isAnalyzing = false,
+  });
 
   final VoidCallback onStop;
+  final String? subtitle;
+  final bool isAnalyzing;
 
   @override
-  State<_VoiceRecordingStopButton> createState() =>
+  State<VoiceRecordingStopButton> createState() =>
       _VoiceRecordingStopButtonState();
 }
 
-class _VoiceRecordingStopButtonState extends State<_VoiceRecordingStopButton>
+class _VoiceRecordingStopButtonState extends State<VoiceRecordingStopButton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _pulseController;
 
@@ -279,8 +285,9 @@ class _VoiceRecordingStopButtonState extends State<_VoiceRecordingStopButton>
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Live feedback card with timer and amplitude level (no live text)
-        Consumer(
+        // Live feedback card with timer and amplitude level (hidden when analyzing: NO text)
+        if (!widget.isAnalyzing)
+          Consumer(
           builder: (context, ref, _) {
             final durationSeconds = ref.watch(voiceRecordingDurationProvider);
             final amplitude = ref.watch(voiceAmplitudeProvider);
@@ -392,10 +399,10 @@ class _VoiceRecordingStopButtonState extends State<_VoiceRecordingStopButton>
                     ],
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    'احكِ مصاريفك بالعامية بحرية',
+                  Text(
+                    widget.subtitle ?? 'احكِ مصاريفك بالعامية بحرية',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: AppColors.secondaryText,
                       fontSize: 12.0,
                     ),
@@ -485,12 +492,22 @@ class _VoiceRecordingStopButtonState extends State<_VoiceRecordingStopButton>
                     widget.onStop();
                   },
                   customBorder: const CircleBorder(),
-                  child: const Center(
-                    child: Icon(
-                      Icons.stop_rounded,
-                      color: Colors.white,
-                      size: 32.0,
-                    ),
+                  child: Center(
+                    child: widget.isAnalyzing
+                        ? const SizedBox(
+                            width: 24.0,
+                            height: 24.0,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(
+                            Icons.stop_rounded,
+                            color: Colors.white,
+                            size: 32.0,
+                          ),
                   ),
                 ),
               ),
@@ -546,14 +563,14 @@ class _ActionCircleButton extends StatelessWidget {
   }
 }
 
-class _VoiceAnalyzingCard extends StatefulWidget {
-  const _VoiceAnalyzingCard();
+class VoiceAnalyzingCard extends StatefulWidget {
+  const VoiceAnalyzingCard({super.key});
 
   @override
-  State<_VoiceAnalyzingCard> createState() => _VoiceAnalyzingCardState();
+  State<VoiceAnalyzingCard> createState() => _VoiceAnalyzingCardState();
 }
 
-class _VoiceAnalyzingCardState extends State<_VoiceAnalyzingCard>
+class _VoiceAnalyzingCardState extends State<VoiceAnalyzingCard>
     with SingleTickerProviderStateMixin {
   late final AnimationController _animController;
 

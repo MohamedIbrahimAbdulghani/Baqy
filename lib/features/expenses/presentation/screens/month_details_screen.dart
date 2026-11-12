@@ -387,6 +387,14 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                             final iconData = CategoryIconHelper.getIcon(
                               item.category.icon,
                             );
+                            final categoryColor = CategoryIconHelper.parseColor(
+                              item.category.color,
+                            );
+                            final isSavings = item.category.name == 'تحويش' ||
+                                item.category.id == -1;
+                            final String dayAmountText = amountEgp < 0
+                                ? '-${NumberFormatter.formatCurrency(amountEgp.abs())} جنيه'
+                                : '${NumberFormatter.formatCurrency(amountEgp)} جنيه';
 
                             return Container(
                               margin: const EdgeInsets.only(bottom: 12.0),
@@ -426,13 +434,17 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                                               width: 44.0,
                                               height: 44.0,
                                               decoration: BoxDecoration(
-                                                color: AppColors.lightGreen,
+                                                color: isSavings
+                                                    ? categoryColor.withValues(alpha: 0.15)
+                                                    : AppColors.lightGreen,
                                                 borderRadius:
                                                     BorderRadius.circular(12.0),
                                               ),
                                               child: Icon(
                                                 iconData,
-                                                color: AppColors.mainGreen,
+                                                color: isSavings
+                                                    ? categoryColor
+                                                    : AppColors.mainGreen,
                                                 size: 22.0,
                                               ),
                                             ),
@@ -476,7 +488,7 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Text(
-                                              '${NumberFormatter.formatCurrency(amountEgp)} جنيه',
+                                              dayAmountText,
                                               style: const TextStyle(
                                                 fontFamily: AppTheme.fontFamily,
                                                 fontSize: 16.0,
