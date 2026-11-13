@@ -1748,6 +1748,15 @@ class $GoalsTable extends Goals with TableInfo<$GoalsTable, GoalData> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _iconMeta = const VerificationMeta('icon');
+  @override
+  late final GeneratedColumn<String> icon = GeneratedColumn<String>(
+    'icon',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1755,6 +1764,7 @@ class $GoalsTable extends Goals with TableInfo<$GoalsTable, GoalData> {
     targetAmount,
     monthlySaving,
     createdAt,
+    icon,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1809,6 +1819,12 @@ class $GoalsTable extends Goals with TableInfo<$GoalsTable, GoalData> {
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('icon')) {
+      context.handle(
+        _iconMeta,
+        icon.isAcceptableOrUnknown(data['icon']!, _iconMeta),
+      );
+    }
     return context;
   }
 
@@ -1838,6 +1854,10 @@ class $GoalsTable extends Goals with TableInfo<$GoalsTable, GoalData> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      icon: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}icon'],
+      ),
     );
   }
 
@@ -1853,12 +1873,14 @@ class GoalData extends DataClass implements Insertable<GoalData> {
   final int targetAmount;
   final int monthlySaving;
   final DateTime createdAt;
+  final String? icon;
   const GoalData({
     required this.id,
     required this.name,
     required this.targetAmount,
     required this.monthlySaving,
     required this.createdAt,
+    this.icon,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1868,6 +1890,9 @@ class GoalData extends DataClass implements Insertable<GoalData> {
     map['target_amount'] = Variable<int>(targetAmount);
     map['monthly_saving'] = Variable<int>(monthlySaving);
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || icon != null) {
+      map['icon'] = Variable<String>(icon);
+    }
     return map;
   }
 
@@ -1878,6 +1903,7 @@ class GoalData extends DataClass implements Insertable<GoalData> {
       targetAmount: Value(targetAmount),
       monthlySaving: Value(monthlySaving),
       createdAt: Value(createdAt),
+      icon: icon == null && nullToAbsent ? const Value.absent() : Value(icon),
     );
   }
 
@@ -1892,6 +1918,7 @@ class GoalData extends DataClass implements Insertable<GoalData> {
       targetAmount: serializer.fromJson<int>(json['targetAmount']),
       monthlySaving: serializer.fromJson<int>(json['monthlySaving']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      icon: serializer.fromJson<String?>(json['icon']),
     );
   }
   @override
@@ -1903,6 +1930,7 @@ class GoalData extends DataClass implements Insertable<GoalData> {
       'targetAmount': serializer.toJson<int>(targetAmount),
       'monthlySaving': serializer.toJson<int>(monthlySaving),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'icon': serializer.toJson<String?>(icon),
     };
   }
 
@@ -1912,12 +1940,14 @@ class GoalData extends DataClass implements Insertable<GoalData> {
     int? targetAmount,
     int? monthlySaving,
     DateTime? createdAt,
+    Value<String?> icon = const Value.absent(),
   }) => GoalData(
     id: id ?? this.id,
     name: name ?? this.name,
     targetAmount: targetAmount ?? this.targetAmount,
     monthlySaving: monthlySaving ?? this.monthlySaving,
     createdAt: createdAt ?? this.createdAt,
+    icon: icon.present ? icon.value : this.icon,
   );
   GoalData copyWithCompanion(GoalsCompanion data) {
     return GoalData(
@@ -1930,6 +1960,7 @@ class GoalData extends DataClass implements Insertable<GoalData> {
           ? data.monthlySaving.value
           : this.monthlySaving,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      icon: data.icon.present ? data.icon.value : this.icon,
     );
   }
 
@@ -1940,14 +1971,15 @@ class GoalData extends DataClass implements Insertable<GoalData> {
           ..write('name: $name, ')
           ..write('targetAmount: $targetAmount, ')
           ..write('monthlySaving: $monthlySaving, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('icon: $icon')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode =>
-      Object.hash(id, name, targetAmount, monthlySaving, createdAt);
+      Object.hash(id, name, targetAmount, monthlySaving, createdAt, icon);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1956,7 +1988,8 @@ class GoalData extends DataClass implements Insertable<GoalData> {
           other.name == this.name &&
           other.targetAmount == this.targetAmount &&
           other.monthlySaving == this.monthlySaving &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.icon == this.icon);
 }
 
 class GoalsCompanion extends UpdateCompanion<GoalData> {
@@ -1965,12 +1998,14 @@ class GoalsCompanion extends UpdateCompanion<GoalData> {
   final Value<int> targetAmount;
   final Value<int> monthlySaving;
   final Value<DateTime> createdAt;
+  final Value<String?> icon;
   const GoalsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.targetAmount = const Value.absent(),
     this.monthlySaving = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.icon = const Value.absent(),
   });
   GoalsCompanion.insert({
     this.id = const Value.absent(),
@@ -1978,6 +2013,7 @@ class GoalsCompanion extends UpdateCompanion<GoalData> {
     required int targetAmount,
     required int monthlySaving,
     required DateTime createdAt,
+    this.icon = const Value.absent(),
   }) : name = Value(name),
        targetAmount = Value(targetAmount),
        monthlySaving = Value(monthlySaving),
@@ -1988,6 +2024,7 @@ class GoalsCompanion extends UpdateCompanion<GoalData> {
     Expression<int>? targetAmount,
     Expression<int>? monthlySaving,
     Expression<DateTime>? createdAt,
+    Expression<String>? icon,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1995,6 +2032,7 @@ class GoalsCompanion extends UpdateCompanion<GoalData> {
       if (targetAmount != null) 'target_amount': targetAmount,
       if (monthlySaving != null) 'monthly_saving': monthlySaving,
       if (createdAt != null) 'created_at': createdAt,
+      if (icon != null) 'icon': icon,
     });
   }
 
@@ -2004,6 +2042,7 @@ class GoalsCompanion extends UpdateCompanion<GoalData> {
     Value<int>? targetAmount,
     Value<int>? monthlySaving,
     Value<DateTime>? createdAt,
+    Value<String?>? icon,
   }) {
     return GoalsCompanion(
       id: id ?? this.id,
@@ -2011,6 +2050,7 @@ class GoalsCompanion extends UpdateCompanion<GoalData> {
       targetAmount: targetAmount ?? this.targetAmount,
       monthlySaving: monthlySaving ?? this.monthlySaving,
       createdAt: createdAt ?? this.createdAt,
+      icon: icon ?? this.icon,
     );
   }
 
@@ -2032,6 +2072,9 @@ class GoalsCompanion extends UpdateCompanion<GoalData> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (icon.present) {
+      map['icon'] = Variable<String>(icon.value);
+    }
     return map;
   }
 
@@ -2042,7 +2085,8 @@ class GoalsCompanion extends UpdateCompanion<GoalData> {
           ..write('name: $name, ')
           ..write('targetAmount: $targetAmount, ')
           ..write('monthlySaving: $monthlySaving, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('icon: $icon')
           ..write(')'))
         .toString();
   }
@@ -4938,6 +4982,7 @@ typedef $$GoalsTableCreateCompanionBuilder =
       required int targetAmount,
       required int monthlySaving,
       required DateTime createdAt,
+      Value<String?> icon,
     });
 typedef $$GoalsTableUpdateCompanionBuilder =
     GoalsCompanion Function({
@@ -4946,6 +4991,7 @@ typedef $$GoalsTableUpdateCompanionBuilder =
       Value<int> targetAmount,
       Value<int> monthlySaving,
       Value<DateTime> createdAt,
+      Value<String?> icon,
     });
 
 final class $$GoalsTableReferences
@@ -5001,6 +5047,11 @@ class $$GoalsTableFilterComposer extends Composer<_$AppDatabase, $GoalsTable> {
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get icon => $composableBuilder(
+    column: $table.icon,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5063,6 +5114,11 @@ class $$GoalsTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get icon => $composableBuilder(
+    column: $table.icon,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$GoalsTableAnnotationComposer
@@ -5092,6 +5148,9 @@ class $$GoalsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get icon =>
+      $composableBuilder(column: $table.icon, builder: (column) => column);
 
   Expression<T> goalSavingsRefs<T extends Object>(
     Expression<T> Function($$GoalSavingsTableAnnotationComposer a) f,
@@ -5152,12 +5211,14 @@ class $$GoalsTableTableManager
                 Value<int> targetAmount = const Value.absent(),
                 Value<int> monthlySaving = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<String?> icon = const Value.absent(),
               }) => GoalsCompanion(
                 id: id,
                 name: name,
                 targetAmount: targetAmount,
                 monthlySaving: monthlySaving,
                 createdAt: createdAt,
+                icon: icon,
               ),
           createCompanionCallback:
               ({
@@ -5166,12 +5227,14 @@ class $$GoalsTableTableManager
                 required int targetAmount,
                 required int monthlySaving,
                 required DateTime createdAt,
+                Value<String?> icon = const Value.absent(),
               }) => GoalsCompanion.insert(
                 id: id,
                 name: name,
                 targetAmount: targetAmount,
                 monthlySaving: monthlySaving,
                 createdAt: createdAt,
+                icon: icon,
               ),
           withReferenceMapper: (p0) => p0
               .map(

@@ -6,6 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import '../../../../core/utils/category_icon_helper.dart';
 import '../../../../core/utils/category_matcher.dart';
+import '../../../../core/utils/goal_icon_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../domain/models/category_item.dart';
 import '../../domain/models/parsed_expense.dart';
@@ -44,6 +45,27 @@ class AudioParseResult {
   @override
   String toString() =>
       'AudioParseResult(transcript: "$transcript", operations: ${operations.length}, time: ${requestDurationMs}ms)';
+}
+
+/// Result object returned by [GeminiExpenseParser.parseGoalAudio].
+class GoalAudioParseResult {
+  final String transcript;
+  final String goalName;
+  final int targetAmountEgp;
+  final String icon;
+  final int requestDurationMs;
+  final int fileSizeBytes;
+  final String rawResponse;
+
+  const GoalAudioParseResult({
+    required this.transcript,
+    required this.goalName,
+    required this.targetAmountEgp,
+    required this.icon,
+    this.requestDurationMs = 0,
+    this.fileSizeBytes = 0,
+    this.rawResponse = '',
+  });
 }
 
 /// Gemini AI parser for colloquial Egyptian Arabic expense statements
@@ -205,6 +227,39 @@ class GeminiExpenseParser {
     'items': audioResponseSchema['properties']['operations']['items'],
   };
 
+  /// Response schema for goal voice utterances
+  static final Map<String, dynamic> goalAudioResponseSchema = {
+    'type': 'OBJECT',
+    'description': 'استخراج هدف التحويش بدقة',
+    'properties': {
+      'transcript': {
+        'type': 'STRING',
+        'description': 'النص المسموع حرفيًا',
+      },
+      'goal_name': {
+        'type': 'STRING',
+        'description': 'اسم الهدف (الشيء المطلوب شراؤه أو ادخار المال لأجله)',
+      },
+      'target_amount_egp': {
+        'type': 'NUMBER',
+        'description': 'المبلغ المطلوب للهدف بالجنيه المصري',
+      },
+      'icon': {
+        'type': 'STRING',
+        'enum': GoalIconHelper.allowedKeys,
+        'description': 'مفتاح الأيقونة من القائمة المسموحة فقط',
+      },
+    },
+    'required': ['transcript', 'goal_name', 'target_amount_egp', 'icon'],
+  };
+
+  /// Logging failure helper adhering to debug-only and zero-financial-data-logging rule
+  static void logGeminiFailure(String type, int? statusCode) {
+    if (kDebugMode) {
+      debugPrint('[VOICE_DEBUG] Gemini failure TYPE: $type, HTTP: $statusCode');
+    }
+  }
+
   GeminiExpenseParser({
     http.Client? client,
     String? apiKey,
@@ -343,11 +398,10 @@ class GeminiExpenseParser {
     );
 
     final base64Audio = base64Encode(fileBytes);
-    final primary = activeModelName;
     final candidateModels = <String>[
-      primary,
-      if (primary != 'gemini-3.8-flash') 'gemini-3.8-flash',
-      if (primary != 'gemini-3.5-flash-lite') 'gemini-3.5-flash-lite',
+      'gemini-3.6-flash',
+      'gemini-3.8-flash',
+      'gemini-3.5-flash-lite',
     ];
 
     final requestPayload = {
@@ -376,6 +430,10 @@ class GeminiExpenseParser {
         'temperature': 0,
         'responseMimeType': 'application/json',
         'responseSchema': audioResponseSchema,
+        'maxOutputTokens': 8192,
+        'thinkingConfig': {
+          'thinkingBudget': 0,
+        },
       }
     };
 
@@ -391,147 +449,77 @@ class GeminiExpenseParser {
       final stopwatch = Stopwatch()..start();
 
       try {
-        if (kDebugMode) {
-          debugPrint(
-            '[AUDIO_DEBUG] Sending request to Gemini (model: $currentModel)...',
-          );
-        }
-
         final response = await _client
             .post(
               url,
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode(requestPayload),
             )
-            .timeout(const Duration(seconds: 4));
+            .timeout(const Duration(seconds: 6));
 
         stopwatch.stop();
         final latencyMs = stopwatch.elapsedMilliseconds;
         lastStatusCode = response.statusCode;
 
-        // Print model used and status
-        if (kDebugMode) {
-          debugPrint(
-            '[AUDIO_DEBUG] Model: $currentModel, Status: ${response.statusCode} (${latencyMs}ms)',
-          );
-        }
-
         if (response.statusCode != 200) {
-          String errCategory = 'unknown';
-          String errCode = '${response.statusCode}';
-          try {
-            final errBody = jsonDecode(response.body);
-            if (errBody is Map && errBody.containsKey('error')) {
-              final errMap = errBody['error'];
-              errCategory = errMap['status']?.toString() ?? 'unknown';
-              errCode = errMap['code']?.toString() ?? '${response.statusCode}';
-            }
-          } catch (_) {}
-
           if (response.statusCode == 429) {
+            logGeminiFailure('429', 429);
             lastAudioError = GeminiAudioErrorType.rateLimited;
-          } else if (response.statusCode == 503 ||
-              (response.statusCode >= 500 && response.statusCode < 600)) {
+          } else if (response.statusCode >= 500 && response.statusCode < 600) {
+            logGeminiFailure('5xx', response.statusCode);
             lastAudioError = GeminiAudioErrorType.serverError;
-          } else if (response.statusCode == 404) {
-            lastAudioError = GeminiAudioErrorType.modelNotFound;
-          } else if (response.statusCode == 401 ||
-              response.statusCode == 403) {
-            lastAudioError = GeminiAudioErrorType.invalidKey;
-          } else if (response.statusCode == 400) {
-            lastAudioError = GeminiAudioErrorType.badRequest;
           } else {
-            lastAudioError = GeminiAudioErrorType.unknown;
+            logGeminiFailure('network', response.statusCode);
+            lastAudioError = GeminiAudioErrorType.network;
           }
 
-          if (kDebugMode) {
-            debugPrint(
-              '[AUDIO_DEBUG] ErrorType: $lastAudioError, HTTP: ${response.statusCode}, GeminiError: $errCategory ($errCode)',
-            );
-          }
-
-          if (response.statusCode == 429) {
-            // Never send more than 1 request per button press on the same model if 429.
-            // Try next model immediately.
-            final hasNext = mIndex + 1 < candidateModels.length;
-            if (hasNext) {
-              if (kDebugMode) {
-                debugPrint(
-                  '[AUDIO_DEBUG] 429 on $currentModel. Moving immediately to next model: ${candidateModels[mIndex + 1]}',
-                );
-              }
-              continue;
-            }
-            break;
-          } else if (response.statusCode == 503 ||
-              (response.statusCode >= 500 && response.statusCode < 600)) {
-            // On 503 / 5xx: Try next model in sequence
-            final hasNext = mIndex + 1 < candidateModels.length;
-            if (hasNext) {
-              if (kDebugMode) {
-                debugPrint(
-                  '[AUDIO_DEBUG] Server error (${response.statusCode}) on $currentModel. Moving to next model: ${candidateModels[mIndex + 1]}',
-                );
-              }
-              continue;
-            }
-            break;
-          } else if (response.statusCode == 404) {
-            final hasNext = mIndex + 1 < candidateModels.length;
-            if (hasNext) {
-              continue;
-            }
-            break;
-          } else if (response.statusCode == 401 ||
-              response.statusCode == 403) {
-            break;
-          } else if (response.statusCode == 400) {
-            final hasNext = mIndex + 1 < candidateModels.length;
-            if (hasNext) {
-              continue;
-            }
-            break;
-          } else {
-            break;
-          }
+          if (mIndex + 1 < candidateModels.length) continue;
+          break;
         }
 
-        final jsonBody = jsonDecode(response.body) as Map<String, dynamic>;
+        Map<String, dynamic> jsonBody;
+        try {
+          jsonBody = jsonDecode(response.body) as Map<String, dynamic>;
+        } catch (_) {
+          logGeminiFailure('invalid JSON', response.statusCode);
+          lastAudioError = GeminiAudioErrorType.unknown;
+          if (mIndex + 1 < candidateModels.length) continue;
+          break;
+        }
+
         final candidates = jsonBody['candidates'] as List<dynamic>?;
         if (candidates == null || candidates.isEmpty) {
-          if (kDebugMode) {
-            debugPrint('[AUDIO_DEBUG] [ERROR] No candidates returned by Gemini');
-          }
+          logGeminiFailure('invalid JSON', response.statusCode);
           lastAudioError = GeminiAudioErrorType.unknown;
-          return null;
+          if (mIndex + 1 < candidateModels.length) continue;
+          break;
         }
 
         final content = candidates.first['content'] as Map<String, dynamic>?;
         final parts = content?['parts'] as List<dynamic>?;
         final rawText = parts?.first?['text'] as String?;
         if (rawText == null || rawText.trim().isEmpty) {
-          if (kDebugMode) {
-            debugPrint(
-              '[AUDIO_DEBUG] [ERROR] Empty text part in candidate content',
-            );
-          }
+          logGeminiFailure('invalid JSON', response.statusCode);
           lastAudioError = GeminiAudioErrorType.unknown;
-          return null;
+          if (mIndex + 1 < candidateModels.length) continue;
+          break;
         }
 
-        if (kDebugMode) {
-          debugPrint('[AUDIO_DEBUG] Raw Gemini response: $rawText');
+        dynamic decoded;
+        try {
+          decoded = jsonDecode(rawText);
+        } catch (_) {
+          logGeminiFailure('invalid JSON', response.statusCode);
+          lastAudioError = GeminiAudioErrorType.unknown;
+          if (mIndex + 1 < candidateModels.length) continue;
+          break;
         }
 
-        final dynamic decoded = jsonDecode(rawText);
         if (decoded is! Map<String, dynamic>) {
-          if (kDebugMode) {
-            debugPrint(
-              '[AUDIO_DEBUG] [ERROR] Decoded response is not a JSON object',
-            );
-          }
+          logGeminiFailure('invalid JSON', response.statusCode);
           lastAudioError = GeminiAudioErrorType.unknown;
-          return null;
+          if (mIndex + 1 < candidateModels.length) continue;
+          break;
         }
 
         final rawTranscript = decoded['transcript'] as String? ?? '';
@@ -552,15 +540,6 @@ class GeminiExpenseParser {
           defaultNames: effectiveCategories,
         );
 
-        if (kDebugMode) {
-          debugPrint(
-            '[AUDIO_DEBUG] Final parsed result: transcript="$rawTranscript", operations=${verifiedExpenses.length}',
-          );
-          for (final op in verifiedExpenses) {
-            debugPrint('[AUDIO_DEBUG] -> $op');
-          }
-        }
-
         result = AudioParseResult(
           transcript: rawTranscript,
           operations: verifiedExpenses,
@@ -570,44 +549,231 @@ class GeminiExpenseParser {
         );
         lastAudioError = GeminiAudioErrorType.none;
         break; // Successfully completed!
-      } on SocketException catch (e) {
+      } on SocketException catch (_) {
         stopwatch.stop();
+        logGeminiFailure('network', null);
         lastAudioError = GeminiAudioErrorType.network;
-        if (kDebugMode) {
-          debugPrint(
-            '[AUDIO_DEBUG] Model: $currentModel, Status: SocketException ($e)',
-          );
-        }
         if (mIndex + 1 < candidateModels.length) continue;
         break;
-      } on TimeoutException catch (e) {
+      } on TimeoutException catch (_) {
         stopwatch.stop();
+        logGeminiFailure('timeout', null);
         lastAudioError = GeminiAudioErrorType.network;
-        if (kDebugMode) {
-          debugPrint(
-            '[AUDIO_DEBUG] Model: $currentModel, Status: TimeoutException ($e)',
-          );
-        }
         if (mIndex + 1 < candidateModels.length) continue;
         break;
-      } on http.ClientException catch (e) {
+      } on http.ClientException catch (_) {
         stopwatch.stop();
+        logGeminiFailure('network', null);
         lastAudioError = GeminiAudioErrorType.network;
-        if (kDebugMode) {
-          debugPrint(
-            '[AUDIO_DEBUG] Model: $currentModel, Status: ClientException ($e)',
-          );
-        }
         if (mIndex + 1 < candidateModels.length) continue;
         break;
-      } catch (e, st) {
+      } catch (_) {
         stopwatch.stop();
+        logGeminiFailure('invalid JSON', lastStatusCode);
         lastAudioError = GeminiAudioErrorType.unknown;
-        if (kDebugMode) {
-          debugPrint(
-            '[AUDIO_DEBUG] Model: $currentModel, Status: Exception ($e)\n$st',
-          );
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  /// Builds the system prompt for goal audio analysis
+  static String buildGoalSystemPrompt() {
+    final keysList = GoalIconHelper.allowedKeys.join(', ');
+    return '''
+أنت مساعد صوتي ذكي لتطبيق باقي في مصر.
+وظيفتك تحليل التسجيل الصوتي بالعامية المصرية لاستخراج:
+1. transcript: النص الحرفي المسموع بدقة.
+2. goal_name: اسم الشيء أو الهدف المراد ادخار المال له (مثال: ايفون، ماك بوك، عربية، مصيف، شقة).
+3. target_amount_egp: المبلغ الإجمالي المطلوب للهدف كرقم صحيح بالجنيه المصري (مثال: مية الف -> 100000).
+4. icon: مفتاح الأيقونة المناسبة للهدف من هذه القائمة الحصرية فقط:
+$keysList
+
+قواعد صارمة:
+- لا تختر أي مفتاح غير موجود في القائمة المسموحة.
+- إذا لم تكن هناك أيقونة واضحة، اختر "flag".
+- لا تختر "savings" إلا لأهداف الطوارئ أو الادخار العام الصريح.
+- المبلغ يجب أن يكون مذكورًا في التسجيل. إذا لم يذكر مبلغ، اجعل target_amount_egp يساوي 0.
+''';
+  }
+
+  /// Sends a continuous audio file to Gemini to extract a goal, amount, and icon.
+  Future<GoalAudioParseResult?> parseGoalAudio(File audioFile) async {
+    final key = apiKey;
+    if (key == null || key.isEmpty) return null;
+    if (!await audioFile.exists()) return null;
+
+    final fileBytes = await audioFile.readAsBytes();
+    final fileSizeBytes = fileBytes.length;
+    final base64Audio = base64Encode(fileBytes);
+    final candidateModels = <String>[
+      'gemini-3.6-flash',
+      'gemini-3.8-flash',
+      'gemini-3.5-flash-lite',
+    ];
+
+    final requestPayload = {
+      'systemInstruction': {
+        'parts': [
+          {'text': buildGoalSystemPrompt()}
+        ]
+      },
+      'contents': [
+        {
+          'role': 'user',
+          'parts': [
+            {
+              'inline_data': {
+                'mime_type': 'audio/mp4',
+                'data': base64Audio,
+              }
+            },
+            {
+              'text': 'حلّل هدف التحويش ده.',
+            }
+          ]
         }
+      ],
+      'generationConfig': {
+        'temperature': 0,
+        'responseMimeType': 'application/json',
+        'responseSchema': goalAudioResponseSchema,
+        'maxOutputTokens': 2048,
+        'thinkingConfig': {
+          'thinkingBudget': 0,
+        },
+      }
+    };
+
+    lastAudioError = GeminiAudioErrorType.none;
+    lastStatusCode = null;
+    GoalAudioParseResult? result;
+
+    for (int mIndex = 0; mIndex < candidateModels.length; mIndex++) {
+      final currentModel = candidateModels[mIndex];
+      final url = Uri.parse('$baseUrl/$currentModel:generateContent?key=$key');
+      final stopwatch = Stopwatch()..start();
+
+      try {
+        final response = await _client
+            .post(
+              url,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode(requestPayload),
+            )
+            .timeout(const Duration(seconds: 6));
+
+        stopwatch.stop();
+        final latencyMs = stopwatch.elapsedMilliseconds;
+        lastStatusCode = response.statusCode;
+
+        if (response.statusCode != 200) {
+          if (response.statusCode == 429) {
+            logGeminiFailure('429', 429);
+            lastAudioError = GeminiAudioErrorType.rateLimited;
+          } else if (response.statusCode >= 500 && response.statusCode < 600) {
+            logGeminiFailure('5xx', response.statusCode);
+            lastAudioError = GeminiAudioErrorType.serverError;
+          } else {
+            logGeminiFailure('network', response.statusCode);
+            lastAudioError = GeminiAudioErrorType.network;
+          }
+          if (mIndex + 1 < candidateModels.length) continue;
+          break;
+        }
+
+        Map<String, dynamic> jsonBody;
+        try {
+          jsonBody = jsonDecode(response.body) as Map<String, dynamic>;
+        } catch (_) {
+          logGeminiFailure('invalid JSON', response.statusCode);
+          if (mIndex + 1 < candidateModels.length) continue;
+          break;
+        }
+
+        final candidates = jsonBody['candidates'] as List<dynamic>?;
+        if (candidates == null || candidates.isEmpty) {
+          logGeminiFailure('invalid JSON', response.statusCode);
+          if (mIndex + 1 < candidateModels.length) continue;
+          break;
+        }
+
+        final content = candidates.first['content'] as Map<String, dynamic>?;
+        final parts = content?['parts'] as List<dynamic>?;
+        final rawText = parts?.first?['text'] as String?;
+        if (rawText == null || rawText.trim().isEmpty) {
+          logGeminiFailure('invalid JSON', response.statusCode);
+          if (mIndex + 1 < candidateModels.length) continue;
+          break;
+        }
+
+        dynamic decoded;
+        try {
+          decoded = jsonDecode(rawText);
+        } catch (_) {
+          logGeminiFailure('invalid JSON', response.statusCode);
+          if (mIndex + 1 < candidateModels.length) continue;
+          break;
+        }
+
+        if (decoded is! Map<String, dynamic>) {
+          logGeminiFailure('invalid JSON', response.statusCode);
+          if (mIndex + 1 < candidateModels.length) continue;
+          break;
+        }
+
+        final rawTranscript = decoded['transcript']?.toString() ?? '';
+        final goalName = decoded['goal_name']?.toString() ?? '';
+        final targetAmountNum = decoded['target_amount_egp'];
+        final rawIcon = decoded['icon']?.toString();
+
+        final targetAmountEgp =
+            targetAmountNum is num ? targetAmountNum.round() : 0;
+        final resolvedIcon = GoalIconHelper.validateOrResolve(
+          rawIcon,
+          goalName: goalName,
+        );
+
+        if (targetAmountEgp <= 0 || goalName.trim().isEmpty) {
+          logGeminiFailure('invalid JSON', response.statusCode);
+          if (mIndex + 1 < candidateModels.length) continue;
+          break;
+        }
+
+        result = GoalAudioParseResult(
+          transcript: rawTranscript,
+          goalName: goalName.trim(),
+          targetAmountEgp: targetAmountEgp,
+          icon: resolvedIcon,
+          requestDurationMs: latencyMs,
+          fileSizeBytes: fileSizeBytes,
+          rawResponse: rawText,
+        );
+        lastAudioError = GeminiAudioErrorType.none;
+        break;
+      } on SocketException catch (_) {
+        stopwatch.stop();
+        logGeminiFailure('network', null);
+        lastAudioError = GeminiAudioErrorType.network;
+        if (mIndex + 1 < candidateModels.length) continue;
+        break;
+      } on TimeoutException catch (_) {
+        stopwatch.stop();
+        logGeminiFailure('timeout', null);
+        lastAudioError = GeminiAudioErrorType.network;
+        if (mIndex + 1 < candidateModels.length) continue;
+        break;
+      } on http.ClientException catch (_) {
+        stopwatch.stop();
+        logGeminiFailure('network', null);
+        lastAudioError = GeminiAudioErrorType.network;
+        if (mIndex + 1 < candidateModels.length) continue;
+        break;
+      } catch (_) {
+        stopwatch.stop();
+        logGeminiFailure('invalid JSON', lastStatusCode);
+        lastAudioError = GeminiAudioErrorType.unknown;
         break;
       }
     }

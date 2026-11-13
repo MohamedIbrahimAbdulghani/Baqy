@@ -88,8 +88,7 @@ void main() {
       );
 
       // Pump to allow reactive streams to deliver new data
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pumpAndSettle();
 
       // In MonthDetailsScreen:
       // Month chart & Day list must reflect the new total of 220 EGP (22,000 piastres)

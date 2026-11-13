@@ -18,6 +18,7 @@ abstract class GoalRepository {
     required String name,
     required int targetAmount, // in piastres
     int monthlySaving = 0, // in piastres
+    String? icon,
   });
 
   /// Updates monthly saving for a goal. Validates amount.
@@ -26,12 +27,13 @@ abstract class GoalRepository {
     required int monthlySaving, // in piastres
   });
 
-  /// Updates goal name, target amount, and optionally monthly saving.
+  /// Updates goal name, target amount, and optionally monthly saving and icon.
   Future<void> updateGoal({
     required int id,
     required String name,
     required int targetAmount, // in piastres
     int? monthlySaving, // in piastres
+    String? icon,
   });
 
   /// Deletes a goal and all its savings within a database transaction.
@@ -50,6 +52,9 @@ abstract class GoalRepository {
     required int amount, // in piastres (positive number)
     DateTime? withdrawnAt,
   });
+
+  /// Deletes a specific goal saving (used for Undo / تراجع).
+  Future<void> deleteGoalSaving(int id);
 
   /// Fetches total saved amount for a goal in piastres.
   Future<int> getTotalSavedForGoal(int goalId);

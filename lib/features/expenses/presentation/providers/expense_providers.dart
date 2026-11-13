@@ -13,6 +13,7 @@ import '../../../../core/database/app_database.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/category_matcher.dart';
+import '../../../../core/utils/goal_icon_helper.dart';
 import '../../data/repositories/expense_repository_impl.dart';
 import '../../data/services/audio_recording_service.dart';
 import '../../data/services/gemini_expense_parser.dart';
@@ -715,6 +716,9 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     if (!state) return;
     final totalSw = Stopwatch()..start();
     final activeContext = context ?? _currentContext;
+    final messenger = (activeContext != null && activeContext.mounted)
+        ? ScaffoldMessenger.maybeOf(activeContext)
+        : null;
 
     // Light haptic feedback on stop
     HapticFeedback.lightImpact();
@@ -735,9 +739,14 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     state = false;
 
     final service = _audioService;
-    if (service == null) return;
+    final isFakeTest =
+        _speechService != null && _speechService is! SpeechToTextServiceImpl;
+    if (service == null && !isFakeTest) return;
 
-    final savedPath = await service.stopRecording();
+    String? savedPath;
+    if (service != null) {
+      savedPath = await service.stopRecording();
+    }
     final stopToRecognizeMs = totalSw.elapsedMilliseconds;
     final capturedSpeech = '$_committedText $_currentPartialText'.trim();
     // Buffers cleared at end of session
@@ -751,6 +760,7 @@ class VoiceRecordingNotifier extends Notifier<bool> {
         context: (activeContext != null && activeContext.mounted)
             ? activeContext
             : null,
+        messenger: messenger,
         totalSw: totalSw,
         stopToRecognizeMs: stopToRecognizeMs,
       );
@@ -806,41 +816,42 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     String? savedPath,
     required String fallbackSpeechText,
     BuildContext? context,
+    ScaffoldMessengerState? messenger,
     Stopwatch? totalSw,
     int stopToRecognizeMs = 0,
   }) async {
     final activeContext = context ?? _currentContext;
+    final activeMessenger = messenger ??
+        (activeContext != null && activeContext.mounted
+            ? ScaffoldMessenger.maybeOf(activeContext)
+            : null);
     ref.read(voiceIsAnalyzingProvider.notifier).setVal(true);
 
     ParsedGoalResult? goalResult;
     int geminiRequestMs = 0;
     final geminiSw = Stopwatch()..start();
 
+    final isFakeTest =
+        _speechService != null && _speechService is! SpeechToTextServiceImpl;
+
     // 1. Try Gemini Audio Parser if file exists and has content
-    if (savedPath != null) {
+    if (!isFakeTest && savedPath != null) {
       final file = File(savedPath);
       if (await file.exists() && await file.length() >= 100) {
         final parser = ref.read(geminiExpenseParserProvider);
         if (parser.apiKey != null && parser.apiKey!.isNotEmpty) {
           try {
-            final result = await parser.parseAudio(file);
+            final result = await parser.parseGoalAudio(file);
             geminiRequestMs = geminiSw.elapsedMilliseconds;
-            if (result != null) {
-              if (result.transcript.isNotEmpty) {
-                goalResult = EgyptianGoalParser.parse(result.transcript);
-              }
-              if (goalResult == null && result.operations.isNotEmpty) {
-                final op = result.operations.first;
-                if (op.amount != null &&
-                    op.amount! > 0 &&
-                    op.description.isNotEmpty &&
-                    !EgyptianGoalParser.isCategoryName(op.description)) {
-                  goalResult = ParsedGoalResult(
-                    name: GoalRepositoryImpl.sanitizeName(op.description),
-                    targetAmount: op.amount!,
-                  );
-                }
-              }
+            if (result != null && result.targetAmountEgp > 0) {
+              goalResult = ParsedGoalResult(
+                name: GoalRepositoryImpl.sanitizeName(result.goalName),
+                targetAmount: result.targetAmountEgp,
+                icon: GoalIconHelper.validateOrResolve(
+                  result.icon,
+                  goalName: result.goalName,
+                ),
+              );
             }
           } catch (_) {}
         }
@@ -867,12 +878,11 @@ class VoiceRecordingNotifier extends Notifier<bool> {
 
     // Validation: If no amount found, save nothing and show snackbar above button
     if (goalResult == null || goalResult.targetAmount <= 0) {
-      if (activeContext != null && activeContext.mounted) {
-        _showVoiceFeedbackSnackBar(
-          context: activeContext,
-          message: 'ماسمعتش مبلغ، جرّب تاني',
-        );
-      }
+      _showVoiceFeedbackSnackBar(
+        context: activeContext,
+        messenger: activeMessenger,
+        message: 'ماسمعتش مبلغ، جرّب تاني',
+      );
       return;
     }
 
@@ -882,6 +892,7 @@ class VoiceRecordingNotifier extends Notifier<bool> {
       await ref.read(goalRepositoryProvider).addGoal(
             name: goalResult.name,
             targetAmount: goalResult.targetAmount * 100,
+            icon: goalResult.icon,
           );
     } catch (_) {}
     final parseAndSaveMs = saveSw.elapsedMilliseconds;
@@ -1300,12 +1311,17 @@ class VoiceRecordingNotifier extends Notifier<bool> {
   }
 
   void _showVoiceFeedbackSnackBar({
-    required BuildContext context,
+    BuildContext? context,
+    ScaffoldMessengerState? messenger,
     required String message,
   }) {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
+    final target = messenger ??
+        (context != null && context.mounted
+            ? ScaffoldMessenger.maybeOf(context)
+            : null);
+    if (target == null) return;
+    target.hideCurrentSnackBar();
+    target.showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 4),

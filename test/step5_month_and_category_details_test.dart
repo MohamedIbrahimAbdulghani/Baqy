@@ -198,7 +198,7 @@ void main() {
         (WidgetTester tester) async {
       final categories = await repository.getCategories();
       final food = categories.firstWhere((c) => c.name == 'أكل');
-      final bills = categories.firstWhere((c) => c.name == 'فواتير');
+      final bills = categories.firstWhere((c) => c.name.startsWith('فواتير'));
 
       final today = DateTime.now();
       final yesterday = DateTime(today.year, today.month, today.day - 1);

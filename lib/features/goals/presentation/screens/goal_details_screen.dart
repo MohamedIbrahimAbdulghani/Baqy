@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/goal_icon_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../../domain/models/goal_item.dart';
@@ -163,12 +164,115 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                 amount: amountPiastres,
               );
         } else {
-          await ref.read(goalRepositoryProvider).addGoalSaving(
+          final savingId = await ref.read(goalRepositoryProvider).addGoalSaving(
                 goalId: goal.id,
                 amount: amountPiastres,
               );
+          if (context.mounted) {
+            final formattedAmount =
+                NumberFormatter.formatCurrency(amountPiastres ~/ 100);
+            ScaffoldMessenger.of(context).removeCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 5),
+                content: Text(
+                  'تم تحويش $formattedAmount جنيه',
+                  style: const TextStyle(fontFamily: AppTheme.fontFamily),
+                ),
+                action: SnackBarAction(
+                  label: 'تراجع',
+                  textColor: AppColors.mainGreen,
+                  onPressed: () async {
+                    await ref
+                        .read(goalRepositoryProvider)
+                        .deleteGoalSaving(savingId);
+                  },
+                ),
+              ),
+            );
+          }
         }
       },
+    );
+  }
+
+  Future<void> _handleHawasht(
+    BuildContext context,
+    GoalItem goal,
+    int remainingEgp,
+  ) async {
+    final text = _savingController.text.trim();
+    if (text.isEmpty) {
+      _openSaveBottomSheet(context, goal, remainingEgp, isWithdrawal: false);
+      return;
+    }
+
+    final parsed = NumberFormatter.parsePositiveInteger(text);
+    if (parsed == null || parsed <= 0) {
+      _openSaveBottomSheet(context, goal, remainingEgp, isWithdrawal: false);
+      return;
+    }
+
+    // Validations:
+    if (parsed > remainingEgp) {
+      setState(() => _savingError = 'المبلغ أكبر من الباقي');
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'المبلغ أكبر من الباقي',
+            style: TextStyle(fontFamily: AppTheme.fontFamily),
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (parsed > goal.remainingToTargetEgp) {
+      setState(() => _savingError = 'المبلغ أكبر من المتبقي للهدف');
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'المبلغ أكبر من المتبقي للهدف',
+            style: TextStyle(fontFamily: AppTheme.fontFamily),
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _savingError = null);
+
+    final amountPiastres = parsed * 100;
+    final savingId = await ref.read(goalRepositoryProvider).addGoalSaving(
+          goalId: goal.id,
+          amount: amountPiastres,
+        );
+
+    if (!context.mounted) return;
+
+    final formattedAmount = NumberFormatter.formatCurrency(parsed);
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        content: Text(
+          'تم تحويش $formattedAmount جنيه',
+          style: const TextStyle(fontFamily: AppTheme.fontFamily),
+        ),
+        action: SnackBarAction(
+          label: 'تراجع',
+          textColor: AppColors.mainGreen,
+          onPressed: () async {
+            await ref.read(goalRepositoryProvider).deleteGoalSaving(savingId);
+          },
+        ),
+      ),
     );
   }
 
@@ -227,6 +331,25 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                         ),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 8.0),
+                      Container(
+                        width: 44.0,
+                        height: 44.0,
+                        decoration: BoxDecoration(
+                          color: AppColors.mainGreen.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                        child: Icon(
+                          GoalIconHelper.getIcon(
+                            goal.icon ??
+                                GoalIconHelper.resolveIconKeyFromName(
+                                  goal.name,
+                                ),
+                          ),
+                          color: AppColors.mainGreen,
+                          size: 24.0,
+                        ),
                       ),
                       const SizedBox(width: 12.0),
                       Expanded(
@@ -484,7 +607,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                     ),
                   ),
 
-                  // Action Buttons: "حوّشت" and "سحبت"
+                  // Action Buttons: "حوّشت" and "سحب"
                   Padding(
                     padding: const EdgeInsets.only(top: 8.0, bottom: 12.0),
                     child: Row(
@@ -494,7 +617,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                             height: 52.0,
                             child: ElevatedButton(
                               onPressed: () =>
-                                  _openSaveBottomSheet(context, goal, remainingEgp, isWithdrawal: false),
+                                  _handleHawasht(context, goal, remainingEgp),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.mainGreen,
                                 foregroundColor: Colors.white,
@@ -532,7 +655,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                                 ),
                               ),
                               child: const Text(
-                                'سحبت',
+                                'سحب',
                                 style: TextStyle(
                                   fontFamily: AppTheme.fontFamily,
                                   fontSize: 16.0,

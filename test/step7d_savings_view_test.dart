@@ -5,14 +5,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/native.dart';
 import 'package:baqy/core/database/app_database.dart';
 import 'package:baqy/core/utils/category_icon_helper.dart';
+import 'package:baqy/core/utils/goal_icon_helper.dart';
 import 'package:baqy/core/utils/number_formatter.dart';
 import 'package:baqy/features/expenses/data/repositories/expense_repository_impl.dart';
 import 'package:baqy/features/expenses/data/services/audio_recording_service.dart';
 import 'package:baqy/features/expenses/data/services/gemini_expense_parser.dart';
 import 'package:baqy/features/expenses/domain/models/category_item.dart';
+import 'package:baqy/features/expenses/domain/models/transaction_item.dart';
+import 'package:baqy/features/expenses/domain/parser/egyptian_expense_parser.dart';
 import 'package:baqy/features/expenses/presentation/providers/expense_providers.dart';
 import 'package:baqy/features/goals/data/repositories/goal_repository_impl.dart';
 import 'package:baqy/features/goals/domain/models/goal_item.dart';
+import 'package:baqy/features/goals/presentation/providers/goal_providers.dart';
+import 'package:baqy/features/goals/presentation/screens/goal_details_screen.dart';
 import 'package:baqy/features/goals/presentation/widgets/goal_save_bottom_sheet.dart';
 import 'package:baqy/features/home/presentation/widgets/budget_ring.dart';
 import 'package:baqy/features/home/presentation/widgets/recent_transactions_section.dart';
@@ -360,51 +365,335 @@ void main() {
     });
 
     testWidgets('RecentTransactionsSection renders withdrawal with minus sign and disables tap', (tester) async {
+      final now = DateTime.now().toUtc();
+      final withdrawalTx = TransactionItem(
+        id: -1,
+        amount: -500 * 100,
+        description: 'ايفون',
+        categoryId: -1,
+        kind: 'saving',
+        source: 'goal',
+        note: 'سحب من الهدف',
+        createdAt: now,
+        category: CategoryItem.virtualSavings,
+      );
+
       await tester.pumpWidget(
-        const ProviderScope(
+        ProviderScope(
           child: MaterialApp(
             home: Scaffold(
               body: RecentTransactionsSection(
-                transactions: [],
+                transactions: [withdrawalTx],
               ),
             ),
           ),
         ),
       );
       expect(find.text('آخر المصاريف'), findsOneWidget);
+      expect(find.text('-٥٠٠ جنيه'), findsOneWidget);
+      expect(find.text('ايفون'), findsOneWidget);
+      expect(find.text('سحب من الهدف'), findsOneWidget);
+
+      // Tap on withdrawal does not trigger edit sheet
+      await tester.tap(find.text('ايفون'));
+      await tester.pumpAndSettle();
+      expect(find.text('تعديل المصروف'), findsNothing);
     });
 
-    test('Gemini failure falls back to local parser and saves expense without error', () async {
+    testWidgets('GoalDetails: one tap on "حوّشت" with valid amount saves immediately, shows snackbar with "تراجع", and "تراجع" restores remaining and percentage', (tester) async {
+      final now = DateTime.now().toUtc();
+      final currentYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+      // Month budget 10,000 EGP
+      await expenseRepo.setMonthBudget(
+        yearMonth: currentYm,
+        amount: 10000 * 100,
+      );
+
+      // Add goal with target 100,000 EGP, monthly saving 5,000 EGP
+      final goalId = await goalRepo.addGoal(
+        name: 'ماك بوك',
+        targetAmount: 100000 * 100,
+        monthlySaving: 5000 * 100,
+      );
+
       final container = ProviderContainer(
         overrides: [
           appDatabaseProvider.overrideWithValue(db),
-          geminiExpenseParserProvider.overrideWithValue(_FailingGeminiParser()),
-          audioRecordingServiceProvider.overrideWithValue(_FakeAudioRecordingService()),
-          skipVoiceReviewProvider.overrideWithValue(true),
+          goalRepositoryProvider.overrideWithValue(goalRepo),
+          expenseRepositoryProvider.overrideWithValue(expenseRepo),
         ],
       );
       addTearDown(container.dispose);
 
-      // Create dummy audio file
-      final tempDir = await Directory.systemTemp.createTemp('audio_test');
-      final tempAudio = File('${tempDir.path}/test.m4a');
-      await tempAudio.writeAsBytes(List.filled(200, 0));
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Scaffold(
+              body: GoalDetailsScreen(goalId: goalId),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-      final notifier = container.read(voiceRecordingProvider.notifier);
-      await notifier.processAudioFile(
-        tempAudio.path,
-        fallbackSpeechText: 'صرفت مية جنيه غدا',
+      // Verify header icon and name
+      expect(find.text('ماك بوك'), findsOneWidget);
+      expect(find.text('٠٪ من الهدف'), findsOneWidget);
+
+      // One tap on "حوّشت" (field has 5,000)
+      await tester.tap(find.widgetWithText(ElevatedButton, 'حوّشت'));
+      await tester.pumpAndSettle();
+
+      // No sheet should open; instead snackbar with "تم تحويش ٥,٠٠٠ جنيه" and action "تراجع" appears
+      expect(find.text('المبلغ بالجنيه'), findsNothing); // Sheet didn't open
+      expect(find.text('تم تحويش ٥,٠٠٠ جنيه'), findsOneWidget);
+      expect(find.text('تراجع'), findsOneWidget);
+
+      // Remaining should now be 5,000, percentage should be 5% (5,000 / 100,000)
+      var remaining = await expenseRepo.getRemainingOfMonth(currentYm);
+      expect(remaining.remaining, equals(5000 * 100));
+      expect(find.text('٥٪ من الهدف'), findsOneWidget);
+
+      // Tap "تراجع"
+      await tester.tap(find.text('تراجع'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+
+      // Restores remaining and percentage immediately!
+      remaining = await expenseRepo.getRemainingOfMonth(currentYm);
+      expect(remaining.remaining, equals(10000 * 100));
+      expect(find.text('٠٪ من الهدف'), findsOneWidget);
+    });
+
+    testWidgets('GoalDetails: invalid amount saves nothing and shows error', (tester) async {
+      final now = DateTime.now().toUtc();
+      final currentYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+      // Budget 3,000 EGP
+      await expenseRepo.setMonthBudget(
+        yearMonth: currentYm,
+        amount: 3000 * 100,
       );
 
-      final currentYm = '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}';
-      final txs = await expenseRepo.getLastTransactionsForMonth(currentYm);
-      expect(txs.isNotEmpty, isTrue);
-      expect(txs.first.amount, equals(100 * 100));
-      expect(txs.first.description, equals('غدا'));
+      final goalId = await goalRepo.addGoal(
+        name: 'عربية',
+        targetAmount: 50000 * 100,
+        monthlySaving: 5000 * 100, // Exceeds remaining 3,000!
+      );
 
-      // Clean up temp
-      if (await tempAudio.exists()) await tempAudio.delete();
-      if (await tempDir.exists()) await tempDir.delete();
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          goalRepositoryProvider.overrideWithValue(goalRepo),
+          expenseRepositoryProvider.overrideWithValue(expenseRepo),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Scaffold(
+              body: GoalDetailsScreen(goalId: goalId),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tap "حوّشت" with 5,000 (> remaining 3,000)
+      await tester.tap(find.widgetWithText(ElevatedButton, 'حوّشت'));
+      await tester.pumpAndSettle();
+
+      // Shows error "المبلغ أكبر من الباقي" and saves nothing!
+      expect(find.text('المبلغ أكبر من الباقي'), findsWidgets);
+      final remaining = await expenseRepo.getRemainingOfMonth(currentYm);
+      expect(remaining.goalSavings, equals(0));
+      expect(remaining.remaining, equals(3000 * 100));
+    });
+
+    testWidgets('GoalDetails: empty field opens bottom sheet with "المبلغ بالجنيه" and button "حفظ"', (tester) async {
+      final now = DateTime.now().toUtc();
+      final currentYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+      await expenseRepo.setMonthBudget(
+        yearMonth: currentYm,
+        amount: 10000 * 100,
+      );
+
+      // Goal with 0 monthly saving
+      final goalId = await goalRepo.addGoal(
+        name: 'سفر',
+        targetAmount: 20000 * 100,
+        monthlySaving: 0,
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          goalRepositoryProvider.overrideWithValue(goalRepo),
+          expenseRepositoryProvider.overrideWithValue(expenseRepo),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Scaffold(
+              body: GoalDetailsScreen(goalId: goalId),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tap "حوّشت" when field is empty
+      await tester.tap(find.widgetWithText(ElevatedButton, 'حوّشت'));
+      await tester.pumpAndSettle();
+
+      // Opens sheet:
+      expect(find.text('المبلغ بالجنيه'), findsOneWidget);
+      expect(find.widgetWithText(ElevatedButton, 'حفظ'), findsOneWidget);
+    });
+
+    test('Goal icon mapping for 20+ sample names', () {
+      expect(GoalIconHelper.resolveIconKeyFromName('ماك بوك برو'), equals('laptop'));
+      expect(GoalIconHelper.resolveIconKeyFromName('عمرة'), equals('mosque'));
+      expect(GoalIconHelper.resolveIconKeyFromName('عربية جديدة'), equals('car'));
+      expect(GoalIconHelper.resolveIconKeyFromName('ايفون 16'), equals('phone'));
+      expect(GoalIconHelper.resolveIconKeyFromName('تلفزيون سامسونج'), equals('tv'));
+      expect(GoalIconHelper.resolveIconKeyFromName('كاميرا سوني'), equals('camera'));
+      expect(GoalIconHelper.resolveIconKeyFromName('ساعة ابل'), equals('watch'));
+      expect(GoalIconHelper.resolveIconKeyFromName('بلايستيشن 5'), equals('game'));
+      expect(GoalIconHelper.resolveIconKeyFromName('عجلة سباق'), equals('bike'));
+      expect(GoalIconHelper.resolveIconKeyFromName('شقة في التجمع'), equals('home'));
+      expect(GoalIconHelper.resolveIconKeyFromName('سفر لدهب'), equals('flight'));
+      expect(GoalIconHelper.resolveIconKeyFromName('مصيف في الساحل'), equals('beach'));
+      expect(GoalIconHelper.resolveIconKeyFromName('دراسة ماجستير'), equals('school'));
+      expect(GoalIconHelper.resolveIconKeyFromName('مشروع كافيه'), equals('work'));
+      expect(GoalIconHelper.resolveIconKeyFromName('عملية جراحية'), equals('medical'));
+      expect(GoalIconHelper.resolveIconKeyFromName('هدية لماما'), equals('gift'));
+      expect(GoalIconHelper.resolveIconKeyFromName('مولود جديد'), equals('baby'));
+      expect(GoalIconHelper.resolveIconKeyFromName('جواز وفرح'), equals('wedding'));
+      expect(GoalIconHelper.resolveIconKeyFromName('اشتراك جيم'), equals('fitness'));
+      expect(GoalIconHelper.resolveIconKeyFromName('تسوق ولبس العيد'), equals('shopping'));
+      expect(GoalIconHelper.resolveIconKeyFromName('صندوق طوارئ'), equals('savings'));
+      expect(GoalIconHelper.resolveIconKeyFromName('هدف غير معروف نهائياً'), equals('flag'));
+    });
+
+    test('Long story sentence with 8 amounts keeps all 8 items and correct sum', () {
+      const story =
+          'صحيت نزلت ركبت تاكسي ب50 جنيه وفطرت فول وطعمية ب40 جنيه وشربت شاي ب20 جنيه واشتريت كتاب ب150 جنيه وجبت غدا كشري ب60 جنيه واشتريت قميص ب400 جنيه وشربت عصير قصب ب15 جنيه وروحت بتوك توك ب30 جنيه';
+
+      final results = EgyptianExpenseParser.parse(story);
+      expect(results.length, equals(8));
+
+      final amounts = results.map((r) => r.amount!).toList();
+      expect(amounts, equals([50, 40, 20, 150, 60, 400, 15, 30]));
+
+      final totalSum = amounts.reduce((a, b) => a + b);
+      expect(totalSum, equals(765));
+    });
+
+    test('Every Gemini failure type (timeout, 429, 5xx, invalid JSON, network) falls back to local parser with no error text', () async {
+      final failureTypes = [
+        GeminiAudioErrorType.network,
+        GeminiAudioErrorType.rateLimited,
+        GeminiAudioErrorType.serverError,
+        GeminiAudioErrorType.unknown,
+      ];
+
+      for (final fType in failureTypes) {
+        final container = ProviderContainer(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(db),
+            geminiExpenseParserProvider.overrideWithValue(
+              _ConfigurableFailingGeminiParser(fType),
+            ),
+            audioRecordingServiceProvider.overrideWithValue(_FakeAudioRecordingService()),
+            skipVoiceReviewProvider.overrideWithValue(true),
+          ],
+        );
+
+        final tempDir = await Directory.systemTemp.createTemp('audio_fail_test_');
+        final tempAudio = File('${tempDir.path}/test.m4a');
+        await tempAudio.writeAsBytes(List.filled(200, 0));
+
+        final notifier = container.read(voiceRecordingProvider.notifier);
+        await notifier.processAudioFile(
+          tempAudio.path,
+          fallbackSpeechText: 'صرفت سبعين جنيه تاكسي',
+        );
+
+        final currentYm = '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}';
+        final txs = await expenseRepo.getLastTransactionsForMonth(currentYm);
+        expect(txs.any((t) => t.amount == 70 * 100), isTrue);
+
+        if (await tempAudio.exists()) {
+          await tempAudio.delete();
+        }
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+        container.dispose();
+      }
+    });
+
+    test('Financial Invariant: Saving 5,000 from 10,000 money gives 5,000 remaining, visible in home, chart, day list, and details', () async {
+      final now = DateTime.now().toUtc();
+      final currentYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+      // 10,000 month budget
+      await expenseRepo.setMonthBudget(
+        yearMonth: currentYm,
+        amount: 10000 * 100,
+      );
+
+      final goalId = await goalRepo.addGoal(
+        name: 'عربية',
+        targetAmount: 200000 * 100,
+      );
+
+      await goalRepo.addGoalSaving(
+        goalId: goalId,
+        amount: 5000 * 100,
+        savedAt: now,
+      );
+
+      // Remaining = 10,000 - 5,000 = 5,000
+      final remaining = await expenseRepo.getRemainingOfMonth(currentYm);
+      expect(remaining.remaining, equals(5000 * 100));
+      expect(remaining.goalSavings, equals(5000 * 100));
+      expect(remaining.expenses, equals(0));
+
+      // Home last transactions has the saving with goal name
+      final lastTxs = await expenseRepo.getLastTransactionsForMonth(currentYm);
+      expect(lastTxs.first.description, equals('عربية'));
+      expect(lastTxs.first.amount, equals(5000 * 100));
+
+      // Month totals has "تحويش"
+      final monthTotals = await expenseRepo.getTotalsPerCategoryPerMonth(currentYm);
+      final savingsCategory = monthTotals.firstWhere((t) => t.category.name == 'تحويش');
+      expect(savingsCategory.totalAmount, equals(5000 * 100));
+
+      // Day totals has "تحويش"
+      final dayTotals = await expenseRepo.getCategoryTotalsForDay(now.toLocal());
+      final daySavings = dayTotals.firstWhere((t) => t.category.name == 'تحويش');
+      expect(daySavings.totalAmount, equals(5000 * 100));
+
+      // Category details for "تحويش" has the item
+      final catTxs = await expenseRepo.getCategoryTransactionsForMonth(
+        categoryId: -1,
+        yearMonth: currentYm,
+      );
+      expect(catTxs.first.description, equals('عربية'));
+      expect(catTxs.first.amount, equals(5000 * 100));
     });
   });
 }
@@ -426,7 +715,10 @@ class _FakeAudioRecordingService implements AudioRecordingService {
   Future<String?> stopRecording() async => null;
 }
 
-class _FailingGeminiParser extends GeminiExpenseParser {
+class _ConfigurableFailingGeminiParser extends GeminiExpenseParser {
+  final GeminiAudioErrorType errorType;
+  _ConfigurableFailingGeminiParser(this.errorType);
+
   @override
   String? get apiKey => 'test-key';
 
@@ -437,7 +729,7 @@ class _FailingGeminiParser extends GeminiExpenseParser {
     List<({int id, String keyword, String categoryName, int categoryId})>
         userRules = const [],
   }) async {
-    lastAudioError = GeminiAudioErrorType.network;
-    return null; // Simulates network failure / timeout
+    lastAudioError = errorType;
+    return null;
   }
 }

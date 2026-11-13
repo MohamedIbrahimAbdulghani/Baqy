@@ -9,6 +9,8 @@ import 'package:baqy/core/utils/arabic_date_helper.dart';
 import 'package:baqy/core/utils/number_formatter.dart';
 import 'package:baqy/features/expenses/data/repositories/expense_repository_impl.dart';
 import 'package:baqy/features/expenses/presentation/providers/expense_providers.dart';
+import 'package:baqy/features/goals/domain/models/goal_item.dart';
+import 'package:baqy/features/goals/presentation/providers/goal_providers.dart';
 import 'package:baqy/features/home/presentation/widgets/home_speed_dial_fab.dart';
 import 'package:baqy/features/shell/presentation/widgets/custom_bottom_nav_bar.dart';
 import 'package:baqy/l10n/app_localizations.dart';
@@ -167,6 +169,7 @@ void main() {
         overrides: [
           appDatabaseProvider.overrideWithValue(db),
           expenseRepositoryProvider.overrideWithValue(repository),
+          goalsStreamProvider.overrideWith((ref) => Stream.value(<GoalItem>[])),
           if (initialMonth != null)
             selectedYearMonthProvider
                 .overrideWith(() => _FakeSelectedYearMonthNotifier(initialMonth)),

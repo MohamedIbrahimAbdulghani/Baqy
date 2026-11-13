@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import '../../../../core/database/app_database.dart';
+import '../../../../core/utils/goal_icon_helper.dart';
 import '../../domain/models/goal_item.dart';
 import '../../domain/repositories/goal_repository.dart';
 
@@ -29,6 +30,7 @@ class GoalRepositoryImpl implements GoalRepository {
       monthlySaving: goalData.monthlySaving,
       createdAt: goalData.createdAt,
       totalSaved: totalSaved,
+      icon: goalData.icon,
     );
   }
 
@@ -107,6 +109,7 @@ class GoalRepositoryImpl implements GoalRepository {
     required String name,
     required int targetAmount,
     int monthlySaving = 0,
+    String? icon,
   }) async {
     final sanitizedName = sanitizeName(name);
     if (sanitizedName.isEmpty) {
@@ -127,12 +130,18 @@ class GoalRepositoryImpl implements GoalRepository {
       );
     }
 
+    final resolvedIcon = GoalIconHelper.validateOrResolve(
+      icon,
+      goalName: sanitizedName,
+    );
+
     return await _db.into(_db.goals).insert(
       GoalsCompanion.insert(
         name: sanitizedName,
         targetAmount: targetAmount,
         monthlySaving: monthlySaving,
         createdAt: DateTime.now().toUtc(),
+        icon: Value(resolvedIcon),
       ),
     );
   }
@@ -170,6 +179,7 @@ class GoalRepositoryImpl implements GoalRepository {
     required String name,
     required int targetAmount,
     int? monthlySaving,
+    String? icon,
   }) async {
     final sanitizedName = sanitizeName(name);
     if (sanitizedName.isEmpty) {
@@ -200,13 +210,23 @@ class GoalRepositoryImpl implements GoalRepository {
       );
     }
 
+    final resolvedIcon = icon != null
+        ? GoalIconHelper.validateOrResolve(icon, goalName: sanitizedName)
+        : GoalIconHelper.resolveIconKeyFromName(sanitizedName);
+
     await (_db.update(_db.goals)..where((g) => g.id.equals(id))).write(
       GoalsCompanion(
         name: Value(sanitizedName),
         targetAmount: Value(targetAmount),
         monthlySaving: Value(saving),
+        icon: Value(resolvedIcon),
       ),
     );
+  }
+
+  @override
+  Future<void> deleteGoalSaving(int id) async {
+    await (_db.delete(_db.goalSavings)..where((s) => s.id.equals(id))).go();
   }
 
   @override

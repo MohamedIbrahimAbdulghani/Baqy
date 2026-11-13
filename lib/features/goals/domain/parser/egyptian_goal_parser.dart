@@ -1,13 +1,16 @@
+import '../../../../core/utils/goal_icon_helper.dart';
 import '../../../expenses/domain/parser/egyptian_expense_parser.dart';
 import '../../data/repositories/goal_repository_impl.dart';
 
 class ParsedGoalResult {
   final String name;
   final int targetAmount; // in EGP
+  final String? icon;
 
   const ParsedGoalResult({
     required this.name,
     required this.targetAmount,
+    this.icon,
   });
 }
 
@@ -226,6 +229,7 @@ class EgyptianGoalParser {
     return ParsedGoalResult(
       name: sanitized,
       targetAmount: extractedAmount,
+      icon: GoalIconHelper.resolveIconKeyFromName(sanitized),
     );
   }
 

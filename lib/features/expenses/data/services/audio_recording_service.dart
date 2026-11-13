@@ -99,23 +99,23 @@ class RecordAudioRecordingService implements AudioRecordingService {
         } catch (_) {}
       });
 
-      // 14-minute safety warning callback
+      // 55-second safety warning callback
       _warningTimer?.cancel();
-      _warningTimer = Timer(const Duration(minutes: 14), () {
+      _warningTimer = Timer(const Duration(seconds: 55), () {
         if (_isRecording && onSafetyWarning != null) {
           if (kDebugMode) {
-            debugPrint('[AUDIO_DEBUG] 14 minutes reached: Safety warning triggered');
+            debugPrint('[AUDIO_DEBUG] 55 seconds reached: Safety warning triggered');
           }
           onSafetyWarning();
         }
       });
 
-      // 15-minute strict safety limit
+      // 60-second strict safety limit
       _maxDurationTimer?.cancel();
-      _maxDurationTimer = Timer(const Duration(minutes: 15), () async {
+      _maxDurationTimer = Timer(const Duration(seconds: 60), () async {
         if (_isRecording) {
           if (kDebugMode) {
-            debugPrint('[AUDIO_DEBUG] 15 minutes limit reached: Stopping recording safely');
+            debugPrint('[AUDIO_DEBUG] 60 seconds limit reached: Stopping recording safely');
           }
           final path = await stopRecording();
           if (path != null && onMaxDurationReached != null) {

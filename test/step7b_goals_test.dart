@@ -354,34 +354,34 @@ void main() {
 
       raw.close();
 
-      // 2. Open with AppDatabase (v5) - executes onUpgrade from 4 to 5
-      final v5Db = AppDatabase(NativeDatabase(dbFile));
+      // 2. Open with AppDatabase (v6) - executes onUpgrade from 4 to 6
+      final v6Db = AppDatabase(NativeDatabase(dbFile));
 
-      // Verify PRAGMA user_version is 5
-      expect(v5Db.schemaVersion, 5);
+      // Verify PRAGMA user_version is 6
+      expect(v6Db.schemaVersion, 6);
 
       // Check existing goal is preserved
-      final goals = await v5Db.select(v5Db.goals).get();
+      final goals = await v6Db.select(v6Db.goals).get();
       expect(goals.length, 1);
       expect(goals.first.name, 'ايفون');
       expect(goals.first.targetAmount, 10000000);
       expect(goals.first.monthlySaving, 200000);
 
       // Check existing transactions & budgets are preserved
-      final txs = await v5Db.select(v5Db.transactions).get();
+      final txs = await v6Db.select(v6Db.transactions).get();
       expect(txs.length, 1);
       expect(txs.first.description, 'فطار');
 
-      final budgets = await v5Db.select(v5Db.monthBudgets).get();
+      final budgets = await v6Db.select(v6Db.monthBudgets).get();
       expect(budgets.length, 1);
       expect(budgets.first.amount, 800000);
 
       // Check goal_savings table was created and can be queried
-      final savings = await v5Db.select(v5Db.goalSavings).get();
+      final savings = await v6Db.select(v6Db.goalSavings).get();
       expect(savings, isEmpty);
 
       // Can insert into goal_savings
-      await v5Db.into(v5Db.goalSavings).insert(
+      await v6Db.into(v6Db.goalSavings).insert(
         GoalSavingsCompanion.insert(
           goalId: 1,
           amount: 50000,
@@ -389,11 +389,11 @@ void main() {
         ),
       );
 
-      final updatedSavings = await v5Db.select(v5Db.goalSavings).get();
+      final updatedSavings = await v6Db.select(v6Db.goalSavings).get();
       expect(updatedSavings.length, 1);
       expect(updatedSavings.first.amount, 50000);
 
-      await v5Db.close();
+      await v6Db.close();
       tempDir.deleteSync(recursive: true);
     });
   });

@@ -20,7 +20,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? openEncryptedConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   static const List<({String name, String icon, String color, int sortOrder})>
       defaultCategoryDefinitions = [
@@ -92,6 +92,13 @@ class AppDatabase extends _$AppDatabase {
         Future<Set<String>> getColumns(String tableName) async {
           final rows = await customSelect("PRAGMA table_info('$tableName');").get();
           return rows.map((r) => r.read<String>('name')).toSet();
+        }
+
+        Future<bool> tableExists(String tableName) async {
+          final rows = await customSelect(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='$tableName';",
+          ).get();
+          return rows.isNotEmpty;
         }
 
         if (from < 2) {
@@ -236,9 +243,25 @@ class AppDatabase extends _$AppDatabase {
 
         if (from < 5) {
           if (kDebugMode) {
-            debugPrint('[DB_DEBUG] onUpgrade (v4->v5): creating goal_savings table');
+            debugPrint('[DB_DEBUG] onUpgrade (v4->v5): checking goal_savings table');
           }
-          await m.createTable(goalSavings);
+          if (!await tableExists('goal_savings')) {
+            await m.createTable(goalSavings);
+          }
+        }
+
+        if (from < 6) {
+          if (kDebugMode) {
+            debugPrint('[DB_DEBUG] onUpgrade (v5->v6): adding icon column to goals');
+          }
+          if (await tableExists('goals')) {
+            final goalCols = await getColumns('goals');
+            if (!goalCols.contains('icon')) {
+              await m.addColumn(goals, goals.icon);
+            }
+          } else {
+            await m.createTable(goals);
+          }
         }
 
         if (kDebugMode) {

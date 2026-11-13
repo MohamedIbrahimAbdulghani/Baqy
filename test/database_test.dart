@@ -450,8 +450,8 @@ void main() {
 
     test('Drift migration v1 to v2 adds note column and seeds ترفيه if missing', () async {
       final mDb = AppDatabase(NativeDatabase.memory());
-      // Check schemaVersion is 5
-      expect(mDb.schemaVersion, equals(5));
+      // Check schemaVersion is 6
+      expect(mDb.schemaVersion, equals(6));
       final cats = await ExpenseRepositoryImpl(mDb).getCategories();
       expect(cats.any((c) => c.name == 'ترفيه'), isTrue);
       await mDb.close();

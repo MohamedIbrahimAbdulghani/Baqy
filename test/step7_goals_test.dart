@@ -90,7 +90,7 @@ class _FakeSpeechRecognitionService implements SpeechRecognitionService {
     _isListening = true;
     _onResult = onResult;
     if (wordsToEmit.isNotEmpty) {
-      _onResult?.call(wordsToEmit, isFinal: true);
+      _onResult?.call(wordsToEmit, isFinal: false);
     }
   }
 
@@ -510,8 +510,7 @@ void main() {
 
       // Tap stop button
       await tester.tap(find.byIcon(Icons.stop_rounded));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
 
       // Check database: goal should be saved with name "ايفون" and 100,000 target
       final goals = await repository.getGoals();
@@ -552,8 +551,7 @@ void main() {
 
       // Tap stop button
       await tester.tap(find.byIcon(Icons.stop_rounded));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
 
       // No goal should be saved
       final goals = await repository.getGoals();

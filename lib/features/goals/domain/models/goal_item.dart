@@ -5,6 +5,7 @@ class GoalItem {
   final int monthlySaving; // in piastres
   final DateTime createdAt; // UTC
   final int totalSaved; // in piastres
+  final String? icon;
 
   const GoalItem({
     required this.id,
@@ -13,6 +14,7 @@ class GoalItem {
     required this.monthlySaving,
     required this.createdAt,
     this.totalSaved = 0,
+    this.icon,
   });
 
   /// Target amount in Egyptian Pounds (EGP)

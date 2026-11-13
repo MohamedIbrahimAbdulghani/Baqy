@@ -113,6 +113,98 @@ void main() {
       await v3DbAgain.close();
       await tempDir.delete(recursive: true);
     });
+
+    test('Migration v5 to v6 adds nullable icon column to goals and preserves all data', () async {
+      final tempDir = await Directory.systemTemp.createTemp('baqy_mig_v6_');
+      final dbFile = File('${tempDir.path}/test_v5.sqlite');
+
+      // 1. Build a real v5 SQLite database
+      final raw = sqlite3.open(dbFile.path);
+      raw.execute('PRAGMA user_version = 5;');
+      raw.execute('''
+        CREATE TABLE categories (
+          id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+          name TEXT NOT NULL,
+          icon TEXT NOT NULL,
+          color TEXT NOT NULL,
+          is_default INTEGER NOT NULL DEFAULT 0,
+          is_archived INTEGER NOT NULL DEFAULT 0,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_by_ai INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL DEFAULT 0
+        );
+      ''');
+      raw.execute('''
+        CREATE TABLE goals (
+          id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+          name TEXT NOT NULL,
+          target_amount INTEGER NOT NULL,
+          monthly_saving INTEGER NOT NULL,
+          created_at INTEGER NOT NULL
+        );
+      ''');
+      raw.execute('''
+        CREATE TABLE goal_savings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+          goal_id INTEGER NOT NULL REFERENCES goals (id),
+          amount INTEGER NOT NULL,
+          saved_at INTEGER NOT NULL
+        );
+      ''');
+
+      // Insert existing goals (v5 without icon)
+      raw.execute('''
+        INSERT INTO goals (id, name, target_amount, monthly_saving, created_at) VALUES
+        (1, 'ماك برو', 10000000, 500000, 1730900000),
+        (2, 'عمرة', 5000000, 1000000, 1730900100);
+      ''');
+
+      // Insert savings
+      raw.execute('''
+        INSERT INTO goal_savings (id, goal_id, amount, saved_at) VALUES
+        (1, 1, 1000000, 1730900200),
+        (2, 2, 500000, 1730900300);
+      ''');
+
+      raw.close();
+
+      // 2. Open with AppDatabase (v6) - triggers onUpgrade from 5 to 6
+      final v6Db = AppDatabase(NativeDatabase(dbFile));
+
+      // Verify schemaVersion is 6
+      expect(v6Db.schemaVersion, equals(6));
+
+      // Verify goals: both preserved, icon is nullable/null for old rows
+      final goals = await v6Db.select(v6Db.goals).get();
+      expect(goals.length, equals(2));
+      expect(goals[0].name, equals('ماك برو'));
+      expect(goals[0].targetAmount, equals(10000000));
+      expect(goals[0].icon, isNull);
+      expect(goals[1].name, equals('عمرة'));
+      expect(goals[1].targetAmount, equals(5000000));
+      expect(goals[1].icon, isNull);
+
+      // Verify savings preserved
+      final savings = await v6Db.select(v6Db.goalSavings).get();
+      expect(savings.length, equals(2));
+      expect(savings[0].amount, equals(1000000));
+      expect(savings[1].amount, equals(500000));
+
+      // Verify PRAGMA table_info confirms icon column exists
+      final cols = await v6Db.customSelect("PRAGMA table_info('goals');").get();
+      final colNames = cols.map((r) => r.read<String>('name')).toSet();
+      expect(colNames.contains('icon'), isTrue);
+
+      await v6Db.close();
+
+      // 3. Idempotency test: Re-open v6 database
+      final v6DbAgain = AppDatabase(NativeDatabase(dbFile));
+      final goalsAgain = await v6DbAgain.select(v6DbAgain.goals).get();
+      expect(goalsAgain.length, equals(2));
+      await v6DbAgain.close();
+
+      await tempDir.delete(recursive: true);
+    });
   });
 }
 

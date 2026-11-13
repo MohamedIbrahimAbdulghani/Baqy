@@ -54,6 +54,7 @@ class Goals extends Table {
   IntColumn get targetAmount => integer()(); // piastres
   IntColumn get monthlySaving => integer()(); // piastres
   DateTimeColumn get createdAt => dateTime()(); // UTC
+  TextColumn get icon => text().nullable()();
 }
 
 @DataClassName('GoalSavingData')
