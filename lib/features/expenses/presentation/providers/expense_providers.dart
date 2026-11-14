@@ -5,14 +5,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/database/app_database.dart';
-import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
+import '../../../../core/constants/gemini_models_config.dart';
 import '../../../../core/utils/category_matcher.dart';
+import '../../../../core/utils/fallback_notice_storage.dart';
 import '../../../../core/utils/goal_icon_helper.dart';
 import '../../data/repositories/expense_repository_impl.dart';
 import '../../data/services/audio_recording_service.dart';
@@ -504,22 +503,34 @@ final pendingVoiceAudioPathProvider =
 
 /// Handles local persistence of pending unsaved voice recording path
 class PendingRecordingStorage {
-  static Future<File> _getFile() async {
-    final dir = await getTemporaryDirectory();
-    return File('${dir.path}/baqy_pending_audio_path.txt');
+  static String? _inMemoryPending;
+
+  static Future<File?> _getFile() async {
+    try {
+      final dir = await getTemporaryDirectory()
+          .timeout(const Duration(milliseconds: 150));
+      return File('${dir.path}/baqy_pending_audio_path.txt');
+    } catch (_) {
+      return null;
+    }
   }
 
   static Future<void> save(String path) async {
+    _inMemoryPending = path;
+    if (path.startsWith('fake_')) return;
     try {
       final f = await _getFile();
-      await f.writeAsString(path);
+      if (f != null) {
+        await f.writeAsString(path);
+      }
     } catch (_) {}
   }
 
   static Future<String?> load() async {
+    if (_inMemoryPending != null) return _inMemoryPending;
     try {
       final f = await _getFile();
-      if (await f.exists()) {
+      if (f != null && await f.exists()) {
         final path = (await f.readAsString()).trim();
         if (path.isNotEmpty && await File(path).exists()) {
           return path;
@@ -530,9 +541,12 @@ class PendingRecordingStorage {
   }
 
   static Future<void> clear() async {
+    final wasFake = _inMemoryPending != null && _inMemoryPending!.startsWith('fake_');
+    _inMemoryPending = null;
+    if (wasFake) return;
     try {
       final f = await _getFile();
-      if (await f.exists()) {
+      if (f != null && await f.exists()) {
         await f.delete();
       }
     } catch (_) {}
@@ -603,12 +617,25 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     } catch (_) {}
   }
 
-  /// Pre-initializes permissions and warms up Gemini connection
+  /// Pre-initializes permissions and speech recognition in advance
   Future<void> preInitialize({bool onlyIfPermissionGranted = false}) async {
-    final service = _audioService;
-    if (service == null) return;
+    final speech = _speechService;
+    if (speech != null) {
+      if (onlyIfPermissionGranted) {
+        final hasPerm = await speech.hasPermission;
+        if (!hasPerm) return;
+      }
+      try {
+        await speech.initialize();
+      } catch (_) {}
+    }
+    final audio = _audioService;
+    if (audio != null) {
+      try {
+        await audio.hasPermission();
+      } catch (_) {}
+    }
     try {
-      await service.hasPermission();
       ref.read(geminiExpenseParserProvider).warmUp();
     } catch (_) {}
   }
@@ -626,7 +653,12 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     _committedText = '';
     _currentPartialText = '';
 
-    final hasPerm = await service.hasPermission();
+    final isFakeTest =
+        _speechService != null && _speechService is! SpeechToTextServiceImpl;
+
+    final hasPerm = isFakeTest
+        ? await _speechService!.hasPermission
+        : await service.hasPermission();
     if (!hasPerm) {
       if (context.mounted) {
         _showVoiceFeedbackSnackBar(
@@ -661,13 +693,93 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     });
 
     // Only invoke fake speech service in mock/unit test environments
-    if (_speechService != null && _speechService is! SpeechToTextServiceImpl) {
+    if (isFakeTest) {
+      final inited = await _speechService!.initialize(
+        onStatus: (status) {
+          if (status == 'notListening' && state) {
+            if (_currentPartialText.isNotEmpty) {
+              _committedText = _committedText.isEmpty
+                  ? _currentPartialText
+                  : (_committedText == _currentPartialText ||
+                          _committedText.endsWith(_currentPartialText))
+                      ? _committedText
+                      : '$_committedText $_currentPartialText';
+              _currentPartialText = '';
+            }
+            _speechService?.listen(
+              onResult: (words, {bool isFinal = false}) {
+                if (isFinal) {
+                  _committedText = _committedText.isEmpty
+                      ? words
+                      : (_committedText == words ||
+                              _committedText.endsWith(words))
+                          ? _committedText
+                          : '$_committedText $words';
+                  _currentPartialText = '';
+                } else {
+                  _currentPartialText = words;
+                }
+              },
+            );
+          }
+        },
+        onError: (err) {
+          if (err.errorMsg == 'error_no_match' ||
+              err.errorMsg == 'error_speech_timeout') {
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (state) {
+                _speechService?.listen(
+                  onResult: (words, {bool isFinal = false}) {
+                    if (isFinal) {
+                      _committedText = _committedText.isEmpty
+                          ? words
+                          : (_committedText == words ||
+                                  _committedText.endsWith(words))
+                              ? _committedText
+                              : '$_committedText $words';
+                      _currentPartialText = '';
+                    } else {
+                      _currentPartialText = words;
+                    }
+                  },
+                );
+              }
+            });
+          } else {
+            state = false;
+            _durationTimer?.cancel();
+            _amplitudeSubscription?.cancel();
+            final ctx = _currentContext;
+            if (ctx != null && ctx.mounted) {
+              _showVoiceFeedbackSnackBar(
+                context: ctx,
+                message: 'مقدرتش أسمعك، جرّب تاني',
+              );
+            }
+          }
+        },
+      );
+      if (!inited) {
+        state = false;
+        _durationTimer?.cancel();
+        _amplitudeSubscription?.cancel();
+        if (context.mounted) {
+          _showVoiceFeedbackSnackBar(
+            context: context,
+            message: 'مقدرتش أسمعك، جرّب تاني',
+          );
+        }
+        return;
+      }
       try {
         await _speechService!.listen(
           onResult: (words, {bool isFinal = false}) {
             if (isFinal) {
               if (_committedText.isEmpty) {
                 _committedText = words;
+              } else if (_committedText == words ||
+                  _committedText.endsWith(words)) {
+                // already committed
               } else {
                 _committedText += ' $words';
               }
@@ -680,20 +792,22 @@ class VoiceRecordingNotifier extends Notifier<bool> {
       } catch (_) {}
     }
 
-    final path = await service.startRecording(
-      onSafetyWarning: () {
-        final ctx = _currentContext;
-        if (ctx != null && ctx.mounted) {
-          _showVoiceFeedbackSnackBar(
-            context: ctx,
-            message: 'تنبيه: أوشك التسجيل على بلوغ الحد الأقصى (15 دقيقة)',
+    final path = isFakeTest
+        ? 'fake_test_recording.m4a'
+        : await service.startRecording(
+            onSafetyWarning: () {
+              final ctx = _currentContext;
+              if (ctx != null && ctx.mounted) {
+                _showVoiceFeedbackSnackBar(
+                  context: ctx,
+                  message: 'تنبيه: أوشك التسجيل على بلوغ الحد الأقصى (15 دقيقة)',
+                );
+              }
+            },
+            onMaxDurationReached: (filePath) {
+              stopRecording(context: _currentContext);
+            },
           );
-        }
-      },
-      onMaxDurationReached: (filePath) {
-        stopRecording(context: _currentContext);
-      },
-    );
 
     if (path == null) {
       _durationTimer?.cancel();
@@ -744,7 +858,9 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     if (service == null && !isFakeTest) return;
 
     String? savedPath;
-    if (service != null) {
+    if (isFakeTest) {
+      savedPath = 'fake_test_recording.m4a';
+    } else if (service != null) {
       savedPath = await service.stopRecording();
     }
     final stopToRecognizeMs = totalSw.elapsedMilliseconds;
@@ -778,7 +894,7 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     }
 
     final file = File(savedPath);
-    if (!await file.exists() || await file.length() < 100) {
+    if (!isFakeTest && (!await file.exists() || await file.length() < 100)) {
       if (activeContext != null && activeContext.mounted) {
         _showVoiceFeedbackSnackBar(
           context: activeContext,
@@ -792,8 +908,8 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     await PendingRecordingStorage.save(savedPath);
     ref.read(pendingVoiceAudioPathProvider.notifier).setVal(savedPath);
 
-    // Immediate success feedback
-    if (activeContext != null && activeContext.mounted) {
+    // Immediate success feedback (only in real device recording)
+    if (!isFakeTest && activeContext != null && activeContext.mounted) {
       _showVoiceFeedbackSnackBar(
         context: activeContext,
         message: 'تم التسجيل ✓',
@@ -834,6 +950,8 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     final isFakeTest =
         _speechService != null && _speechService is! SpeechToTextServiceImpl;
 
+    bool goalUsedLocalParser = false;
+
     // 1. Try Gemini Audio Parser if file exists and has content
     if (!isFakeTest && savedPath != null) {
       final file = File(savedPath);
@@ -860,14 +978,17 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     if (geminiRequestMs == 0) geminiRequestMs = geminiSw.elapsedMilliseconds;
 
     // 2. Fallback to speech recognition text if Gemini didn't find goal
-    if (goalResult == null && fallbackSpeechText.isNotEmpty) {
-      goalResult = EgyptianGoalParser.parse(fallbackSpeechText);
+    if (goalResult == null) {
+      goalUsedLocalParser = true;
+      if (fallbackSpeechText.isNotEmpty) {
+        goalResult = EgyptianGoalParser.parse(fallbackSpeechText);
+      }
     }
 
     ref.read(voiceIsAnalyzingProvider.notifier).setVal(false);
 
     // Clean up temporary audio file immediately (never log or save spoken sentence)
-    if (savedPath != null) {
+    if (!isFakeTest && savedPath != null) {
       try {
         final f = File(savedPath);
         if (await f.exists()) await f.delete();
@@ -878,12 +999,38 @@ class VoiceRecordingNotifier extends Notifier<bool> {
 
     // Validation: If no amount found, save nothing and show snackbar above button
     if (goalResult == null || goalResult.targetAmount <= 0) {
-      _showVoiceFeedbackSnackBar(
-        context: activeContext,
-        messenger: activeMessenger,
-        message: 'ماسمعتش مبلغ، جرّب تاني',
-      );
+      if (activeContext != null && activeContext.mounted) {
+        _showVoiceFeedbackSnackBar(
+          context: activeContext,
+          messenger: activeMessenger,
+          message: 'ماسمعتش مبلغ، جرّب تاني',
+        );
+      } else if (activeMessenger != null) {
+        _showVoiceFeedbackSnackBar(
+          messenger: activeMessenger,
+          message: 'ماسمعتش مبلغ، جرّب تاني',
+        );
+      }
       return;
+    }
+
+    // Show once-daily notice if local parser was used
+    if (!isFakeTest &&
+        goalUsedLocalParser &&
+        await FallbackNoticeStorage.shouldShowNoticeToday()) {
+      await FallbackNoticeStorage.markNoticeShownToday();
+      if (activeContext != null && activeContext.mounted) {
+        _showVoiceFeedbackSnackBar(
+          context: activeContext,
+          messenger: activeMessenger,
+          message: GeminiModelsConfig.fallbackNoticeText,
+        );
+      } else if (activeMessenger != null) {
+        _showVoiceFeedbackSnackBar(
+          messenger: activeMessenger,
+          message: GeminiModelsConfig.fallbackNoticeText,
+        );
+      }
     }
 
     // Save goal with target in piastres (never log or save spoken sentence)
@@ -920,87 +1067,75 @@ class VoiceRecordingNotifier extends Notifier<bool> {
 
     final parser = ref.read(geminiExpenseParserProvider);
     final key = parser.apiKey;
-    if (key == null || key.isEmpty) {
-      ref.read(voiceIsAnalyzingProvider.notifier).setVal(false);
-      if (activeContext != null && activeContext.mounted) {
-        _showConfigErrorDialog(
-          context: activeContext,
-          message:
-              'مفتاح GEMINI_API_KEY غير موجود في ملف .env أو إعدادات التطبيق. يرجى إضافته لمعالجة الصوت بالذكاء الاصطناعي.',
-          onManual: () {
-            activeContext.push('/add-expense');
-          },
-        );
-      }
-      return;
-    }
 
     final categories = await ref.read(getCategoriesUseCaseProvider)();
     final userRules =
         await ref.read(saveUserRuleUseCaseProvider).getRecentRules(limit: 50);
 
+    final isFakeTest =
+        _speechService != null && _speechService is! SpeechToTextServiceImpl;
+
     AudioParseResult? result;
     int geminiRequestMs = 0;
     final geminiSw = Stopwatch()..start();
-    try {
-      result = await parser.parseAudio(
-        File(audioPath),
-        categories: categories,
-        userRules: userRules,
-      );
-      geminiRequestMs = geminiSw.elapsedMilliseconds;
-    } catch (e) {
-      geminiRequestMs = geminiSw.elapsedMilliseconds;
-      if (kDebugMode) {
-        debugPrint('[AUDIO_DEBUG] Exception in processAudioFile: $e');
+    if (!isFakeTest && key != null && key.isNotEmpty) {
+      try {
+        result = await parser.parseAudio(
+          File(audioPath),
+          categories: categories,
+          userRules: userRules,
+        );
+        geminiRequestMs = geminiSw.elapsedMilliseconds;
+      } catch (e) {
+        geminiRequestMs = geminiSw.elapsedMilliseconds;
+        if (kDebugMode) {
+          debugPrint('[AUDIO_DEBUG] Exception in processAudioFile: $e');
+        }
       }
     }
 
-    // Fallback to local parser if Gemini failed or timed out (never calls network)
-    if (result == null && fallbackSpeechText != null && fallbackSpeechText.isNotEmpty) {
-      final localOps = EgyptianExpenseParser.parse(
-        fallbackSpeechText,
-        customCategories: categories.map((c) => c.name).toList(),
-        userRules: userRules,
+    bool usedLocalParser = false;
+
+    // Fallback to local parser silently if Gemini failed or timed out (never calls network)
+    if (result == null) {
+      usedLocalParser = true;
+      final speechText = fallbackSpeechText ?? '';
+      final localOps = speechText.isNotEmpty
+          ? EgyptianExpenseParser.parse(
+              speechText,
+              customCategories: categories.map((c) => c.name).toList(),
+              userRules: userRules,
+            )
+          : <ParsedExpense>[];
+      result = AudioParseResult(
+        transcript: speechText,
+        operations: localOps,
       );
-      if (localOps.isNotEmpty) {
-        result = AudioParseResult(
-          transcript: fallbackSpeechText,
-          operations: localOps,
-        );
-      }
     }
 
     ref.read(voiceIsAnalyzingProvider.notifier).setVal(false);
-
-    if (result == null) {
-      // Failed (network / timeout / server error): Do NOT delete audio file!
-      final errorReason = parser.lastErrorMessage;
-      if (activeContext != null && activeContext.mounted) {
-        _showErrorRetryDialog(
-          context: activeContext,
-          message: errorReason,
-          onRetry: () => processAudioFile(
-            audioPath,
-            fallbackSpeechText: fallbackSpeechText,
-            context: activeContext,
-          ),
-          onManual: () {
-            activeContext.push('/add-expense');
-          },
-        );
-      }
-      return;
-    }
 
     if (result.operations.isEmpty) {
       if (activeContext != null && activeContext.mounted) {
         _showVoiceFeedbackSnackBar(
           context: activeContext,
-          message: 'ماسمعتش مبالغ في التسجيل، جرّب تاني',
+          message: 'ماسمعتش مبلغ، جرّب تاني',
         );
       }
+      await _deleteAudioAfterSuccess(audioPath);
       return;
+    }
+
+    if (!isFakeTest &&
+        usedLocalParser &&
+        await FallbackNoticeStorage.shouldShowNoticeToday()) {
+      await FallbackNoticeStorage.markNoticeShownToday();
+      if (activeContext != null && activeContext.mounted) {
+        _showVoiceFeedbackSnackBar(
+          context: activeContext,
+          message: GeminiModelsConfig.fallbackNoticeText,
+        );
+      }
     }
 
     final skipReview = ref.read(skipVoiceReviewProvider);
@@ -1016,7 +1151,8 @@ class VoiceRecordingNotifier extends Notifier<bool> {
         categories: categories,
         transcript: result.transcript,
         onSave: (reviewedExpenses) async {
-          await _saveExpenses(expenses: reviewedExpenses, categories: categories);
+          await _saveExpenses(
+              expenses: reviewedExpenses, categories: categories);
           await _deleteAudioAfterSuccess(audioPath);
         },
       );
@@ -1033,12 +1169,14 @@ class VoiceRecordingNotifier extends Notifier<bool> {
   }
 
   Future<void> _deleteAudioAfterSuccess(String audioPath) async {
-    try {
-      final f = File(audioPath);
-      if (await f.exists()) {
-        await f.delete();
-      }
-    } catch (_) {}
+    if (!audioPath.startsWith('fake_')) {
+      try {
+        final f = File(audioPath);
+        if (await f.exists()) {
+          await f.delete();
+        }
+      } catch (_) {}
+    }
     await PendingRecordingStorage.clear();
     ref.read(pendingVoiceAudioPathProvider.notifier).setVal(null);
   }
@@ -1055,137 +1193,6 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     }
     await PendingRecordingStorage.clear();
     ref.read(pendingVoiceAudioPathProvider.notifier).setVal(null);
-  }
-
-  void _showErrorRetryDialog({
-    required BuildContext context,
-    required String message,
-    required VoidCallback onRetry,
-    required VoidCallback onManual,
-  }) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          backgroundColor: AppColors.card,
-          title: const Row(
-            children: [
-              Icon(Icons.wifi_off_rounded, color: Colors.orangeAccent),
-              SizedBox(width: 8),
-              Text(
-                'تعذر الاتصال',
-                style: TextStyle(
-                  fontFamily: AppTheme.fontFamily,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          content: Text(
-            message,
-            style: const TextStyle(
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 14,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                onManual();
-              },
-              child: const Text(
-                'إضافة يدوي',
-                style: TextStyle(fontFamily: AppTheme.fontFamily),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                onRetry();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.mainGreen,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text(
-                'إعادة المحاولة',
-                style: TextStyle(
-                  fontFamily: AppTheme.fontFamily,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showConfigErrorDialog({
-    required BuildContext context,
-    required String message,
-    required VoidCallback onManual,
-  }) {
-    showDialog(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          backgroundColor: AppColors.card,
-          title: const Row(
-            children: [
-              Icon(Icons.key_off_rounded, color: Colors.amber),
-              SizedBox(width: 8),
-              Text(
-                'إعدادات الذكاء الاصطناعي',
-                style: TextStyle(
-                  fontFamily: AppTheme.fontFamily,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          content: Text(
-            message,
-            style: const TextStyle(
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 14,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text(
-                'إغلاق',
-                style: TextStyle(fontFamily: AppTheme.fontFamily),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                onManual();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.mainGreen,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text(
-                'إضافة يدوي',
-                style: TextStyle(
-                  fontFamily: AppTheme.fontFamily,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   // Backward compatibility static helpers

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import '../../../../core/constants/gemini_models_config.dart';
 import '../../../../core/utils/category_icon_helper.dart';
 import '../../../../core/utils/category_matcher.dart';
 import '../../../../core/utils/goal_icon_helper.dart';
@@ -75,10 +76,10 @@ class GeminiExpenseParser {
   final http.Client _client;
   final String? _apiKeyOverride;
   final String? modelOverride;
+  final List<String>? candidateModelsOverride;
 
   /// Default model name for audio and text processing.
-  /// Configurable in this single constant.
-  static const String modelName = 'gemini-3.6-flash';
+  static const String modelName = 'gemini-3.5-flash-lite';
 
   static const String baseUrl =
       'https://generativelanguage.googleapis.com/v1beta/models';
@@ -264,8 +265,12 @@ class GeminiExpenseParser {
     http.Client? client,
     String? apiKey,
     this.modelOverride,
+    this.candidateModelsOverride,
   })  : _client = client ?? http.Client(),
         _apiKeyOverride = apiKey;
+
+  /// Tracks how many Gemini HTTP requests were used during the last recording.
+  int lastRecordingGeminiRequestCount = 0;
 
   /// Tracks the last audio error type for user-friendly error messages.
   GeminiAudioErrorType lastAudioError = GeminiAudioErrorType.none;
@@ -317,15 +322,9 @@ class GeminiExpenseParser {
     return modelName;
   }
 
-  /// Pre-warms the HTTP connection and DNS cache for Gemini in advance
-  Future<void> warmUp() async {
-    try {
-      final key = apiKey;
-      if (key == null || key.isEmpty) return;
-      final url = Uri.parse('$baseUrl/$activeModelName?key=$key');
-      unawaited(_client.get(url).catchError((_) => http.Response('', 500)));
-    } catch (_) {}
-  }
+  /// Pre-warms connection. Intentionally performs NO network requests
+  /// to ensure each recording consumes strictly 1 request and avoids quota spikes.
+  Future<void> warmUp() async {}
 
   /// Builds the resolved system prompt using [geminiSystemPromptTemplate]
   static String buildAudioSystemPrompt({
@@ -360,19 +359,17 @@ class GeminiExpenseParser {
   }) async {
     final key = apiKey;
     if (key == null || key.isEmpty) {
+      lastRecordingGeminiRequestCount = 0;
       if (kDebugMode) {
-        debugPrint(
-          '[AUDIO_DEBUG] [ERROR] GEMINI_API_KEY is not set or empty.',
-        );
+        debugPrint('0');
       }
       return null;
     }
 
     if (!await audioFile.exists()) {
+      lastRecordingGeminiRequestCount = 0;
       if (kDebugMode) {
-        debugPrint(
-          '[AUDIO_DEBUG] [ERROR] Audio file does not exist at: ${audioFile.path}',
-        );
+        debugPrint('0');
       }
       return null;
     }
@@ -398,11 +395,11 @@ class GeminiExpenseParser {
     );
 
     final base64Audio = base64Encode(fileBytes);
-    final candidateModels = <String>[
-      'gemini-3.6-flash',
-      'gemini-3.8-flash',
-      'gemini-3.5-flash-lite',
-    ];
+    final candidateList =
+        candidateModelsOverride ?? GeminiModelsConfig.fallbackModels;
+    final availableModels = candidateList
+        .where((m) => !GeminiModelManager.isModelExhausted(m))
+        .toList();
 
     final requestPayload = {
       'systemInstruction': {
@@ -437,16 +434,35 @@ class GeminiExpenseParser {
       }
     };
 
-    // Reset error state
+    // Reset error state and request count
     lastAudioError = GeminiAudioErrorType.none;
     lastStatusCode = null;
+    lastRecordingGeminiRequestCount = 0;
 
+    if (availableModels.isEmpty) {
+      if (kDebugMode) {
+        debugPrint('0');
+      }
+      return null;
+    }
+
+    int requestCounter = 0;
     AudioParseResult? result;
+    final overallStopwatch = Stopwatch()..start();
+    const maxTotalBudgetMs = 6000;
 
-    for (int mIndex = 0; mIndex < candidateModels.length; mIndex++) {
-      final currentModel = candidateModels[mIndex];
+    for (int mIndex = 0; mIndex < availableModels.length; mIndex++) {
+      final remainingMs =
+          maxTotalBudgetMs - overallStopwatch.elapsedMilliseconds;
+      if (remainingMs <= 300) {
+        // Exceeded total 6s budget for Gemini: fall to local parser silently
+        break;
+      }
+
+      final currentModel = availableModels[mIndex];
       final url = Uri.parse('$baseUrl/$currentModel:generateContent?key=$key');
       final stopwatch = Stopwatch()..start();
+      requestCounter++;
 
       try {
         final response = await _client
@@ -455,7 +471,7 @@ class GeminiExpenseParser {
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode(requestPayload),
             )
-            .timeout(const Duration(seconds: 6));
+            .timeout(Duration(milliseconds: remainingMs));
 
         stopwatch.stop();
         final latencyMs = stopwatch.elapsedMilliseconds;
@@ -463,6 +479,7 @@ class GeminiExpenseParser {
 
         if (response.statusCode != 200) {
           if (response.statusCode == 429) {
+            GeminiModelManager.markExhausted(currentModel);
             logGeminiFailure('429', 429);
             lastAudioError = GeminiAudioErrorType.rateLimited;
           } else if (response.statusCode >= 500 && response.statusCode < 600) {
@@ -473,7 +490,7 @@ class GeminiExpenseParser {
             lastAudioError = GeminiAudioErrorType.network;
           }
 
-          if (mIndex + 1 < candidateModels.length) continue;
+          if (mIndex + 1 < availableModels.length) continue;
           break;
         }
 
@@ -483,7 +500,7 @@ class GeminiExpenseParser {
         } catch (_) {
           logGeminiFailure('invalid JSON', response.statusCode);
           lastAudioError = GeminiAudioErrorType.unknown;
-          if (mIndex + 1 < candidateModels.length) continue;
+          if (mIndex + 1 < availableModels.length) continue;
           break;
         }
 
@@ -491,7 +508,7 @@ class GeminiExpenseParser {
         if (candidates == null || candidates.isEmpty) {
           logGeminiFailure('invalid JSON', response.statusCode);
           lastAudioError = GeminiAudioErrorType.unknown;
-          if (mIndex + 1 < candidateModels.length) continue;
+          if (mIndex + 1 < availableModels.length) continue;
           break;
         }
 
@@ -501,7 +518,7 @@ class GeminiExpenseParser {
         if (rawText == null || rawText.trim().isEmpty) {
           logGeminiFailure('invalid JSON', response.statusCode);
           lastAudioError = GeminiAudioErrorType.unknown;
-          if (mIndex + 1 < candidateModels.length) continue;
+          if (mIndex + 1 < availableModels.length) continue;
           break;
         }
 
@@ -511,14 +528,14 @@ class GeminiExpenseParser {
         } catch (_) {
           logGeminiFailure('invalid JSON', response.statusCode);
           lastAudioError = GeminiAudioErrorType.unknown;
-          if (mIndex + 1 < candidateModels.length) continue;
+          if (mIndex + 1 < availableModels.length) continue;
           break;
         }
 
         if (decoded is! Map<String, dynamic>) {
           logGeminiFailure('invalid JSON', response.statusCode);
           lastAudioError = GeminiAudioErrorType.unknown;
-          if (mIndex + 1 < candidateModels.length) continue;
+          if (mIndex + 1 < availableModels.length) continue;
           break;
         }
 
@@ -553,19 +570,19 @@ class GeminiExpenseParser {
         stopwatch.stop();
         logGeminiFailure('network', null);
         lastAudioError = GeminiAudioErrorType.network;
-        if (mIndex + 1 < candidateModels.length) continue;
+        if (mIndex + 1 < availableModels.length) continue;
         break;
       } on TimeoutException catch (_) {
         stopwatch.stop();
         logGeminiFailure('timeout', null);
         lastAudioError = GeminiAudioErrorType.network;
-        if (mIndex + 1 < candidateModels.length) continue;
+        if (mIndex + 1 < availableModels.length) continue;
         break;
       } on http.ClientException catch (_) {
         stopwatch.stop();
         logGeminiFailure('network', null);
         lastAudioError = GeminiAudioErrorType.network;
-        if (mIndex + 1 < candidateModels.length) continue;
+        if (mIndex + 1 < availableModels.length) continue;
         break;
       } catch (_) {
         stopwatch.stop();
@@ -573,6 +590,11 @@ class GeminiExpenseParser {
         lastAudioError = GeminiAudioErrorType.unknown;
         break;
       }
+    }
+
+    lastRecordingGeminiRequestCount = requestCounter;
+    if (kDebugMode) {
+      debugPrint('$requestCounter');
     }
 
     return result;
@@ -601,17 +623,29 @@ $keysList
   /// Sends a continuous audio file to Gemini to extract a goal, amount, and icon.
   Future<GoalAudioParseResult?> parseGoalAudio(File audioFile) async {
     final key = apiKey;
-    if (key == null || key.isEmpty) return null;
-    if (!await audioFile.exists()) return null;
+    if (key == null || key.isEmpty) {
+      lastRecordingGeminiRequestCount = 0;
+      if (kDebugMode) {
+        debugPrint('0');
+      }
+      return null;
+    }
+    if (!await audioFile.exists()) {
+      lastRecordingGeminiRequestCount = 0;
+      if (kDebugMode) {
+        debugPrint('0');
+      }
+      return null;
+    }
 
     final fileBytes = await audioFile.readAsBytes();
     final fileSizeBytes = fileBytes.length;
     final base64Audio = base64Encode(fileBytes);
-    final candidateModels = <String>[
-      'gemini-3.6-flash',
-      'gemini-3.8-flash',
-      'gemini-3.5-flash-lite',
-    ];
+    final candidateList =
+        candidateModelsOverride ?? GeminiModelsConfig.fallbackModels;
+    final availableModels = candidateList
+        .where((m) => !GeminiModelManager.isModelExhausted(m))
+        .toList();
 
     final requestPayload = {
       'systemInstruction': {
@@ -648,12 +682,31 @@ $keysList
 
     lastAudioError = GeminiAudioErrorType.none;
     lastStatusCode = null;
-    GoalAudioParseResult? result;
+    lastRecordingGeminiRequestCount = 0;
 
-    for (int mIndex = 0; mIndex < candidateModels.length; mIndex++) {
-      final currentModel = candidateModels[mIndex];
+    if (availableModels.isEmpty) {
+      if (kDebugMode) {
+        debugPrint('0');
+      }
+      return null;
+    }
+
+    int requestCounter = 0;
+    GoalAudioParseResult? result;
+    final overallStopwatch = Stopwatch()..start();
+    const maxTotalBudgetMs = 6000;
+
+    for (int mIndex = 0; mIndex < availableModels.length; mIndex++) {
+      final remainingMs =
+          maxTotalBudgetMs - overallStopwatch.elapsedMilliseconds;
+      if (remainingMs <= 300) {
+        break;
+      }
+
+      final currentModel = availableModels[mIndex];
       final url = Uri.parse('$baseUrl/$currentModel:generateContent?key=$key');
       final stopwatch = Stopwatch()..start();
+      requestCounter++;
 
       try {
         final response = await _client
@@ -662,7 +715,7 @@ $keysList
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode(requestPayload),
             )
-            .timeout(const Duration(seconds: 6));
+            .timeout(Duration(milliseconds: remainingMs));
 
         stopwatch.stop();
         final latencyMs = stopwatch.elapsedMilliseconds;
@@ -670,6 +723,7 @@ $keysList
 
         if (response.statusCode != 200) {
           if (response.statusCode == 429) {
+            GeminiModelManager.markExhausted(currentModel);
             logGeminiFailure('429', 429);
             lastAudioError = GeminiAudioErrorType.rateLimited;
           } else if (response.statusCode >= 500 && response.statusCode < 600) {
@@ -679,7 +733,7 @@ $keysList
             logGeminiFailure('network', response.statusCode);
             lastAudioError = GeminiAudioErrorType.network;
           }
-          if (mIndex + 1 < candidateModels.length) continue;
+          if (mIndex + 1 < availableModels.length) continue;
           break;
         }
 
@@ -688,14 +742,14 @@ $keysList
           jsonBody = jsonDecode(response.body) as Map<String, dynamic>;
         } catch (_) {
           logGeminiFailure('invalid JSON', response.statusCode);
-          if (mIndex + 1 < candidateModels.length) continue;
+          if (mIndex + 1 < availableModels.length) continue;
           break;
         }
 
         final candidates = jsonBody['candidates'] as List<dynamic>?;
         if (candidates == null || candidates.isEmpty) {
           logGeminiFailure('invalid JSON', response.statusCode);
-          if (mIndex + 1 < candidateModels.length) continue;
+          if (mIndex + 1 < availableModels.length) continue;
           break;
         }
 
@@ -704,7 +758,7 @@ $keysList
         final rawText = parts?.first?['text'] as String?;
         if (rawText == null || rawText.trim().isEmpty) {
           logGeminiFailure('invalid JSON', response.statusCode);
-          if (mIndex + 1 < candidateModels.length) continue;
+          if (mIndex + 1 < availableModels.length) continue;
           break;
         }
 
@@ -713,13 +767,13 @@ $keysList
           decoded = jsonDecode(rawText);
         } catch (_) {
           logGeminiFailure('invalid JSON', response.statusCode);
-          if (mIndex + 1 < candidateModels.length) continue;
+          if (mIndex + 1 < availableModels.length) continue;
           break;
         }
 
         if (decoded is! Map<String, dynamic>) {
           logGeminiFailure('invalid JSON', response.statusCode);
-          if (mIndex + 1 < candidateModels.length) continue;
+          if (mIndex + 1 < availableModels.length) continue;
           break;
         }
 
@@ -737,7 +791,7 @@ $keysList
 
         if (targetAmountEgp <= 0 || goalName.trim().isEmpty) {
           logGeminiFailure('invalid JSON', response.statusCode);
-          if (mIndex + 1 < candidateModels.length) continue;
+          if (mIndex + 1 < availableModels.length) continue;
           break;
         }
 
@@ -756,19 +810,19 @@ $keysList
         stopwatch.stop();
         logGeminiFailure('network', null);
         lastAudioError = GeminiAudioErrorType.network;
-        if (mIndex + 1 < candidateModels.length) continue;
+        if (mIndex + 1 < availableModels.length) continue;
         break;
       } on TimeoutException catch (_) {
         stopwatch.stop();
         logGeminiFailure('timeout', null);
         lastAudioError = GeminiAudioErrorType.network;
-        if (mIndex + 1 < candidateModels.length) continue;
+        if (mIndex + 1 < availableModels.length) continue;
         break;
       } on http.ClientException catch (_) {
         stopwatch.stop();
         logGeminiFailure('network', null);
         lastAudioError = GeminiAudioErrorType.network;
-        if (mIndex + 1 < candidateModels.length) continue;
+        if (mIndex + 1 < availableModels.length) continue;
         break;
       } catch (_) {
         stopwatch.stop();
@@ -776,6 +830,11 @@ $keysList
         lastAudioError = GeminiAudioErrorType.unknown;
         break;
       }
+    }
+
+    lastRecordingGeminiRequestCount = requestCounter;
+    if (kDebugMode) {
+      debugPrint('$requestCounter');
     }
 
     return result;

@@ -511,11 +511,11 @@ class _VoiceExpenseReviewSheetState
                   const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.card,
+                    child: Material(
+                      color: AppColors.card,
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12.0),
-                        border: Border.all(color: AppColors.dividers),
+                        side: const BorderSide(color: AppColors.dividers),
                       ),
                       child: Theme(
                         data: Theme.of(context).copyWith(
