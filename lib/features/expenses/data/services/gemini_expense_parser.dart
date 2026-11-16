@@ -260,6 +260,119 @@ class GeminiExpenseParser {
     }
   }
 
+  /// Diagnostic helper printing detailed Gemini attempt metadata in debug mode.
+  /// Strictly one line per attempt, no secrets, no financial or spoken data.
+  static void _logGeminiAttemptDiagnostic({
+    required int attemptNumber,
+    required int totalAttempts,
+    required String modelId,
+    required int elapsedMs,
+    required int? httpStatusCode,
+    required String? exceptionClassName,
+    required String? rawResponseBody,
+    required Map<String, dynamic> requestPayload,
+    String? apiKeyToRedact,
+  }) {
+    if (!kDebugMode) return;
+
+    // 1. Gemini error.message text from the JSON error body cut to 120 characters (only for HTTP errors)
+    String geminiErrorMsg = 'none';
+    if (httpStatusCode != null &&
+        httpStatusCode != 200 &&
+        rawResponseBody != null &&
+        rawResponseBody.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawResponseBody);
+        if (decoded is Map<String, dynamic>) {
+          String? msg;
+          if (decoded['error'] is Map<String, dynamic>) {
+            final errorObj = decoded['error'] as Map<String, dynamic>;
+            msg = errorObj['message']?.toString();
+          } else if (decoded['message'] != null) {
+            msg = decoded['message']?.toString();
+          }
+          if (msg != null && msg.isNotEmpty) {
+            String sanitized = msg;
+            if (apiKeyToRedact != null && apiKeyToRedact.isNotEmpty) {
+              sanitized = sanitized.replaceAll(apiKeyToRedact, '[REDACTED]');
+            }
+            sanitized =
+                sanitized.replaceAll(RegExp(r'[\r\n\t]+'), ' ').trim();
+            geminiErrorMsg = sanitized.length > 120
+                ? sanitized.substring(0, 120)
+                : sanitized;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. Audio mime type sent and size of base64 audio in characters
+    String mimeType = 'audio/mp4';
+    int base64Length = 0;
+    try {
+      final contents = requestPayload['contents'] as List<dynamic>?;
+      final firstContent = contents?.first as Map<String, dynamic>?;
+      final contentParts = firstContent?['parts'] as List<dynamic>?;
+      if (contentParts != null) {
+        for (final p in contentParts) {
+          if (p is Map<String, dynamic> &&
+              p['inline_data'] is Map<String, dynamic>) {
+            final inlineData = p['inline_data'] as Map<String, dynamic>;
+            mimeType = inlineData['mime_type']?.toString() ?? mimeType;
+            final dataStr = inlineData['data']?.toString() ?? '';
+            base64Length = dataStr.length;
+            break;
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. NAMES ONLY of the keys inside generationConfig and any thinking or tool settings
+    final genConfig =
+        requestPayload['generationConfig'] as Map<String, dynamic>?;
+    final genConfigKeys =
+        genConfig != null ? genConfig.keys.toList().toString() : '[]';
+
+    final dynamic thinkingConfig =
+        genConfig?['thinkingConfig'] ?? requestPayload['thinkingConfig'];
+    final thinkingKeys = thinkingConfig is Map
+        ? thinkingConfig.keys.toList().toString()
+        : '[]';
+
+    final dynamic tools =
+        requestPayload['tools'] ?? requestPayload['toolConfig'];
+    final toolKeys = tools is Map
+        ? tools.keys.toList().toString()
+        : (tools is List
+            ? tools
+                .map((e) => e is Map ? e.keys.toList().toString() : 'tool')
+                .toList()
+                .toString()
+            : '[]');
+
+    final exceptionDisplay =
+        (exceptionClassName != null && exceptionClassName.isNotEmpty)
+            ? exceptionClassName
+            : 'none';
+    final httpStatusDisplay =
+        httpStatusCode != null ? httpStatusCode.toString() : 'none';
+
+    debugPrint(
+      '[GEMINI_DIAGNOSTIC] '
+      'attempt=$attemptNumber/$totalAttempts '
+      'model=$modelId '
+      'elapsed_ms=$elapsedMs '
+      'http_status=$httpStatusDisplay '
+      'exception=$exceptionDisplay '
+      'gemini_error="$geminiErrorMsg" '
+      'mime_type=$mimeType '
+      'base64_chars=$base64Length '
+      'gen_config_keys=$genConfigKeys '
+      'thinking_keys=$thinkingKeys '
+      'tool_keys=$toolKeys',
+    );
+  }
+
   GeminiExpenseParser({
     http.Client? client,
     String? apiKey,
@@ -441,12 +554,19 @@ class GeminiExpenseParser {
     lastAudioError = GeminiAudioErrorType.none;
     lastStatusCode = null;
 
+    if (kDebugMode) {
+      debugPrint(
+        '[GEMINI_DIAGNOSTIC] Recording chain models: [${candidateModels.join(', ')}], timeout per attempt: 6s',
+      );
+    }
+
     AudioParseResult? result;
 
     for (int mIndex = 0; mIndex < candidateModels.length; mIndex++) {
       final currentModel = candidateModels[mIndex];
       final url = Uri.parse('$baseUrl/$currentModel:generateContent?key=$key');
       final stopwatch = Stopwatch()..start();
+      bool attemptLogged = false;
 
       try {
         final response = await _client
@@ -460,6 +580,19 @@ class GeminiExpenseParser {
         stopwatch.stop();
         final latencyMs = stopwatch.elapsedMilliseconds;
         lastStatusCode = response.statusCode;
+
+        _logGeminiAttemptDiagnostic(
+          attemptNumber: mIndex + 1,
+          totalAttempts: candidateModels.length,
+          modelId: currentModel,
+          elapsedMs: latencyMs,
+          httpStatusCode: response.statusCode,
+          exceptionClassName: null,
+          rawResponseBody: response.statusCode != 200 ? response.body : null,
+          requestPayload: requestPayload,
+          apiKeyToRedact: key,
+        );
+        attemptLogged = true;
 
         if (response.statusCode != 200) {
           if (response.statusCode == 429) {
@@ -549,26 +682,82 @@ class GeminiExpenseParser {
         );
         lastAudioError = GeminiAudioErrorType.none;
         break; // Successfully completed!
-      } on SocketException catch (_) {
+      } on SocketException catch (e) {
         stopwatch.stop();
+        if (!attemptLogged) {
+          _logGeminiAttemptDiagnostic(
+            attemptNumber: mIndex + 1,
+            totalAttempts: candidateModels.length,
+            modelId: currentModel,
+            elapsedMs: stopwatch.elapsedMilliseconds,
+            httpStatusCode: null,
+            exceptionClassName: e.runtimeType.toString(),
+            rawResponseBody: null,
+            requestPayload: requestPayload,
+            apiKeyToRedact: key,
+          );
+          attemptLogged = true;
+        }
         logGeminiFailure('network', null);
         lastAudioError = GeminiAudioErrorType.network;
         if (mIndex + 1 < candidateModels.length) continue;
         break;
-      } on TimeoutException catch (_) {
+      } on TimeoutException catch (e) {
         stopwatch.stop();
+        if (!attemptLogged) {
+          _logGeminiAttemptDiagnostic(
+            attemptNumber: mIndex + 1,
+            totalAttempts: candidateModels.length,
+            modelId: currentModel,
+            elapsedMs: stopwatch.elapsedMilliseconds,
+            httpStatusCode: null,
+            exceptionClassName: e.runtimeType.toString(),
+            rawResponseBody: null,
+            requestPayload: requestPayload,
+            apiKeyToRedact: key,
+          );
+          attemptLogged = true;
+        }
         logGeminiFailure('timeout', null);
         lastAudioError = GeminiAudioErrorType.network;
         if (mIndex + 1 < candidateModels.length) continue;
         break;
-      } on http.ClientException catch (_) {
+      } on http.ClientException catch (e) {
         stopwatch.stop();
+        if (!attemptLogged) {
+          _logGeminiAttemptDiagnostic(
+            attemptNumber: mIndex + 1,
+            totalAttempts: candidateModels.length,
+            modelId: currentModel,
+            elapsedMs: stopwatch.elapsedMilliseconds,
+            httpStatusCode: null,
+            exceptionClassName: e.runtimeType.toString(),
+            rawResponseBody: null,
+            requestPayload: requestPayload,
+            apiKeyToRedact: key,
+          );
+          attemptLogged = true;
+        }
         logGeminiFailure('network', null);
         lastAudioError = GeminiAudioErrorType.network;
         if (mIndex + 1 < candidateModels.length) continue;
         break;
-      } catch (_) {
+      } catch (e) {
         stopwatch.stop();
+        if (!attemptLogged) {
+          _logGeminiAttemptDiagnostic(
+            attemptNumber: mIndex + 1,
+            totalAttempts: candidateModels.length,
+            modelId: currentModel,
+            elapsedMs: stopwatch.elapsedMilliseconds,
+            httpStatusCode: lastStatusCode,
+            exceptionClassName: e.runtimeType.toString(),
+            rawResponseBody: null,
+            requestPayload: requestPayload,
+            apiKeyToRedact: key,
+          );
+          attemptLogged = true;
+        }
         logGeminiFailure('invalid JSON', lastStatusCode);
         lastAudioError = GeminiAudioErrorType.unknown;
         break;
@@ -648,12 +837,20 @@ $keysList
 
     lastAudioError = GeminiAudioErrorType.none;
     lastStatusCode = null;
+
+    if (kDebugMode) {
+      debugPrint(
+        '[GEMINI_DIAGNOSTIC] Recording chain models: [${candidateModels.join(', ')}], timeout per attempt: 6s',
+      );
+    }
+
     GoalAudioParseResult? result;
 
     for (int mIndex = 0; mIndex < candidateModels.length; mIndex++) {
       final currentModel = candidateModels[mIndex];
       final url = Uri.parse('$baseUrl/$currentModel:generateContent?key=$key');
       final stopwatch = Stopwatch()..start();
+      bool attemptLogged = false;
 
       try {
         final response = await _client
@@ -667,6 +864,19 @@ $keysList
         stopwatch.stop();
         final latencyMs = stopwatch.elapsedMilliseconds;
         lastStatusCode = response.statusCode;
+
+        _logGeminiAttemptDiagnostic(
+          attemptNumber: mIndex + 1,
+          totalAttempts: candidateModels.length,
+          modelId: currentModel,
+          elapsedMs: latencyMs,
+          httpStatusCode: response.statusCode,
+          exceptionClassName: null,
+          rawResponseBody: response.statusCode != 200 ? response.body : null,
+          requestPayload: requestPayload,
+          apiKeyToRedact: key,
+        );
+        attemptLogged = true;
 
         if (response.statusCode != 200) {
           if (response.statusCode == 429) {
@@ -752,26 +962,82 @@ $keysList
         );
         lastAudioError = GeminiAudioErrorType.none;
         break;
-      } on SocketException catch (_) {
+      } on SocketException catch (e) {
         stopwatch.stop();
+        if (!attemptLogged) {
+          _logGeminiAttemptDiagnostic(
+            attemptNumber: mIndex + 1,
+            totalAttempts: candidateModels.length,
+            modelId: currentModel,
+            elapsedMs: stopwatch.elapsedMilliseconds,
+            httpStatusCode: null,
+            exceptionClassName: e.runtimeType.toString(),
+            rawResponseBody: null,
+            requestPayload: requestPayload,
+            apiKeyToRedact: key,
+          );
+          attemptLogged = true;
+        }
         logGeminiFailure('network', null);
         lastAudioError = GeminiAudioErrorType.network;
         if (mIndex + 1 < candidateModels.length) continue;
         break;
-      } on TimeoutException catch (_) {
+      } on TimeoutException catch (e) {
         stopwatch.stop();
+        if (!attemptLogged) {
+          _logGeminiAttemptDiagnostic(
+            attemptNumber: mIndex + 1,
+            totalAttempts: candidateModels.length,
+            modelId: currentModel,
+            elapsedMs: stopwatch.elapsedMilliseconds,
+            httpStatusCode: null,
+            exceptionClassName: e.runtimeType.toString(),
+            rawResponseBody: null,
+            requestPayload: requestPayload,
+            apiKeyToRedact: key,
+          );
+          attemptLogged = true;
+        }
         logGeminiFailure('timeout', null);
         lastAudioError = GeminiAudioErrorType.network;
         if (mIndex + 1 < candidateModels.length) continue;
         break;
-      } on http.ClientException catch (_) {
+      } on http.ClientException catch (e) {
         stopwatch.stop();
+        if (!attemptLogged) {
+          _logGeminiAttemptDiagnostic(
+            attemptNumber: mIndex + 1,
+            totalAttempts: candidateModels.length,
+            modelId: currentModel,
+            elapsedMs: stopwatch.elapsedMilliseconds,
+            httpStatusCode: null,
+            exceptionClassName: e.runtimeType.toString(),
+            rawResponseBody: null,
+            requestPayload: requestPayload,
+            apiKeyToRedact: key,
+          );
+          attemptLogged = true;
+        }
         logGeminiFailure('network', null);
         lastAudioError = GeminiAudioErrorType.network;
         if (mIndex + 1 < candidateModels.length) continue;
         break;
-      } catch (_) {
+      } catch (e) {
         stopwatch.stop();
+        if (!attemptLogged) {
+          _logGeminiAttemptDiagnostic(
+            attemptNumber: mIndex + 1,
+            totalAttempts: candidateModels.length,
+            modelId: currentModel,
+            elapsedMs: stopwatch.elapsedMilliseconds,
+            httpStatusCode: lastStatusCode,
+            exceptionClassName: e.runtimeType.toString(),
+            rawResponseBody: null,
+            requestPayload: requestPayload,
+            apiKeyToRedact: key,
+          );
+          attemptLogged = true;
+        }
         logGeminiFailure('invalid JSON', lastStatusCode);
         lastAudioError = GeminiAudioErrorType.unknown;
         break;

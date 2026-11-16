@@ -878,11 +878,13 @@ class VoiceRecordingNotifier extends Notifier<bool> {
 
     // Validation: If no amount found, save nothing and show snackbar above button
     if (goalResult == null || goalResult.targetAmount <= 0) {
-      _showVoiceFeedbackSnackBar(
-        context: activeContext,
-        messenger: activeMessenger,
-        message: 'ماسمعتش مبلغ، جرّب تاني',
-      );
+      if (activeContext != null && activeContext.mounted) {
+        _showVoiceFeedbackSnackBar(
+          context: activeContext,
+          messenger: activeMessenger,
+          message: 'ماسمعتش مبلغ، جرّب تاني',
+        );
+      }
       return;
     }
 
