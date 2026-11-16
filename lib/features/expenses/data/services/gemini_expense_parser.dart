@@ -80,6 +80,17 @@ class GeminiExpenseParser {
   /// Configurable in this single constant.
   static const String modelName = 'gemini-3.6-flash';
 
+  /// Ordered fallback models for audio processing when a model encounters
+  /// rate limits (429), spikes (503), or quota exhaustion.
+  static const List<String> audioFallbackModels = [
+    'gemini-3.6-flash',
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
+    'gemini-3.5-flash',
+    'gemini-2.5-flash',
+    'gemini-3.5-flash-lite',
+  ];
+
   static const String baseUrl =
       'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -392,12 +403,12 @@ class GeminiExpenseParser {
       case GeminiAudioErrorType.invalidKey:
         return 'مفتاح Gemini مش مظبوط';
       case GeminiAudioErrorType.rateLimited:
-        return 'الخدمة مشغولة، جرب بعد دقيقة';
+        return 'خلص الحد الأقصى للتسجيل الصوتي، وتقدر تستخدم البرنامج بالكتابة مش الريكورد';
       case GeminiAudioErrorType.serverError:
         return 'الخدمة مشغولة، جرب بعد دقيقة';
       case GeminiAudioErrorType.network:
       default:
-        return 'تأكد من الإنترنت';
+        return 'تأكد من الإنترنت، تعذر إرسال التسجيل';
     }
   }
 
@@ -428,6 +439,72 @@ class GeminiExpenseParser {
       }
     } catch (_) {}
     return modelName;
+  }
+
+  /// Returns the ordered list of candidate models for audio analysis fallback.
+  List<String> getCandidateModels() {
+    final list = <String>[];
+    if (modelOverride != null && modelOverride!.trim().isNotEmpty) {
+      list.add(modelOverride!.trim());
+    }
+    try {
+      final envAudio = dotenv.env['GEMINI_AUDIO_MODEL']?.trim();
+      if (envAudio != null && envAudio.isNotEmpty) {
+        list.add(envAudio);
+      }
+    } catch (_) {}
+    list.addAll(audioFallbackModels);
+    return list.toSet().toList();
+  }
+
+  /// Builds the request payload for audio analysis, selectively enabling thinking
+  /// only for models that support it to avoid 400 Bad Request errors.
+  static Map<String, dynamic> _buildAudioRequestPayload({
+    required String systemPrompt,
+    required String base64Audio,
+    required String model,
+    required Map<String, dynamic> schema,
+    String userText = 'حلّل التسجيل ده.',
+    int maxTokens = 8192,
+    bool includeThinking = true,
+  }) {
+    final genConfig = <String, dynamic>{
+      'temperature': 0,
+      'responseMimeType': 'application/json',
+      'responseSchema': schema,
+      'maxOutputTokens': maxTokens,
+    };
+
+    if (includeThinking && !model.contains('lite')) {
+      genConfig['thinkingConfig'] = {
+        'thinkingBudget': 0,
+      };
+    }
+
+    return {
+      'systemInstruction': {
+        'parts': [
+          {'text': systemPrompt}
+        ]
+      },
+      'contents': [
+        {
+          'role': 'user',
+          'parts': [
+            {
+              'inline_data': {
+                'mime_type': 'audio/mp4',
+                'data': base64Audio,
+              }
+            },
+            {
+              'text': userText,
+            }
+          ]
+        }
+      ],
+      'generationConfig': genConfig,
+    };
   }
 
   /// Pre-warms the HTTP connection and DNS cache for Gemini in advance
@@ -511,52 +588,16 @@ class GeminiExpenseParser {
     );
 
     final base64Audio = base64Encode(fileBytes);
-    final candidateModels = <String>[
-      'gemini-3.6-flash',
-      'gemini-3.8-flash',
-      'gemini-3.5-flash-lite',
-    ];
-
-    final requestPayload = {
-      'systemInstruction': {
-        'parts': [
-          {'text': systemPrompt}
-        ]
-      },
-      'contents': [
-        {
-          'role': 'user',
-          'parts': [
-            {
-              'inline_data': {
-                'mime_type': 'audio/mp4',
-                'data': base64Audio,
-              }
-            },
-            {
-              'text': 'حلّل التسجيل ده.',
-            }
-          ]
-        }
-      ],
-      'generationConfig': {
-        'temperature': 0,
-        'responseMimeType': 'application/json',
-        'responseSchema': audioResponseSchema,
-        'maxOutputTokens': 8192,
-        'thinkingConfig': {
-          'thinkingBudget': 0,
-        },
-      }
-    };
+    final candidateModels = getCandidateModels();
 
     // Reset error state
     lastAudioError = GeminiAudioErrorType.none;
     lastStatusCode = null;
+    bool hadRateLimit = false;
 
     if (kDebugMode) {
       debugPrint(
-        '[GEMINI_DIAGNOSTIC] Recording chain models: [${candidateModels.join(', ')}], timeout per attempt: 6s',
+        '[GEMINI_DIAGNOSTIC] Recording chain models: [${candidateModels.join(', ')}], timeout per attempt: 25s',
       );
     }
 
@@ -565,17 +606,48 @@ class GeminiExpenseParser {
     for (int mIndex = 0; mIndex < candidateModels.length; mIndex++) {
       final currentModel = candidateModels[mIndex];
       final url = Uri.parse('$baseUrl/$currentModel:generateContent?key=$key');
+      var requestPayload = _buildAudioRequestPayload(
+        systemPrompt: systemPrompt,
+        base64Audio: base64Audio,
+        model: currentModel,
+        schema: audioResponseSchema,
+        userText: 'حلّل التسجيل ده.',
+        maxTokens: 8192,
+        includeThinking: true,
+      );
+
       final stopwatch = Stopwatch()..start();
       bool attemptLogged = false;
 
       try {
-        final response = await _client
+        var response = await _client
             .post(
               url,
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode(requestPayload),
             )
-            .timeout(const Duration(seconds: 6));
+            .timeout(const Duration(seconds: 25));
+
+        // If 400 occurred and we had thinkingConfig enabled, retry once without it
+        if (response.statusCode == 400 &&
+            (requestPayload['generationConfig'] as Map?)?['thinkingConfig'] != null) {
+          requestPayload = _buildAudioRequestPayload(
+            systemPrompt: systemPrompt,
+            base64Audio: base64Audio,
+            model: currentModel,
+            schema: audioResponseSchema,
+            userText: 'حلّل التسجيل ده.',
+            maxTokens: 8192,
+            includeThinking: false,
+          );
+          response = await _client
+              .post(
+                url,
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode(requestPayload),
+              )
+              .timeout(const Duration(seconds: 25));
+        }
 
         stopwatch.stop();
         final latencyMs = stopwatch.elapsedMilliseconds;
@@ -597,6 +669,7 @@ class GeminiExpenseParser {
         if (response.statusCode != 200) {
           if (response.statusCode == 429) {
             logGeminiFailure('429', 429);
+            hadRateLimit = true;
             lastAudioError = GeminiAudioErrorType.rateLimited;
           } else if (response.statusCode >= 500 && response.statusCode < 600) {
             logGeminiFailure('5xx', response.statusCode);
@@ -760,8 +833,13 @@ class GeminiExpenseParser {
         }
         logGeminiFailure('invalid JSON', lastStatusCode);
         lastAudioError = GeminiAudioErrorType.unknown;
+        if (mIndex + 1 < candidateModels.length) continue;
         break;
       }
+    }
+
+    if (result == null && hadRateLimit) {
+      lastAudioError = GeminiAudioErrorType.rateLimited;
     }
 
     return result;
@@ -796,51 +874,15 @@ $keysList
     final fileBytes = await audioFile.readAsBytes();
     final fileSizeBytes = fileBytes.length;
     final base64Audio = base64Encode(fileBytes);
-    final candidateModels = <String>[
-      'gemini-3.6-flash',
-      'gemini-3.8-flash',
-      'gemini-3.5-flash-lite',
-    ];
-
-    final requestPayload = {
-      'systemInstruction': {
-        'parts': [
-          {'text': buildGoalSystemPrompt()}
-        ]
-      },
-      'contents': [
-        {
-          'role': 'user',
-          'parts': [
-            {
-              'inline_data': {
-                'mime_type': 'audio/mp4',
-                'data': base64Audio,
-              }
-            },
-            {
-              'text': 'حلّل هدف التحويش ده.',
-            }
-          ]
-        }
-      ],
-      'generationConfig': {
-        'temperature': 0,
-        'responseMimeType': 'application/json',
-        'responseSchema': goalAudioResponseSchema,
-        'maxOutputTokens': 2048,
-        'thinkingConfig': {
-          'thinkingBudget': 0,
-        },
-      }
-    };
+    final candidateModels = getCandidateModels();
 
     lastAudioError = GeminiAudioErrorType.none;
     lastStatusCode = null;
+    bool hadRateLimit = false;
 
     if (kDebugMode) {
       debugPrint(
-        '[GEMINI_DIAGNOSTIC] Recording chain models: [${candidateModels.join(', ')}], timeout per attempt: 6s',
+        '[GEMINI_DIAGNOSTIC] Recording chain models: [${candidateModels.join(', ')}], timeout per attempt: 25s',
       );
     }
 
@@ -849,17 +891,48 @@ $keysList
     for (int mIndex = 0; mIndex < candidateModels.length; mIndex++) {
       final currentModel = candidateModels[mIndex];
       final url = Uri.parse('$baseUrl/$currentModel:generateContent?key=$key');
+      var requestPayload = _buildAudioRequestPayload(
+        systemPrompt: buildGoalSystemPrompt(),
+        base64Audio: base64Audio,
+        model: currentModel,
+        schema: goalAudioResponseSchema,
+        userText: 'حلّل هدف التحويش ده.',
+        maxTokens: 2048,
+        includeThinking: true,
+      );
+
       final stopwatch = Stopwatch()..start();
       bool attemptLogged = false;
 
       try {
-        final response = await _client
+        var response = await _client
             .post(
               url,
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode(requestPayload),
             )
-            .timeout(const Duration(seconds: 6));
+            .timeout(const Duration(seconds: 25));
+
+        // If 400 occurred and we had thinkingConfig enabled, retry once without it
+        if (response.statusCode == 400 &&
+            (requestPayload['generationConfig'] as Map?)?['thinkingConfig'] != null) {
+          requestPayload = _buildAudioRequestPayload(
+            systemPrompt: buildGoalSystemPrompt(),
+            base64Audio: base64Audio,
+            model: currentModel,
+            schema: goalAudioResponseSchema,
+            userText: 'حلّل هدف التحويش ده.',
+            maxTokens: 2048,
+            includeThinking: false,
+          );
+          response = await _client
+              .post(
+                url,
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode(requestPayload),
+              )
+              .timeout(const Duration(seconds: 25));
+        }
 
         stopwatch.stop();
         final latencyMs = stopwatch.elapsedMilliseconds;
@@ -881,6 +954,7 @@ $keysList
         if (response.statusCode != 200) {
           if (response.statusCode == 429) {
             logGeminiFailure('429', 429);
+            hadRateLimit = true;
             lastAudioError = GeminiAudioErrorType.rateLimited;
           } else if (response.statusCode >= 500 && response.statusCode < 600) {
             logGeminiFailure('5xx', response.statusCode);
@@ -1040,8 +1114,13 @@ $keysList
         }
         logGeminiFailure('invalid JSON', lastStatusCode);
         lastAudioError = GeminiAudioErrorType.unknown;
+        if (mIndex + 1 < candidateModels.length) continue;
         break;
       }
+    }
+
+    if (result == null && hadRateLimit) {
+      lastAudioError = GeminiAudioErrorType.rateLimited;
     }
 
     return result;
@@ -1086,10 +1165,10 @@ $keysList
         if (!amountVerified) {
           if (kDebugMode) {
             debugPrint(
-              '[AUDIO_DEBUG] [VERIFICATION] Amount $amt for "${op.description}" NOT found in transcript. Setting amount=null and needs_review=true.',
+              '[AUDIO_DEBUG] [VERIFICATION] Amount $amt for "${op.description}" NOT found in transcript regex. Keeping amount from AI model and adjusting confidence.',
             );
           }
-          op = op.copyWith(clearAmount: true, confidence: (op.confidence * 0.5));
+          op = op.copyWith(confidence: (op.confidence * 0.8));
         } else {
           if (kDebugMode) {
             debugPrint(

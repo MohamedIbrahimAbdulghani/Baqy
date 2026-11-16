@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/routing/app_router.dart';
+import 'core/services/notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'l10n/app_localizations.dart';
 
@@ -15,6 +16,17 @@ Future<void> main() async {
       debugPrint('[ENV] Warning: Failed to load .env file: $e');
     }
   }
+
+  // Initialize local notifications service and request permissions
+  try {
+    await NotificationService.instance.initialize();
+    await NotificationService.instance.requestPermissions();
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint('[NOTIFICATION] Failed to initialize NotificationService: $e');
+    }
+  }
+
   runApp(
     const ProviderScope(
       child: BaqyApp(),

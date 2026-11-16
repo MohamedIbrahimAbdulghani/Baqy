@@ -20,102 +20,102 @@ abstract final class TransactionActionsHelper {
       builder: (sheetContext) {
         return Directionality(
           textDirection: TextDirection.rtl,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-            decoration: const BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24.0)),
-            ),
-            child: SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.dividers,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    transaction.description,
-                    style: const TextStyle(
-                      fontFamily: AppTheme.fontFamily,
-                      fontSize: 18.0,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.text,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${NumberFormatter.formatCurrency(transaction.amount ~/ 100)} جنيه',
-                    style: const TextStyle(
-                      fontFamily: AppTheme.fontFamily,
-                      fontSize: 15.0,
-                      color: AppColors.secondaryText,
-                    ),
-                  ),
-                  if (transaction.foreignAmount != null &&
-                      transaction.foreignCurrency != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      '≈ ${transaction.foreignAmount} ${transaction.foreignCurrency}',
-                      style: const TextStyle(
-                        fontFamily: AppTheme.fontFamily,
-                        fontSize: 13.0,
-                        color: AppColors.mainGreen,
-                        fontWeight: FontWeight.w600,
+          child: Material(
+            color: AppColors.background,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24.0)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+              child: SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.dividers,
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 20),
-                  ListTile(
-                    leading: const Icon(Icons.edit_outlined, color: AppColors.mainGreen),
-                    title: const Text(
-                      'تعديل العملية',
-                      style: TextStyle(
+                    const SizedBox(height: 16),
+                    Text(
+                      transaction.description,
+                      style: const TextStyle(
                         fontFamily: AppTheme.fontFamily,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 18.0,
+                        fontWeight: FontWeight.bold,
                         color: AppColors.text,
                       ),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.0),
-                    ),
-                    onTap: () {
-                      Navigator.of(sheetContext).pop();
-                      showEditSheet(
-                        context: context,
-                        ref: ref,
-                        transaction: transaction,
-                      );
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                    title: const Text(
-                      'حذف العملية',
-                      style: TextStyle(
+                    const SizedBox(height: 6),
+                    Text(
+                      '${NumberFormatter.formatCurrency(transaction.amount ~/ 100)} جنيه',
+                      style: const TextStyle(
                         fontFamily: AppTheme.fontFamily,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.redAccent,
+                        fontSize: 15.0,
+                        color: AppColors.secondaryText,
                       ),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.0),
+                    if (transaction.foreignAmount != null &&
+                        transaction.foreignCurrency != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '≈ ${transaction.foreignAmount} ${transaction.foreignCurrency}',
+                        style: const TextStyle(
+                          fontFamily: AppTheme.fontFamily,
+                          fontSize: 13.0,
+                          color: AppColors.mainGreen,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    ListTile(
+                      leading: const Icon(Icons.edit_outlined, color: AppColors.mainGreen),
+                      title: const Text(
+                        'تعديل العملية',
+                        style: TextStyle(
+                          fontFamily: AppTheme.fontFamily,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.text,
+                        ),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.0),
+                      ),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        showEditSheet(
+                          context: context,
+                          ref: ref,
+                          transaction: transaction,
+                        );
+                      },
                     ),
-                    onTap: () {
-                      Navigator.of(sheetContext).pop();
-                      confirmAndDelete(
-                        context: context,
-                        ref: ref,
-                        transaction: transaction,
-                      );
-                    },
-                  ),
-                ],
+                    ListTile(
+                      leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                      title: const Text(
+                        'حذف العملية',
+                        style: TextStyle(
+                          fontFamily: AppTheme.fontFamily,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.redAccent,
+                        ),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.0),
+                      ),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        confirmAndDelete(
+                          context: context,
+                          ref: ref,
+                          transaction: transaction,
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

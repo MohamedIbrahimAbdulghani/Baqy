@@ -978,10 +978,12 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     if (result == null) {
       // Failed (network / timeout / server error): Do NOT delete audio file!
       final errorReason = parser.lastErrorMessage;
+      final isRateLimited = parser.lastAudioError == GeminiAudioErrorType.rateLimited;
       if (activeContext != null && activeContext.mounted) {
         _showErrorRetryDialog(
           context: activeContext,
           message: errorReason,
+          isRateLimited: isRateLimited,
           onRetry: () => processAudioFile(
             audioPath,
             fallbackSpeechText: fallbackSpeechText,
@@ -1062,6 +1064,7 @@ class VoiceRecordingNotifier extends Notifier<bool> {
   void _showErrorRetryDialog({
     required BuildContext context,
     required String message,
+    bool isRateLimited = false,
     required VoidCallback onRetry,
     required VoidCallback onManual,
   }) {
@@ -1073,13 +1076,16 @@ class VoiceRecordingNotifier extends Notifier<bool> {
         child: AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           backgroundColor: AppColors.card,
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.wifi_off_rounded, color: Colors.orangeAccent),
-              SizedBox(width: 8),
+              Icon(
+                isRateLimited ? Icons.hourglass_top_rounded : Icons.wifi_off_rounded,
+                color: isRateLimited ? Colors.amber : Colors.orangeAccent,
+              ),
+              const SizedBox(width: 8),
               Text(
-                'تعذر الاتصال',
-                style: TextStyle(
+                isRateLimited ? 'تم استهلاك الحد الأقصى' : 'تعذر الاتصال',
+                style: const TextStyle(
                   fontFamily: AppTheme.fontFamily,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1094,33 +1100,63 @@ class VoiceRecordingNotifier extends Notifier<bool> {
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                onManual();
-              },
-              child: const Text(
-                'إضافة يدوي',
-                style: TextStyle(fontFamily: AppTheme.fontFamily),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                onRetry();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.mainGreen,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text(
-                'إعادة المحاولة',
-                style: TextStyle(
-                  fontFamily: AppTheme.fontFamily,
-                  fontWeight: FontWeight.bold,
+            if (!isRateLimited) ...[
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  onManual();
+                },
+                child: const Text(
+                  'إضافة يدوي',
+                  style: TextStyle(fontFamily: AppTheme.fontFamily),
                 ),
               ),
-            ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  onRetry();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.mainGreen,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text(
+                  'إعادة المحاولة',
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ] else ...[
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                },
+                child: const Text(
+                  'إلغاء',
+                  style: TextStyle(fontFamily: AppTheme.fontFamily),
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  onManual();
+                },
+                icon: const Icon(Icons.edit_note_rounded),
+                label: const Text(
+                  'تسجيل بالكتابة',
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.mainGreen,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
           ],
         ),
       ),

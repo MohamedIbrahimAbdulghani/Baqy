@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/number_formatter.dart';
+import '../controllers/budget_monitor_controller.dart';
 
 class BudgetRing extends StatelessWidget {
   const BudgetRing({
@@ -36,6 +37,12 @@ class BudgetRing extends StatelessWidget {
         ? (remainingPiastres / monthMoneyPiastres).clamp(0.0, 1.0)
         : 0.0;
 
+    // Dynamic color: turns warningRed if remaining <= 25%, reverts to defaultGreen otherwise
+    final Color progressColor = BudgetMonitorController.getIndicatorColor(
+      totalBudget: monthMoneyEgp.toDouble(),
+      remainingAmount: remainingEgp.toDouble(),
+    );
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -48,7 +55,10 @@ class BudgetRing extends StatelessWidget {
             children: [
               CustomPaint(
                 size: const Size(250.0, 250.0),
-                painter: _RingProgressPainter(progress: progress),
+                painter: _RingProgressPainter(
+                  progress: progress,
+                  progressColor: progressColor,
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -122,13 +132,17 @@ class BudgetRing extends StatelessWidget {
 }
 
 class _RingProgressPainter extends CustomPainter {
-  const _RingProgressPainter({required this.progress});
+  const _RingProgressPainter({
+    required this.progress,
+    required this.progressColor,
+  });
 
   final double progress;
+  final Color progressColor;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double strokeWidth = 16.0;
+    const double strokeWidth = 16.0;
     final Offset center = Offset(size.width / 2, size.height / 2);
     final double radius = (size.width - strokeWidth) / 2;
 
@@ -140,10 +154,10 @@ class _RingProgressPainter extends CustomPainter {
 
     canvas.drawCircle(center, radius, trackPaint);
 
-    // Green progress arc starting at 12 o'clock (-pi / 2) sweeping clockwise
+    // Progress arc starting at 12 o'clock (-pi / 2) sweeping clockwise with dynamic color
     if (progress > 0.0) {
       final Paint progressPaint = Paint()
-        ..color = AppColors.mainGreen
+        ..color = progressColor
         ..strokeWidth = strokeWidth
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
@@ -157,6 +171,7 @@ class _RingProgressPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _RingProgressPainter oldDelegate) {
-    return oldDelegate.progress != progress;
+    return oldDelegate.progress != progress ||
+        oldDelegate.progressColor != progressColor;
   }
 }

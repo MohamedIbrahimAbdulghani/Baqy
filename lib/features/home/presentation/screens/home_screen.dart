@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../expenses/domain/models/month_remaining.dart';
 import '../../../expenses/presentation/providers/expense_providers.dart';
+import '../controllers/budget_monitor_controller.dart';
 import '../widgets/budget_bottom_sheet.dart';
 import '../widgets/budget_ring.dart';
 import '../widgets/home_top_bar.dart';
@@ -111,6 +112,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Auto-open budget bottom sheet if current month has no budget
     monthRemainingAsync.whenData((remaining) {
       _checkAutoOpenBudget(selectedYm, month, remaining);
+      final double totalBudget = remaining.monthMoney / 100.0;
+      final double remainingEgp = remaining.remaining / 100.0;
+      BudgetMonitorController.evaluateAndNotify(
+        totalBudget: totalBudget,
+        remainingAmount: remainingEgp,
+        currentMonthKey: remaining.yearMonth,
+      );
     });
 
     final topInset = MediaQuery.of(context).padding.top;
