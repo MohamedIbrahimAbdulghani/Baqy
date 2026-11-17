@@ -202,7 +202,7 @@ void main() {
       );
 
       final dayTotals = await expenseRepo.getCategoryTotalsForDay(now);
-      final savingsDayTotal = dayTotals.firstWhere((t) => t.category.name == 'تحويش');
+      final savingsDayTotal = dayTotals.firstWhere((t) => t.category.id < 0 || t.category.name == 'تحويش');
       expect(savingsDayTotal.totalAmount, equals(3000 * 100));
       expect(savingsDayTotal.transactionCount, equals(1));
     });
@@ -238,6 +238,118 @@ void main() {
       expect(txs[0].note, equals('سحب من الهدف'));
       expect(txs[1].amount, equals(10000 * 100));
       expect(txs[1].description, equals('عربية'));
+    });
+
+    test('Multiple goals on same day have isolated category totals and transactions', () async {
+      final now = DateTime.now();
+
+      final goalUmrahId = await goalRepo.addGoal(
+        name: 'عمرة',
+        targetAmount: 50000 * 100,
+      );
+      final goalCarId = await goalRepo.addGoal(
+        name: 'عربية',
+        targetAmount: 300000 * 100,
+      );
+
+      await goalRepo.addGoalSaving(
+        goalId: goalUmrahId,
+        amount: 500 * 100,
+        savedAt: now.toUtc(),
+      );
+      await goalRepo.addGoalSaving(
+        goalId: goalCarId,
+        amount: 2000 * 100,
+        savedAt: now.toUtc(),
+      );
+
+      final dayTotals = await expenseRepo.getCategoryTotalsForDay(now);
+      final umrahTotal = dayTotals.firstWhere((t) => t.category.name == 'عمرة');
+      final carTotal = dayTotals.firstWhere((t) => t.category.name == 'عربية');
+
+      expect(umrahTotal.totalAmount, equals(500 * 100));
+      expect(carTotal.totalAmount, equals(2000 * 100));
+      expect(umrahTotal.category.id, isNot(equals(carTotal.category.id)));
+
+      final umrahTxs = await expenseRepo.getCategoryTransactionsForDay(
+        categoryId: umrahTotal.category.id,
+        day: now,
+      );
+      expect(umrahTxs.length, equals(1));
+      expect(umrahTxs.first.description, equals('عمرة'));
+      expect(umrahTxs.first.amount, equals(500 * 100));
+
+      final carTxs = await expenseRepo.getCategoryTransactionsForDay(
+        categoryId: carTotal.category.id,
+        day: now,
+      );
+      expect(carTxs.length, equals(1));
+      expect(carTxs.first.description, equals('عربية'));
+      expect(carTxs.first.amount, equals(2000 * 100));
+    });
+
+    test('Deleting a goal saving transaction removes it from goalSavings and updates totals', () async {
+      final now = DateTime.now();
+
+      final goalId = await goalRepo.addGoal(
+        name: 'ايفون 18 برو ماكس',
+        targetAmount: 80000 * 100,
+      );
+
+      await goalRepo.addGoalSaving(
+        goalId: goalId,
+        amount: 1000 * 100,
+        savedAt: now.subtract(const Duration(minutes: 5)).toUtc(),
+      );
+
+      final saving2Id = await goalRepo.addGoalSaving(
+        goalId: goalId,
+        amount: 3660 * 100,
+        savedAt: now.toUtc(),
+      );
+
+      // Verify initial total saved is 4660 EGP
+      final initialGoal = await goalRepo.getGoalById(goalId);
+      expect(initialGoal?.totalSaved, equals(4660 * 100));
+
+      final dayTotals = await expenseRepo.getCategoryTotalsForDay(now);
+      final iphoneTotal = dayTotals.firstWhere((t) => t.category.name == 'ايفون 18 برو ماكس');
+      expect(iphoneTotal.totalAmount, equals(4660 * 100));
+
+      final txsBefore = await expenseRepo.getCategoryTransactionsForDay(
+        categoryId: iphoneTotal.category.id,
+        day: now,
+      );
+      expect(txsBefore.length, equals(2));
+
+      // Find the 3660 saving (id is -saving2Id)
+      final txToDelete = txsBefore.firstWhere((t) => t.amount == 3660 * 100);
+      expect(txToDelete.id, equals(-saving2Id));
+
+      // Delete the transaction via deleteTransaction
+      await expenseRepo.deleteTransaction(txToDelete.id);
+
+      // Verify the saving is deleted
+      final txsAfter = await expenseRepo.getCategoryTransactionsForDay(
+        categoryId: iphoneTotal.category.id,
+        day: now,
+      );
+      expect(txsAfter.length, equals(1));
+      expect(txsAfter.first.amount, equals(1000 * 100));
+
+      // Verify updated goal totalSaved is 1000 EGP
+      final updatedGoal = await goalRepo.getGoalById(goalId);
+      expect(updatedGoal?.totalSaved, equals(1000 * 100));
+
+      // Verify updated day total
+      final updatedDayTotals = await expenseRepo.getCategoryTotalsForDay(now);
+      final updatedIphoneTotal = updatedDayTotals.firstWhere((t) => t.category.name == 'ايفون 18 برو ماكس');
+      expect(updatedIphoneTotal.totalAmount, equals(1000 * 100));
+
+      // Restore transaction
+      await expenseRepo.restoreTransaction(txToDelete);
+      final restoredGoal = await goalRepo.getGoalById(goalId);
+      expect(restoredGoal?.totalSaved, equals(4660 * 100));
     });
   });
 
@@ -682,9 +794,9 @@ void main() {
       final savingsCategory = monthTotals.firstWhere((t) => t.category.name == 'تحويش');
       expect(savingsCategory.totalAmount, equals(5000 * 100));
 
-      // Day totals has "تحويش"
+      // Day totals has goal savings
       final dayTotals = await expenseRepo.getCategoryTotalsForDay(now.toLocal());
-      final daySavings = dayTotals.firstWhere((t) => t.category.name == 'تحويش');
+      final daySavings = dayTotals.firstWhere((t) => t.category.id < 0 || t.category.name == 'تحويش');
       expect(daySavings.totalAmount, equals(5000 * 100));
 
       // Category details for "تحويش" has the item

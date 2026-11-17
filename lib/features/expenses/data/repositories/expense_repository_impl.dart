@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import '../../../../core/database/app_database.dart';
+import '../../../../core/utils/goal_icon_helper.dart';
 import '../../domain/models/category_item.dart';
 import '../../domain/models/category_total.dart';
 import '../../domain/models/day_transactions.dart';
@@ -125,22 +126,57 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     final rows = await query.get();
     final results = _mapCategoryTotalRows(rows, totalAmountExp, countExp);
 
-    // Goal savings as virtual category "تحويش" (shown only if net saved > 0)
+    // Goal savings as virtual category "تحويش" with goal's icon (shown only if net saved > 0)
     final (start, end) = _getMonthRange(yearMonth);
-    final savingsRows = await (_db.select(_db.goalSavings)
-          ..where((s) =>
-              s.savedAt.isBiggerOrEqualValue(start) &
-              s.savedAt.isSmallerThanValue(end)))
-        .get();
-    final netSavings = savingsRows.fold<int>(0, (sum, s) => sum + s.amount);
-    if (netSavings > 0) {
-      results.add(
-        CategoryTotal(
-          category: CategoryItem.virtualSavings,
-          totalAmount: netSavings,
-          transactionCount: savingsRows.length,
-        ),
+    final savingsQuery = _db.select(_db.goalSavings).join([
+      innerJoin(_db.goals, _db.goals.id.equalsExp(_db.goalSavings.goalId)),
+    ])
+      ..where(_db.goalSavings.savedAt.isBiggerOrEqualValue(start) &
+          _db.goalSavings.savedAt.isSmallerThanValue(end))
+      ..orderBy([OrderingTerm.desc(_db.goalSavings.savedAt)]);
+    final savingsJoinedRows = await savingsQuery.get();
+
+    if (savingsJoinedRows.isNotEmpty) {
+      final netSavings = savingsJoinedRows.fold<int>(
+        0,
+        (sum, r) => sum + r.readTable(_db.goalSavings).amount,
       );
+      if (netSavings > 0) {
+        final firstGoal = savingsJoinedRows.first.readTable(_db.goals);
+        final goalIconKey =
+            (firstGoal.icon != null && firstGoal.icon!.isNotEmpty)
+                ? firstGoal.icon!
+                : GoalIconHelper.resolveIconKeyFromName(firstGoal.name);
+
+        results.add(
+          CategoryTotal(
+            category: CategoryItem(
+              id: CategoryItem.virtualSavings.id,
+              name: 'تحويش',
+              icon: goalIconKey,
+              color: CategoryItem.virtualSavings.color,
+            ),
+            totalAmount: netSavings,
+            transactionCount: savingsJoinedRows.length,
+          ),
+        );
+      }
+    } else {
+      final savingsRows = await (_db.select(_db.goalSavings)
+            ..where((s) =>
+                s.savedAt.isBiggerOrEqualValue(start) &
+                s.savedAt.isSmallerThanValue(end)))
+          .get();
+      final netSavings = savingsRows.fold<int>(0, (sum, s) => sum + s.amount);
+      if (netSavings > 0) {
+        results.add(
+          CategoryTotal(
+            category: CategoryItem.virtualSavings,
+            totalAmount: netSavings,
+            transactionCount: savingsRows.length,
+          ),
+        );
+      }
     }
 
     return results;
@@ -151,7 +187,7 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     return _db
         .customSelect(
           'SELECT 1',
-          readsFrom: {_db.transactions, _db.categories, _db.goalSavings},
+          readsFrom: {_db.transactions, _db.categories, _db.goalSavings, _db.goals},
         )
         .watch()
         .asyncMap((_) => getTotalsPerCategoryPerMonth(yearMonth));
@@ -185,6 +221,22 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
       ..orderBy([OrderingTerm.asc(_db.categories.id)]);
   }
 
+  /// Encodes a goal ID into a distinct negative virtual category ID (e.g. goal 1 -> -1001, goal 2 -> -1002).
+  /// This prevents collisions with `CategoryItem.virtualSavings.id` (-1).
+  static int goalToVirtualCategoryId(int goalId) => -(1000 + goalId);
+
+  /// Decodes a goal ID from a virtual category ID.
+  /// Returns null if categoryId is `CategoryItem.virtualSavings.id` (-1) or not a goal category.
+  static int? virtualCategoryIdToGoalId(int categoryId) {
+    if (categoryId <= -1000) {
+      return -categoryId - 1000;
+    }
+    if (categoryId < -1) {
+      return -categoryId;
+    }
+    return null;
+  }
+
   @override
   Future<List<CategoryTotal>> getCategoryTotalsForDay(DateTime day) async {
     final totalAmountExp = _db.transactions.amount.sum();
@@ -193,23 +245,47 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     final rows = await query.get();
     final results = _mapCategoryTotalRows(rows, totalAmountExp, countExp);
 
-    // Goal savings on this day (net of savings and withdrawals)
+    // Goal savings on this day (net of savings and withdrawals, grouped by goal)
     final (start, end) = _getDayRange(day);
-    final savingsRows = await (_db.select(_db.goalSavings)
-          ..where((s) =>
-              s.savedAt.isBiggerOrEqualValue(start) &
-              s.savedAt.isSmallerThanValue(end)))
-        .get();
-    if (savingsRows.isNotEmpty) {
-      final netDaySavings =
-          savingsRows.fold<int>(0, (sum, s) => sum + s.amount);
-      results.add(
-        CategoryTotal(
-          category: CategoryItem.virtualSavings,
-          totalAmount: netDaySavings,
-          transactionCount: savingsRows.length,
-        ),
-      );
+    final savingsQuery = _db.select(_db.goalSavings).join([
+      innerJoin(_db.goals, _db.goals.id.equalsExp(_db.goalSavings.goalId)),
+    ])
+      ..where(_db.goalSavings.savedAt.isBiggerOrEqualValue(start) &
+          _db.goalSavings.savedAt.isSmallerThanValue(end));
+    final savingsJoinedRows = await savingsQuery.get();
+
+    if (savingsJoinedRows.isNotEmpty) {
+      final Map<int, List<TypedResult>> groupedByGoal = {};
+      for (final row in savingsJoinedRows) {
+        final saving = row.readTable(_db.goalSavings);
+        groupedByGoal.putIfAbsent(saving.goalId, () => []).add(row);
+      }
+
+      for (final entry in groupedByGoal.entries) {
+        final rowsForGoal = entry.value;
+        final firstGoal = rowsForGoal.first.readTable(_db.goals);
+        final netGoalSavings = rowsForGoal.fold<int>(
+          0,
+          (sum, r) => sum + r.readTable(_db.goalSavings).amount,
+        );
+        final goalIconKey =
+            (firstGoal.icon != null && firstGoal.icon!.isNotEmpty)
+                ? firstGoal.icon!
+                : GoalIconHelper.resolveIconKeyFromName(firstGoal.name);
+
+        results.add(
+          CategoryTotal(
+            category: CategoryItem(
+              id: goalToVirtualCategoryId(firstGoal.id),
+              name: firstGoal.name,
+              icon: goalIconKey,
+              color: CategoryItem.virtualSavings.color,
+            ),
+            totalAmount: netGoalSavings,
+            transactionCount: rowsForGoal.length,
+          ),
+        );
+      }
     }
 
     return results;
@@ -251,28 +327,41 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     required int categoryId,
     required DateTime day,
   }) async {
-    if (categoryId == CategoryItem.virtualSavings.id) {
+    if (categoryId < 0 || categoryId == CategoryItem.virtualSavings.id) {
       final (start, end) = _getDayRange(day);
       final query = _db.select(_db.goalSavings).join([
         innerJoin(_db.goals, _db.goals.id.equalsExp(_db.goalSavings.goalId)),
       ])
         ..where(_db.goalSavings.savedAt.isBiggerOrEqualValue(start) &
-            _db.goalSavings.savedAt.isSmallerThanValue(end))
-        ..orderBy([OrderingTerm.desc(_db.goalSavings.savedAt)]);
+            _db.goalSavings.savedAt.isSmallerThanValue(end));
+      final goalId = virtualCategoryIdToGoalId(categoryId);
+      if (goalId != null) {
+        query.where(_db.goals.id.equals(goalId));
+      }
+      query.orderBy([OrderingTerm.desc(_db.goalSavings.savedAt)]);
       final rows = await query.get();
       return rows.map((row) {
         final saving = row.readTable(_db.goalSavings);
         final goal = row.readTable(_db.goals);
+        final goalIconKey =
+            (goal.icon != null && goal.icon!.isNotEmpty)
+                ? goal.icon!
+                : GoalIconHelper.resolveIconKeyFromName(goal.name);
         return TransactionItem(
           id: -saving.id,
           amount: saving.amount,
           description: goal.name,
-          categoryId: CategoryItem.virtualSavings.id,
+          categoryId: categoryId,
           kind: 'saving',
           source: 'goal',
           note: saving.amount < 0 ? 'سحب من الهدف' : null,
           createdAt: saving.savedAt,
-          category: CategoryItem.virtualSavings,
+          category: CategoryItem(
+            id: categoryId,
+            name: goal.name,
+            icon: goalIconKey,
+            color: CategoryItem.virtualSavings.color,
+          ),
         );
       }).toList();
     }
@@ -286,7 +375,7 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     required int categoryId,
     required DateTime day,
   }) {
-    if (categoryId == CategoryItem.virtualSavings.id) {
+    if (categoryId < 0 || categoryId == CategoryItem.virtualSavings.id) {
       return _db
           .customSelect(
             'SELECT 1',
@@ -327,28 +416,41 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     required int categoryId,
     required String yearMonth,
   }) async {
-    if (categoryId == CategoryItem.virtualSavings.id) {
+    if (categoryId < 0 || categoryId == CategoryItem.virtualSavings.id) {
       final (start, end) = _getMonthRange(yearMonth);
       final query = _db.select(_db.goalSavings).join([
         innerJoin(_db.goals, _db.goals.id.equalsExp(_db.goalSavings.goalId)),
       ])
         ..where(_db.goalSavings.savedAt.isBiggerOrEqualValue(start) &
-            _db.goalSavings.savedAt.isSmallerThanValue(end))
-        ..orderBy([OrderingTerm.desc(_db.goalSavings.savedAt)]);
+            _db.goalSavings.savedAt.isSmallerThanValue(end));
+      final goalId = virtualCategoryIdToGoalId(categoryId);
+      if (goalId != null) {
+        query.where(_db.goals.id.equals(goalId));
+      }
+      query.orderBy([OrderingTerm.desc(_db.goalSavings.savedAt)]);
       final rows = await query.get();
       return rows.map((row) {
         final saving = row.readTable(_db.goalSavings);
         final goal = row.readTable(_db.goals);
+        final goalIconKey =
+            (goal.icon != null && goal.icon!.isNotEmpty)
+                ? goal.icon!
+                : GoalIconHelper.resolveIconKeyFromName(goal.name);
         return TransactionItem(
           id: -saving.id,
           amount: saving.amount,
           description: goal.name,
-          categoryId: CategoryItem.virtualSavings.id,
+          categoryId: categoryId,
           kind: 'saving',
           source: 'goal',
           note: saving.amount < 0 ? 'سحب من الهدف' : null,
           createdAt: saving.savedAt,
-          category: CategoryItem.virtualSavings,
+          category: CategoryItem(
+            id: categoryId,
+            name: goal.name,
+            icon: goalIconKey,
+            color: CategoryItem.virtualSavings.color,
+          ),
         );
       }).toList();
     }
@@ -362,7 +464,7 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     required int categoryId,
     required String yearMonth,
   }) {
-    if (categoryId == CategoryItem.virtualSavings.id) {
+    if (categoryId < 0 || categoryId == CategoryItem.virtualSavings.id) {
       return _db
           .customSelect(
             'SELECT 1',
@@ -448,17 +550,10 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
 
   @override
   Future<List<TransactionItem>> getLast3Transactions() async {
-    final query = _db.select(_db.transactions).join([
-      leftOuterJoin(
-        _db.categories,
-        _db.categories.id.equalsExp(_db.transactions.categoryId),
-      ),
-    ])
-      ..orderBy([OrderingTerm.desc(_db.transactions.createdAt)])
-      ..limit(3);
-
-    final rows = await query.get();
-    return rows.map(_mapTransactionRow).toList();
+    final now = DateTime.now();
+    final ym =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    return getLastTransactionsForMonth(ym, limit: 3);
   }
 
   JoinedSelectStatement _lastTransactionsForMonthQuery(
@@ -505,6 +600,9 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     final savingsList = savingsRows.map((row) {
       final saving = row.readTable(_db.goalSavings);
       final goal = row.readTable(_db.goals);
+      final goalIconKey = (goal.icon != null && goal.icon!.isNotEmpty)
+          ? goal.icon!
+          : GoalIconHelper.resolveIconKeyFromName(goal.name);
       return TransactionItem(
         id: -saving.id,
         amount: saving.amount,
@@ -514,7 +612,12 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
         source: 'goal',
         note: saving.amount < 0 ? 'سحب من الهدف' : null,
         createdAt: saving.savedAt,
-        category: CategoryItem.virtualSavings,
+        category: CategoryItem(
+          id: CategoryItem.virtualSavings.id,
+          name: 'تحويش',
+          icon: goalIconKey,
+          color: CategoryItem.virtualSavings.color,
+        ),
       );
     }).toList();
 
@@ -816,6 +919,19 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     required int categoryId,
     required String yearMonth,
   }) {
+    if (categoryId < 0 || categoryId == CategoryItem.virtualSavings.id) {
+      return _db
+          .customSelect(
+            'SELECT 1',
+            readsFrom: {_db.goalSavings, _db.goals},
+          )
+          .watch()
+          .asyncMap((_) async {
+            final totals = await getTotalsPerCategoryPerMonth(yearMonth);
+            final match = totals.where((c) => c.category.id == categoryId).firstOrNull;
+            return match?.totalAmount ?? 0;
+          });
+    }
     final (start, end) = _getMonthRange(yearMonth);
     return _db
         .customSelect(
@@ -837,6 +953,19 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     required int categoryId,
     required DateTime day,
   }) {
+    if (categoryId < 0 || categoryId == CategoryItem.virtualSavings.id) {
+      return _db
+          .customSelect(
+            'SELECT 1',
+            readsFrom: {_db.goalSavings, _db.goals},
+          )
+          .watch()
+          .asyncMap((_) async {
+            final totals = await getCategoryTotalsForDay(day);
+            final match = totals.where((c) => c.category.id == categoryId).firstOrNull;
+            return match?.totalAmount ?? 0;
+          });
+    }
     final (start, end) = _getDayRange(day);
     return _db
         .customSelect(
@@ -948,11 +1077,40 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
 
   @override
   Future<void> deleteTransaction(int id) async {
+    if (id < 0) {
+      // Negative ID corresponds to a goal saving transaction: -saving.id
+      final savingId = -id;
+      await (_db.delete(_db.goalSavings)..where((s) => s.id.equals(savingId))).go();
+      return;
+    }
     await (_db.delete(_db.transactions)..where((tbl) => tbl.id.equals(id))).go();
   }
 
   @override
   Future<void> restoreTransaction(TransactionItem transaction) async {
+    if (transaction.id < 0 || transaction.source == 'goal') {
+      final savingId = -transaction.id;
+      final decodedGoalId = virtualCategoryIdToGoalId(transaction.categoryId);
+      int? targetGoalId = decodedGoalId;
+      if (targetGoalId == null) {
+        final goal = await (_db.select(_db.goals)
+              ..where((g) => g.name.equals(transaction.description)))
+            .getSingleOrNull();
+        targetGoalId = goal?.id;
+      }
+      if (targetGoalId != null) {
+        await _db.into(_db.goalSavings).insert(
+          GoalSavingsCompanion.insert(
+            id: Value(savingId),
+            goalId: targetGoalId,
+            amount: transaction.amount,
+            savedAt: transaction.createdAt.toUtc(),
+          ),
+          mode: InsertMode.insertOrReplace,
+        );
+      }
+      return;
+    }
     await _db.into(_db.transactions).insert(
       TransactionsCompanion.insert(
         id: Value(transaction.id),

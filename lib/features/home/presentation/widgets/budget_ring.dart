@@ -71,7 +71,7 @@ class BudgetRing extends StatelessWidget {
                       child: Text(
                         '${NumberFormatter.formatCurrency(remainingEgp)} جنيه',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: AppTheme.fontFamily,
                           fontSize: 34.0,
                           fontWeight: FontWeight.w700,
@@ -83,7 +83,7 @@ class BudgetRing extends StatelessWidget {
                     const SizedBox(height: 4.0),
 
                     // "الباقي لك الشهر ده"
-                    const Text(
+                    Text(
                       'الباقي لك الشهر ده',
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -104,7 +104,7 @@ class BudgetRing extends StatelessWidget {
                         children: [
                           Text(
                             spentSummaryText,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: AppTheme.fontFamily,
                               fontSize: 13.0,
                               fontWeight: FontWeight.w400,

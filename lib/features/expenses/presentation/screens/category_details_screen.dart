@@ -93,7 +93,7 @@ class CategoryDetailsScreen extends ConsumerWidget {
                     InkWell(
                       onTap: () => context.pop(),
                       borderRadius: BorderRadius.circular(8.0),
-                      child: const Padding(
+                      child: Padding(
                         padding: EdgeInsets.all(8.0),
                         child: Icon(
                           Icons.arrow_forward_ios_rounded,
@@ -109,7 +109,7 @@ class CategoryDetailsScreen extends ConsumerWidget {
                       children: [
                         Text(
                           args.category.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: AppTheme.fontFamily,
                             fontSize: 22.0,
                             fontWeight: FontWeight.w700,
@@ -120,7 +120,7 @@ class CategoryDetailsScreen extends ConsumerWidget {
                           const SizedBox(height: 2.0),
                           Text(
                             dateSubtitle,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: AppTheme.fontFamily,
                               fontSize: 14.0,
                               fontWeight: FontWeight.w400,
@@ -189,7 +189,7 @@ class CategoryDetailsScreen extends ConsumerWidget {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text(
+                              Text(
                                 'الإجمالي',
                                 style: TextStyle(
                                   fontFamily: AppTheme.fontFamily,
@@ -201,7 +201,7 @@ class CategoryDetailsScreen extends ConsumerWidget {
                               const SizedBox(height: 6.0),
                               Text(
                                 '${NumberFormatter.formatCurrency(totalEgp)} جنيه',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: AppTheme.fontFamily,
                                   fontSize: 42.0,
                                   fontWeight: FontWeight.w700,
@@ -221,30 +221,28 @@ class CategoryDetailsScreen extends ConsumerWidget {
                           final String timeText = args.isMonthMode
                               ? ArabicDateHelper.formatDateTime(tx.createdAt)
                               : ArabicDateHelper.formatTime(tx.createdAt);
-                          final isVirtualSavings = args.category.id == -1 ||
-                              args.category.name == 'تحويش' ||
-                              tx.categoryId == -1;
+                          final isGoalSaving = tx.id < 0 ||
+                              tx.source == 'goal' ||
+                              args.category.id < 0;
 
                           final String txAmountText = txAmountEgp < 0
                               ? '-${NumberFormatter.formatCurrency(txAmountEgp.abs())} جنيه'
                               : '${NumberFormatter.formatCurrency(txAmountEgp)} جنيه';
 
                           return InkWell(
-                            onTap: isVirtualSavings
+                            onTap: isGoalSaving
                                 ? null
                                 : () => TransactionActionsHelper.showEditSheet(
                                       context: context,
                                       ref: ref,
                                       transaction: tx,
                                     ),
-                            onLongPress: isVirtualSavings
-                                ? null
-                                : () => TransactionActionsHelper
-                                    .showActionsBottomSheet(
-                                    context: context,
-                                    ref: ref,
-                                    transaction: tx,
-                                  ),
+                            onLongPress: () =>
+                                TransactionActionsHelper.showActionsBottomSheet(
+                              context: context,
+                              ref: ref,
+                              transaction: tx,
+                            ),
                             borderRadius: BorderRadius.circular(
                                 AppDimensions.cardRadius),
                             child: Container(
@@ -272,7 +270,7 @@ class CategoryDetailsScreen extends ConsumerWidget {
                                       children: [
                                         Text(
                                           tx.description,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontFamily: AppTheme.fontFamily,
                                             fontSize: 16.0,
                                             fontWeight: FontWeight.w700,
@@ -284,7 +282,7 @@ class CategoryDetailsScreen extends ConsumerWidget {
                                           const SizedBox(height: 2.0),
                                           Text(
                                             tx.note!,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontFamily: AppTheme.fontFamily,
                                               fontSize: 12.0,
                                               fontWeight: FontWeight.w400,
@@ -308,7 +306,7 @@ class CategoryDetailsScreen extends ConsumerWidget {
                                         const SizedBox(height: 4.0),
                                         Text(
                                           timeText,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontFamily: AppTheme.fontFamily,
                                             fontSize: 13.0,
                                             fontWeight: FontWeight.w400,
@@ -324,7 +322,7 @@ class CategoryDetailsScreen extends ConsumerWidget {
                                   // Left: Amount
                                   Text(
                                     txAmountText,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontFamily: AppTheme.fontFamily,
                                       fontSize: 16.0,
                                       fontWeight: FontWeight.w700,

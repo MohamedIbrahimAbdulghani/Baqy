@@ -1,51 +1,81 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_dimensions.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/theme_provider.dart';
 
-class HomeTopBar extends StatelessWidget {
+class HomeTopBar extends ConsumerWidget {
   const HomeTopBar({
     super.key,
     required this.selectedMonthText,
     required this.onTapMonthSelector,
+    this.customGreeting,
   });
 
   final String selectedMonthText;
   final VoidCallback onTapMonthSelector;
+  final String? customGreeting;
+
+  /// Returns "صباح الخير" (morning: 4:00 AM to 11:59 AM)
+  /// or "مساء الخير" (afternoon/evening/night: 12:00 PM to 3:59 AM).
+  static String resolveGreeting([DateTime? now]) {
+    final current = now ?? DateTime.now();
+    final hour = current.hour;
+    if (hour >= 4 && hour < 12) {
+      return 'صباح الخير';
+    }
+    return 'مساء الخير';
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = themeMode == ThemeMode.dark;
+    final greeting = customGreeting ?? resolveGreeting();
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Left: Settings / Sun icon (does nothing yet)
-          Container(
-            width: 42.0,
-            height: 42.0,
-            decoration: BoxDecoration(
-              color: AppColors.card,
+          // Left: Theme mode toggle button (Light <-> Dark)
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => ref.read(themeModeProvider.notifier).toggleTheme(),
               borderRadius: BorderRadius.circular(12.0),
-              boxShadow: AppDimensions.cardShadow,
-            ),
-            child: const Icon(
-              Icons.wb_sunny_outlined,
-              color: AppColors.darkGreen,
-              size: 22.0,
+              child: Container(
+                width: 42.0,
+                height: 42.0,
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(12.0),
+                  boxShadow: AppDimensions.cardShadow,
+                ),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: Icon(
+                    isDark ? Icons.wb_sunny_rounded : Icons.wb_sunny_outlined,
+                    key: ValueKey<bool>(isDark),
+                    color: isDark ? AppColors.coinGold : AppColors.darkGreen,
+                    size: 22.0,
+                  ),
+                ),
+              ),
             ),
           ),
 
-          // Right: "صباح الخير" & Month Selector
+          // Right: "صباح الخير" / "مساء الخير" & Month Selector
           Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'صباح الخير',
-                  style: TextStyle(
+                Text(
+                  greeting,
+                  style: const TextStyle(
                     fontFamily: AppTheme.fontFamily,
                     fontSize: 14.0,
                     fontWeight: FontWeight.w600,
@@ -66,7 +96,7 @@ class HomeTopBar extends StatelessWidget {
                             fit: BoxFit.scaleDown,
                             child: Text(
                               selectedMonthText,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: AppTheme.fontFamily,
                                 fontSize: 22.0,
                                 fontWeight: FontWeight.w700,
@@ -76,7 +106,7 @@ class HomeTopBar extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 4.0),
-                        const Icon(
+                        Icon(
                           Icons.keyboard_arrow_down_rounded,
                           color: AppColors.text,
                           size: 24.0,

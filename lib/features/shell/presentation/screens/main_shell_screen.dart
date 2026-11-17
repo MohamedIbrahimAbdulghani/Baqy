@@ -5,6 +5,7 @@ import '../../../goals/presentation/widgets/goals_speed_dial_fab.dart';
 import '../../../home/presentation/widgets/home_speed_dial_fab.dart';
 import '../providers/tab_provider.dart';
 import '../widgets/custom_bottom_nav_bar.dart';
+import '../../../../core/theme/theme_provider.dart';
 import 'appointments_tab.dart';
 import 'debts_tab.dart';
 import 'goals_tab.dart';
@@ -32,22 +33,22 @@ class AboveBottomBarFabLocation extends FloatingActionButtonLocation {
 class MainShellScreen extends ConsumerWidget {
   const MainShellScreen({super.key});
 
-  static const List<Widget> _tabs = [
-    HomeTab(),
-    GoalsTab(),
-    AppointmentsTab(),
-    DebtsTab(),
-  ];
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = themeMode == ThemeMode.dark;
     final int selectedIndex = ref.watch(tabIndexProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: IndexedStack(
         index: selectedIndex,
-        children: _tabs,
+        children: [
+          HomeTab(key: ValueKey('home_${isDark ? 'dark' : 'light'}')),
+          GoalsTab(key: ValueKey('goals_${isDark ? 'dark' : 'light'}')),
+          AppointmentsTab(key: ValueKey('appts_${isDark ? 'dark' : 'light'}')),
+          DebtsTab(key: ValueKey('debts_${isDark ? 'dark' : 'light'}')),
+        ],
       ),
       floatingActionButton: selectedIndex == 0
           ? const HomeSpeedDialFab()

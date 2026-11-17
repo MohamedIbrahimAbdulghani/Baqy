@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -443,7 +444,7 @@ class _VoiceExpenseReviewSheetState
             maxHeight: MediaQuery.of(context).size.height * 0.9,
           ),
           margin: EdgeInsets.only(bottom: bottomInset),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.background,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24.0)),
           ),
@@ -469,7 +470,7 @@ class _VoiceExpenseReviewSheetState
                   padding: const EdgeInsets.symmetric(horizontal: 20.0),
                   child: Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'مراجعة وتأكيد المصاريف',
                           style: TextStyle(
@@ -491,7 +492,7 @@ class _VoiceExpenseReviewSheetState
                         ),
                         child: Text(
                           'الإجمالي: ${NumberFormatter.formatCurrency(_liveTotalEgp)} جنيه',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: AppTheme.fontFamily,
                             fontSize: 13.0,
                             fontWeight: FontWeight.bold,
@@ -503,7 +504,7 @@ class _VoiceExpenseReviewSheetState
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Divider(height: 1, color: AppColors.dividers),
+                Divider(height: 1, color: AppColors.dividers),
 
                 // Expandable Transcript Section (if available)
                 if (widget.transcript != null &&
@@ -528,7 +529,7 @@ class _VoiceExpenseReviewSheetState
                             color: AppColors.mainGreen,
                             size: 20,
                           ),
-                          title: const Text(
+                          title: Text(
                             'تفريغ التسجيل المسموع',
                             style: TextStyle(
                               fontFamily: AppTheme.fontFamily,
@@ -549,7 +550,7 @@ class _VoiceExpenseReviewSheetState
                                 ),
                                 child: SelectableText(
                                   widget.transcript!,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontFamily: AppTheme.fontFamily,
                                     fontSize: 13.0,
                                     color: AppColors.text,
@@ -607,7 +608,7 @@ class _VoiceExpenseReviewSheetState
                                 children: [
                                   Text(
                                     'العملية ${index + 1}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontFamily: AppTheme.fontFamily,
                                       fontSize: 13.0,
                                       fontWeight: FontWeight.bold,
@@ -732,7 +733,7 @@ class _VoiceExpenseReviewSheetState
                                   ),
                                   child: Text(
                                     'الكمية / المواصفات: ${item.quantityText}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontFamily: AppTheme.fontFamily,
                                       fontSize: 12.0,
                                       fontWeight: FontWeight.w600,
@@ -754,6 +755,12 @@ class _VoiceExpenseReviewSheetState
                                     child: TextFormField(
                                       controller: item.amountController,
                                       keyboardType: TextInputType.number,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.allow(
+                                          RegExp(r'[0-9٠-٩,،]'),
+                                        ),
+                                        ThousandsSeparatorInputFormatter(),
+                                      ],
                                       onChanged: (_) => setState(() {}),
                                       decoration: InputDecoration(
                                         labelText: 'المبلغ بالجنيه',
@@ -893,12 +900,12 @@ class _VoiceExpenseReviewSheetState
                       const Spacer(),
                       TextButton.icon(
                         onPressed: _quickAddCategory,
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.create_new_folder_outlined,
                           color: AppColors.secondaryText,
                           size: 18,
                         ),
-                        label: const Text(
+                        label: Text(
                           'تصنيف جديد',
                           style: TextStyle(
                             fontFamily: AppTheme.fontFamily,
@@ -935,9 +942,9 @@ class _VoiceExpenseReviewSheetState
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12.0),
                             ),
-                            side: const BorderSide(color: AppColors.dividers),
+                            side: BorderSide(color: AppColors.dividers),
                           ),
-                          child: const Text(
+                          child: Text(
                             'إلغاء',
                             style: TextStyle(
                               fontFamily: AppTheme.fontFamily,

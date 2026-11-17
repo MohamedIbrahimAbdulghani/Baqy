@@ -11,6 +11,7 @@ import '../widgets/budget_ring.dart';
 import '../widgets/home_top_bar.dart';
 import '../widgets/month_selector_popup.dart';
 import '../widgets/recent_transactions_section.dart';
+import '../../../../core/theme/theme_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -100,6 +101,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeModeProvider);
     final selectedYm = ref.watch(selectedYearMonthProvider);
     final (year, month) = ArabicDateHelper.parseYearMonthKey(selectedYm);
     final selectedMonthText = ArabicDateHelper.formatMonthYear(year, month);
@@ -173,7 +175,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       margin: const EdgeInsets.symmetric(horizontal: 20.0),
                       padding: const EdgeInsets.all(16.0),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppColors.card,
                         borderRadius: BorderRadius.circular(16.0),
                         border: Border.all(color: Colors.red.shade200),
                       ),
@@ -183,7 +185,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           children: [
                             const Icon(Icons.error_outline, color: Colors.red, size: 36.0),
                             const SizedBox(height: 8.0),
-                            const Text(
+                            Text(
                               'تعذر تحميل بيانات الميزانية',
                               style: TextStyle(
                                 fontFamily: 'Cairo',
@@ -232,13 +234,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(16.0),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColors.card,
                           borderRadius: BorderRadius.circular(12.0),
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text(
+                            Text(
                               'تعذر تحميل آخر العمليات',
                               style: TextStyle(
                                 fontFamily: 'Cairo',

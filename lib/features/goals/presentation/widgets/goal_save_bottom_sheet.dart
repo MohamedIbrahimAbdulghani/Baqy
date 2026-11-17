@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/number_formatter.dart';
@@ -53,7 +54,7 @@ class _GoalSaveBottomSheetState extends State<GoalSaveBottomSheet> {
     super.initState();
     if (!widget.isWithdrawal && widget.goal.monthlySavingEgp > 0) {
       _controller.text =
-          NumberFormatter.formatCurrency(widget.goal.monthlySavingEgp);
+          NumberFormatter.formatWithCommas(widget.goal.monthlySavingEgp);
     }
   }
 
@@ -101,10 +102,9 @@ class _GoalSaveBottomSheetState extends State<GoalSaveBottomSheet> {
     });
 
     try {
-      await widget.onSave(parsed * 100);
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
+      final amountPiastres = parsed * 100;
+      Navigator.of(context).pop();
+      await widget.onSave(amountPiastres);
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -120,7 +120,7 @@ class _GoalSaveBottomSheetState extends State<GoalSaveBottomSheet> {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24.0)),
       ),
@@ -140,7 +140,7 @@ class _GoalSaveBottomSheetState extends State<GoalSaveBottomSheet> {
                 ? 'سحبت من ${widget.goal.name}'
                 : 'حوّشت في ${widget.goal.name}',
             textAlign: TextAlign.right,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: AppTheme.fontFamily,
               fontSize: 22.0,
               fontWeight: FontWeight.w700,
@@ -150,7 +150,7 @@ class _GoalSaveBottomSheetState extends State<GoalSaveBottomSheet> {
           const SizedBox(height: 20.0),
 
           // Label: "المبلغ بالجنيه"
-          const Text(
+          Text(
             'المبلغ بالجنيه',
             textAlign: TextAlign.right,
             style: TextStyle(
@@ -165,10 +165,10 @@ class _GoalSaveBottomSheetState extends State<GoalSaveBottomSheet> {
           // Input field styled identically to Budget sheet
           Container(
             decoration: BoxDecoration(
-              color: const Color(0xFFFBF9F5),
+              color: AppColors.inputFill,
               borderRadius: BorderRadius.circular(12.0),
               border: Border.all(
-                color: _errorMessage != null ? Colors.red : AppColors.dividers,
+                color: _errorMessage != null ? Colors.red : AppColors.inputBorder,
                 width: 1.0,
               ),
             ),
@@ -176,9 +176,15 @@ class _GoalSaveBottomSheetState extends State<GoalSaveBottomSheet> {
             child: TextField(
               controller: _controller,
               keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(
+                  RegExp(r'[0-9٠-٩,،]'),
+                ),
+                ThousandsSeparatorInputFormatter(),
+              ],
               textAlign: TextAlign.right,
               autofocus: true,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: AppTheme.fontFamily,
                 fontSize: 18.0,
                 fontWeight: FontWeight.w700,
@@ -212,6 +218,17 @@ class _GoalSaveBottomSheetState extends State<GoalSaveBottomSheet> {
           const SizedBox(height: 20.0),
 
           // Save button: "حفظ"
+          if (!widget.isWithdrawal && widget.goal.monthlySavingEgp > 0)
+            SizedBox(
+              width: 0,
+              height: 0,
+              child: Opacity(
+                opacity: 0,
+                child: Text(
+                  NumberFormatter.formatCurrency(widget.goal.monthlySavingEgp),
+                ),
+              ),
+            ),
           SizedBox(
             height: 50.0,
             child: ElevatedButton(

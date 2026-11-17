@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
+import 'goal_icon_helper.dart';
 
 abstract final class CategoryIconHelper {
   /// Available custom icon keys displayed in the "نوع جديد" grid
@@ -109,7 +110,17 @@ abstract final class CategoryIconHelper {
   }
 
   static IconData getIcon(String? iconName) {
-    switch (iconName?.toLowerCase().replaceAll(' ', '_')) {
+    final normalized = iconName?.toLowerCase().replaceAll(' ', '_').trim();
+    if (normalized == null || normalized.isEmpty) {
+      return Icons.more_horiz_rounded;
+    }
+
+    // Goal icons guarantee: Always match the exact same IconData as GoalIconHelper
+    if (GoalIconHelper.allowedKeys.contains(normalized)) {
+      return GoalIconHelper.getIcon(normalized);
+    }
+
+    switch (normalized) {
       // Food & Drinks
       case 'food':
       case 'restaurant':
@@ -229,6 +240,11 @@ abstract final class CategoryIconHelper {
       case 'other':
       case 'more_horiz':
       default:
+        final normalized = iconName?.toLowerCase().replaceAll(' ', '_').trim();
+        if (normalized != null &&
+            GoalIconHelper.allowedKeys.contains(normalized)) {
+          return GoalIconHelper.getIcon(normalized);
+        }
         return Icons.more_horiz_rounded;
     }
   }

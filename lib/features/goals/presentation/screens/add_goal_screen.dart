@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../domain/models/goal_item.dart';
 import '../../data/repositories/goal_repository_impl.dart';
@@ -32,7 +33,7 @@ class _AddGoalScreenState extends ConsumerState<AddGoalScreen> {
     if (widget.goalToEdit != null) {
       _nameController.text = widget.goalToEdit!.name;
       _amountController.text =
-          NumberFormatter.formatCurrency(widget.goalToEdit!.targetEgp);
+          NumberFormatter.formatWithCommas(widget.goalToEdit!.targetEgp);
     }
   }
 
@@ -137,6 +138,7 @@ class _AddGoalScreenState extends ConsumerState<AddGoalScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeModeProvider);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -151,7 +153,7 @@ class _AddGoalScreenState extends ConsumerState<AddGoalScreen> {
                 children: [
                   IconButton(
                     onPressed: () => context.pop(),
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.arrow_forward_ios_rounded,
                       size: 20.0,
                       color: AppColors.text,
@@ -160,7 +162,7 @@ class _AddGoalScreenState extends ConsumerState<AddGoalScreen> {
                     constraints: const BoxConstraints(),
                   ),
                   const SizedBox(width: 12.0),
-                  const Text(
+                  Text(
                     'هدف جديد',
                     style: TextStyle(
                       fontFamily: AppTheme.fontFamily,
@@ -179,7 +181,7 @@ class _AddGoalScreenState extends ConsumerState<AddGoalScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // Field 1: اسم الهدف
-                      const Text(
+                      Text(
                         'اسم الهدف',
                         style: TextStyle(
                           fontFamily: AppTheme.fontFamily,
@@ -190,12 +192,12 @@ class _AddGoalScreenState extends ConsumerState<AddGoalScreen> {
                       const SizedBox(height: 8.0),
                       Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColors.inputFill,
                           borderRadius: BorderRadius.circular(14.0),
                           border: Border.all(
                             color: _nameError != null
                                 ? Colors.redAccent
-                                : const Color(0xFFE2DDD5),
+                                : AppColors.inputBorder,
                             width: 1.0,
                           ),
                         ),
@@ -212,7 +214,7 @@ class _AddGoalScreenState extends ConsumerState<AddGoalScreen> {
                               vertical: 14.0,
                             ),
                           ),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: AppTheme.fontFamily,
                             fontSize: 16.0,
                             color: AppColors.text,
@@ -233,7 +235,7 @@ class _AddGoalScreenState extends ConsumerState<AddGoalScreen> {
                       const SizedBox(height: 20.0),
 
                       // Field 2: المبلغ المطلوب
-                      const Text(
+                      Text(
                         'المبلغ المطلوب',
                         style: TextStyle(
                           fontFamily: AppTheme.fontFamily,
@@ -244,12 +246,12 @@ class _AddGoalScreenState extends ConsumerState<AddGoalScreen> {
                       const SizedBox(height: 8.0),
                       Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColors.inputFill,
                           borderRadius: BorderRadius.circular(14.0),
                           border: Border.all(
                             color: _amountError != null
                                 ? Colors.redAccent
-                                : const Color(0xFFE2DDD5),
+                                : AppColors.inputBorder,
                             width: 1.0,
                           ),
                         ),
@@ -260,6 +262,7 @@ class _AddGoalScreenState extends ConsumerState<AddGoalScreen> {
                             FilteringTextInputFormatter.allow(
                               RegExp(r'[0-9٠-٩,،]'),
                             ),
+                            ThousandsSeparatorInputFormatter(),
                           ],
                           onChanged: _onAmountChanged,
                           textInputAction: TextInputAction.done,
@@ -271,7 +274,7 @@ class _AddGoalScreenState extends ConsumerState<AddGoalScreen> {
                               vertical: 14.0,
                             ),
                           ),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: AppTheme.fontFamily,
                             fontSize: 16.0,
                             color: AppColors.text,

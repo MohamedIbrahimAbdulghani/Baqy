@@ -110,7 +110,7 @@ class _HomeSpeedDialFabState extends ConsumerState<HomeSpeedDialFab>
                   size: 20,
                 ),
                 const SizedBox(width: 8),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'عندك تسجيل لسه ما اتحفظش',
                     style: TextStyle(
@@ -141,7 +141,7 @@ class _HomeSpeedDialFabState extends ConsumerState<HomeSpeedDialFab>
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.close,
                     size: 16,
                     color: AppColors.secondaryText,
@@ -402,7 +402,7 @@ class _VoiceRecordingStopButtonState extends State<VoiceRecordingStopButton>
                   Text(
                     widget.subtitle ?? 'احكِ مصاريفك بالعامية بحرية',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontSize: 12.0,
                     ),
@@ -620,7 +620,7 @@ class _VoiceAnalyzingCardState extends State<VoiceAnalyzingCard>
             ),
           ),
           const SizedBox(width: 12),
-          const Column(
+          Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

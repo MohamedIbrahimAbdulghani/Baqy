@@ -169,7 +169,7 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                     InkWell(
                       onTap: () => context.pop(),
                       borderRadius: BorderRadius.circular(8.0),
-                      child: const Padding(
+                      child: Padding(
                         padding: EdgeInsets.all(8.0),
                         child: Icon(
                           Icons.arrow_forward_ios_rounded,
@@ -181,7 +181,7 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                     const SizedBox(width: 8.0),
                     Text(
                       pageTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: AppTheme.fontFamily,
                         fontSize: 22.0,
                         fontWeight: FontWeight.w700,
@@ -287,7 +287,7 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                               decoration: BoxDecoration(
                                 color: canGoBack
                                     ? AppColors.lightGreen
-                                    : const Color(0xFFF0ECE4),
+                                    : AppColors.subtleBox,
                                 borderRadius: BorderRadius.circular(10.0),
                               ),
                               child: Icon(
@@ -295,7 +295,7 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                                 size: 18.0,
                                 color: canGoBack
                                     ? AppColors.darkGreen
-                                    : const Color(0xFFC4BFB6),
+                                    : AppColors.secondaryText.withValues(alpha: 0.5),
                               ),
                             ),
                           ),
@@ -303,7 +303,7 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                           // Center: "<weekday> <day> <month>"
                           Text(
                             ArabicDateHelper.formatWeekdayDayMonth(_selectedDay),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: AppTheme.fontFamily,
                               fontSize: 16.0,
                               fontWeight: FontWeight.w700,
@@ -321,7 +321,7 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                               decoration: BoxDecoration(
                                 color: canGoForward
                                     ? AppColors.lightGreen
-                                    : const Color(0xFFF0ECE4),
+                                    : AppColors.subtleBox,
                                 borderRadius: BorderRadius.circular(10.0),
                               ),
                               child: Icon(
@@ -329,7 +329,7 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                                 size: 18.0,
                                 color: canGoForward
                                     ? AppColors.darkGreen
-                                    : const Color(0xFFC4BFB6),
+                                    : AppColors.secondaryText.withValues(alpha: 0.5),
                               ),
                             ),
                           ),
@@ -391,7 +391,7 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                               item.category.color,
                             );
                             final isSavings = item.category.name == 'تحويش' ||
-                                item.category.id == -1;
+                                item.category.id < 0;
                             final String dayAmountText = amountEgp < 0
                                 ? '-${NumberFormatter.formatCurrency(amountEgp.abs())} جنيه'
                                 : '${NumberFormatter.formatCurrency(amountEgp)} جنيه';
@@ -456,7 +456,7 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                                               children: [
                                                 Text(
                                                   item.category.name,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontFamily:
                                                         AppTheme.fontFamily,
                                                     fontSize: 16.0,
@@ -469,7 +469,7 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                                                   ArabicDateHelper.formatCount(
                                                     item.transactionCount,
                                                   ),
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontFamily:
                                                         AppTheme.fontFamily,
                                                     fontSize: 13.0,
@@ -489,7 +489,7 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                                           children: [
                                             Text(
                                               dayAmountText,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontFamily: AppTheme.fontFamily,
                                                 fontSize: 16.0,
                                                 fontWeight: FontWeight.w700,
@@ -497,7 +497,7 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                                               ),
                                             ),
                                             const SizedBox(width: 6.0),
-                                            const Icon(
+                                            Icon(
                                               Icons.arrow_back_ios_new_rounded,
                                               size: 13.0,
                                               color: AppColors.text,

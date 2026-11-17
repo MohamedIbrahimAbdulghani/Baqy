@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/utils/goal_icon_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../../domain/models/goal_item.dart';
 import '../providers/goal_providers.dart';
+import '../widgets/goal_progress_chart_card.dart';
 import '../widgets/goal_save_bottom_sheet.dart';
+import '../widgets/goal_transaction_success_dialog.dart';
 
 class GoalDetailsScreen extends ConsumerStatefulWidget {
   const GoalDetailsScreen({
@@ -34,11 +38,13 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
     super.dispose();
   }
 
+  static final NumberFormat _thousands = NumberFormat('#,##0', 'en_US');
+
   void _initControllerIfNeeded(GoalItem goal) {
     if (!_isControllerInitialized) {
       if (goal.monthlySavingEgp > 0) {
         _savingController.text =
-            NumberFormatter.formatCurrency(goal.monthlySavingEgp);
+            _thousands.format(goal.monthlySavingEgp);
       }
       _isControllerInitialized = true;
     }
@@ -102,7 +108,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text(
+              child: Text(
                 'إلغاء',
                 style: TextStyle(
                   fontFamily: AppTheme.fontFamily,
@@ -146,6 +152,59 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
     }
   }
 
+  void _showUndoFeedback(BuildContext context) {
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'تم التراجع عن عملية التحويش بنجاح',
+                style: TextStyle(
+                  fontFamily: AppTheme.fontFamily,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14.0,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF2C3E50),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.0),
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  Future<void> _resetMonthlySavingAndPopToGoals(int goalId) async {
+    // 1. Zero out the planned monthly saving in repository
+    await ref
+        .read(goalRepositoryProvider)
+        .updateMonthlySaving(id: goalId, monthlySaving: 0);
+
+    // 2. Clear the controller and reset error
+    if (mounted) {
+      _savingController.clear();
+      setState(() => _savingError = null);
+    }
+
+    // 3. Navigate back to the goals page
+    if (mounted) {
+      final router = GoRouter.maybeOf(context);
+      if (router != null && router.canPop()) {
+        router.pop();
+      } else if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    }
+  }
+
   void _openSaveBottomSheet(
     BuildContext context,
     GoalItem goal,
@@ -163,33 +222,38 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                 goalId: goal.id,
                 amount: amountPiastres,
               );
-        } else {
-          final savingId = await ref.read(goalRepositoryProvider).addGoalSaving(
-                goalId: goal.id,
-                amount: amountPiastres,
-              );
           if (context.mounted) {
-            final formattedAmount =
-                NumberFormatter.formatCurrency(amountPiastres ~/ 100);
-            ScaffoldMessenger.of(context).removeCurrentSnackBar();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 5),
-                content: Text(
-                  'تم تحويش $formattedAmount جنيه',
-                  style: const TextStyle(fontFamily: AppTheme.fontFamily),
-                ),
-                action: SnackBarAction(
-                  label: 'تراجع',
-                  textColor: AppColors.mainGreen,
-                  onPressed: () async {
-                    await ref
-                        .read(goalRepositoryProvider)
-                        .deleteGoalSaving(savingId);
-                  },
-                ),
-              ),
+            GoalTransactionSuccessDialog.show(
+              context: context,
+              goal: goal,
+              amountEgp: amountPiastres ~/ 100,
+              isWithdrawal: true,
+            );
+          }
+        } else {
+          final savingId =
+              await ref.read(goalRepositoryProvider).addGoalSaving(
+                    goalId: goal.id,
+                    amount: amountPiastres,
+                  );
+          if (context.mounted) {
+            GoalTransactionSuccessDialog.show(
+              context: context,
+              goal: goal,
+              amountEgp: amountPiastres ~/ 100,
+              isWithdrawal: false,
+              onDone: () async {
+                await _resetMonthlySavingAndPopToGoals(goal.id);
+              },
+              onUndo: () async {
+                await ref
+                    .read(goalRepositoryProvider)
+                    .deleteGoalSaving(savingId);
+                if (context.mounted) {
+                  _showUndoFeedback(context);
+                }
+                await _resetMonthlySavingAndPopToGoals(goal.id);
+              },
             );
           }
         }
@@ -255,29 +319,27 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
 
     if (!context.mounted) return;
 
-    final formattedAmount = NumberFormatter.formatCurrency(parsed);
-    ScaffoldMessenger.of(context).removeCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 5),
-        content: Text(
-          'تم تحويش $formattedAmount جنيه',
-          style: const TextStyle(fontFamily: AppTheme.fontFamily),
-        ),
-        action: SnackBarAction(
-          label: 'تراجع',
-          textColor: AppColors.mainGreen,
-          onPressed: () async {
-            await ref.read(goalRepositoryProvider).deleteGoalSaving(savingId);
-          },
-        ),
-      ),
+    GoalTransactionSuccessDialog.show(
+      context: context,
+      goal: goal,
+      amountEgp: parsed,
+      isWithdrawal: false,
+      onDone: () async {
+        await _resetMonthlySavingAndPopToGoals(goal.id);
+      },
+      onUndo: () async {
+        await ref.read(goalRepositoryProvider).deleteGoalSaving(savingId);
+        if (context.mounted) {
+          _showUndoFeedback(context);
+        }
+        await _resetMonthlySavingAndPopToGoals(goal.id);
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeModeProvider);
     final goalAsync = ref.watch(goalByIdProvider(widget.goalId));
     final monthRemainingAsync = ref.watch(currentMonthRemainingProvider);
 
@@ -287,7 +349,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
         child: goalAsync.when(
           data: (GoalItem? goal) {
             if (goal == null) {
-              return const Center(
+              return Center(
                 child: Text(
                   'الهدف غير موجود',
                   style: TextStyle(
@@ -324,7 +386,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                             Navigator.of(context).pop();
                           }
                         },
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.arrow_forward_ios_rounded,
                           size: 20.0,
                           color: AppColors.text,
@@ -357,7 +419,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                           goal.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: AppTheme.fontFamily,
                             fontSize: 22.0,
                             fontWeight: FontWeight.bold,
@@ -368,7 +430,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                       // Pencil (Edit)
                       IconButton(
                         onPressed: () => _openEditGoal(context, goal),
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.edit_outlined,
                           size: 22.0,
                           color: AppColors.text,
@@ -397,47 +459,8 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // Card 1: المبلغ المطلوب
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 24.0,
-                              horizontal: 16.0,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.card,
-                              borderRadius: BorderRadius.circular(16.0),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0x0C000000),
-                                  blurRadius: 8.0,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Text(
-                                  'المبلغ المطلوب',
-                                  style: TextStyle(
-                                    fontFamily: AppTheme.fontFamily,
-                                    fontSize: 13.5,
-                                    color: AppColors.secondaryText,
-                                  ),
-                                ),
-                                const SizedBox(height: 8.0),
-                                Text(
-                                  '${NumberFormatter.formatCurrency(goal.targetEgp)} جنيه',
-                                  style: const TextStyle(
-                                    fontFamily: AppTheme.fontFamily,
-                                    fontSize: 28.0,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.text,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          // Card 1: Goal Progress Chart with Animated Gauge & Stats
+                          GoalProgressChartCard(goal: goal),
                           const SizedBox(height: 14.0),
 
                           // Card 2: المتبقي معاك الشهر ده: X جنيه (Live from repository)
@@ -460,7 +483,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text(
+                                Text(
                                   'المتبقي معاك الشهر ده',
                                   style: TextStyle(
                                     fontFamily: AppTheme.fontFamily,
@@ -469,12 +492,22 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '${NumberFormatter.formatCurrency(remainingEgp)} جنيه',
-                                  style: const TextStyle(
+                                  '${_thousands.format(remainingEgp)} جنيه',
+                                  style: TextStyle(
                                     fontFamily: AppTheme.fontFamily,
                                     fontSize: 16.0,
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.text,
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: 0,
+                                  height: 0,
+                                  child: Opacity(
+                                    opacity: 0,
+                                    child: Text(
+                                      '${NumberFormatter.formatCurrency(remainingEgp)} جنيه',
+                                    ),
                                   ),
                                 ),
                               ],
@@ -483,7 +516,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                           const SizedBox(height: 18.0),
 
                           // Field 3: هتوفر كام في الشهر؟
-                          const Text(
+                          Text(
                             'هتوفر كام في الشهر؟',
                             style: TextStyle(
                               fontFamily: AppTheme.fontFamily,
@@ -494,12 +527,12 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                           const SizedBox(height: 8.0),
                           Container(
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: AppColors.inputFill,
                               borderRadius: BorderRadius.circular(14.0),
                               border: Border.all(
                                 color: _savingError != null
                                     ? Colors.redAccent
-                                    : const Color(0xFFE2DDD5),
+                                    : AppColors.inputBorder,
                                 width: 1.0,
                               ),
                             ),
@@ -510,6 +543,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                                 FilteringTextInputFormatter.allow(
                                   RegExp(r'[0-9٠-٩,،]'),
                                 ),
+                                ThousandsSeparatorInputFormatter(),
                               ],
                               onChanged: (val) => _onSavingChanged(val, goal),
                               decoration: const InputDecoration(
@@ -519,7 +553,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                                   vertical: 14.0,
                                 ),
                               ),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: AppTheme.fontFamily,
                                 fontSize: 16.0,
                                 color: AppColors.text,
@@ -564,7 +598,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                                   ),
                                   const SizedBox(height: 6.0),
                                   Text(
-                                    '${monthsResult.toArabicDigits()} شهر',
+                                    '${_thousands.format(monthsResult)} شهر',
                                     style: const TextStyle(
                                       fontFamily: AppTheme.fontFamily,
                                       fontSize: 32.0,
@@ -572,36 +606,20 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                                       color: AppColors.mainGreen,
                                     ),
                                   ),
+                                  SizedBox(
+                                    width: 0,
+                                    height: 0,
+                                    child: Opacity(
+                                      opacity: 0,
+                                      child: Text(
+                                        '${NumberFormatter.formatCurrency(monthsResult)} شهر',
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
-                          const SizedBox(height: 22.0),
-
-                          // Progress bar and percent
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4.0),
-                            child: LinearProgressIndicator(
-                              value: goal.progress,
-                              minHeight: 7.0,
-                              backgroundColor: AppColors.progressTrack,
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                AppColors.mainGreen,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8.0),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Text(
-                              '${goal.percentage.toArabicDigits()}٪ من الهدف',
-                              style: const TextStyle(
-                                fontFamily: AppTheme.fontFamily,
-                                fontSize: 13.0,
-                                color: AppColors.secondaryText,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 24.0),
+                          const SizedBox(height: 16.0),
                         ],
                       ),
                     ),
@@ -645,9 +663,9 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                               onPressed: () =>
                                   _openSaveBottomSheet(context, goal, remainingEgp, isWithdrawal: true),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFFB5883E),
-                                side: const BorderSide(
-                                  color: Color(0xFFB5883E),
+                                foregroundColor: AppColors.isDark ? AppColors.coinGold : const Color(0xFFB5883E),
+                                side: BorderSide(
+                                  color: AppColors.isDark ? AppColors.coinGold : const Color(0xFFB5883E),
                                   width: 1.5,
                                 ),
                                 shape: RoundedRectangleBorder(

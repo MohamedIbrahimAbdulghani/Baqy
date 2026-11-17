@@ -22,7 +22,7 @@ class RecentTransactionsSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Padding(
+        Padding(
           padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
           child: Align(
             alignment: Alignment.centerRight,
@@ -66,9 +66,12 @@ class _TransactionCard extends ConsumerWidget {
     final iconData = CategoryIconHelper.getIcon(transaction.category?.icon);
     final categoryColor =
         CategoryIconHelper.parseColor(transaction.category?.color);
-    final isVirtualSavings = transaction.categoryId == -1 ||
-        transaction.category?.id == -1 ||
-        transaction.category?.name == 'تحويش';
+    final isVirtualSavings = transaction.categoryId < 0 ||
+        (transaction.category?.id != null &&
+            transaction.category!.id < 0) ||
+        transaction.category?.name == 'تحويش' ||
+        transaction.kind == 'saving' ||
+        transaction.source == 'goal';
 
     final String amountText = amountEgp < 0
         ? '-${NumberFormatter.formatCurrency(amountEgp.abs())} جنيه'
@@ -108,7 +111,7 @@ class _TransactionCard extends ConsumerWidget {
               children: [
                 Text(
                   amountText,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: AppTheme.fontFamily,
                     fontSize: 16.0,
                     fontWeight: FontWeight.w700,
@@ -141,7 +144,7 @@ class _TransactionCard extends ConsumerWidget {
                   children: [
                     Text(
                       transaction.description,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: AppTheme.fontFamily,
                         fontSize: 16.0,
                         fontWeight: FontWeight.w600,
@@ -153,7 +156,7 @@ class _TransactionCard extends ConsumerWidget {
                       const SizedBox(height: 2.0),
                       Text(
                         transaction.note!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: AppTheme.fontFamily,
                           fontSize: 12.0,
                           color: AppColors.secondaryText,

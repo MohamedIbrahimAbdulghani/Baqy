@@ -75,7 +75,7 @@ class GoalCard extends StatelessWidget {
                                   goal.name,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontFamily: AppTheme.fontFamily,
                                     fontSize: 18.0,
                                     fontWeight: FontWeight.bold,
@@ -98,7 +98,7 @@ class GoalCard extends StatelessWidget {
                           const SizedBox(height: 4.0),
                           Text(
                             'الهدف: ${NumberFormatter.formatCurrency(goal.targetEgp)} جنيه',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: AppTheme.fontFamily,
                               fontSize: 13.0,
                               color: AppColors.secondaryText,

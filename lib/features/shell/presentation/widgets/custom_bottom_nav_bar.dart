@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/theme_provider.dart';
 import '../../../../l10n/app_localizations.dart';
 
-class CustomBottomNavBar extends StatelessWidget {
+class CustomBottomNavBar extends ConsumerWidget {
   const CustomBottomNavBar({
     super.key,
     required this.currentIndex,
@@ -14,7 +16,8 @@ class CustomBottomNavBar extends StatelessWidget {
   final ValueChanged<int> onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(themeModeProvider);
     final l10n = AppLocalizations.of(context);
     final List<String> tabTitles = [
       l10n?.tabHome ?? 'الرئيسية',
@@ -25,7 +28,7 @@ class CustomBottomNavBar extends StatelessWidget {
 
     return Container(
       height: 60.0,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.background,
         border: Border(
           top: BorderSide(
@@ -64,4 +67,3 @@ class CustomBottomNavBar extends StatelessWidget {
     );
   }
 }
-

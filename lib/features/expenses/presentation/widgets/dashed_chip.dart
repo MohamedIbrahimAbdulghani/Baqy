@@ -30,9 +30,9 @@ class DashedChip extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(22.0),
-              color: const Color(0xFFF3F7F5),
+              color: AppColors.subtleBox,
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/theme_provider.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../goals/domain/models/goal_item.dart';
 import '../../../goals/presentation/providers/goal_providers.dart';
@@ -12,6 +13,7 @@ class GoalsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(themeModeProvider);
     final title = AppLocalizations.of(context)?.tabGoals ?? 'الأهداف';
     final goalsAsync = ref.watch(goalsStreamProvider);
 
@@ -28,7 +30,7 @@ class GoalsTab extends ConsumerWidget {
               Text(
                 title,
                 textAlign: TextAlign.start,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: AppTheme.fontFamily,
                   fontSize: 26.0,
                   fontWeight: FontWeight.bold,

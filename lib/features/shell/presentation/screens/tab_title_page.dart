@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/theme_provider.dart';
 
-class TabTitlePage extends StatelessWidget {
+class TabTitlePage extends ConsumerWidget {
   const TabTitlePage({
     super.key,
     required this.title,
@@ -11,7 +13,8 @@ class TabTitlePage extends StatelessWidget {
   final String title;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(themeModeProvider);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -21,7 +24,7 @@ class TabTitlePage extends StatelessWidget {
             alignment: AlignmentDirectional.topStart,
             child: Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: AppTheme.fontFamily,
                 fontSize: 24.0,
                 fontWeight: FontWeight.w700,

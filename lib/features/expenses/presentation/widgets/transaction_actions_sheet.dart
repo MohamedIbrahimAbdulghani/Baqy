@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -40,7 +41,7 @@ abstract final class TransactionActionsHelper {
                     const SizedBox(height: 16),
                     Text(
                       transaction.description,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: AppTheme.fontFamily,
                         fontSize: 18.0,
                         fontWeight: FontWeight.bold,
@@ -50,7 +51,7 @@ abstract final class TransactionActionsHelper {
                     const SizedBox(height: 6),
                     Text(
                       '${NumberFormatter.formatCurrency(transaction.amount ~/ 100)} جنيه',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: AppTheme.fontFamily,
                         fontSize: 15.0,
                         color: AppColors.secondaryText,
@@ -70,28 +71,29 @@ abstract final class TransactionActionsHelper {
                       ),
                     ],
                     const SizedBox(height: 20),
-                    ListTile(
-                      leading: const Icon(Icons.edit_outlined, color: AppColors.mainGreen),
-                      title: const Text(
-                        'تعديل العملية',
-                        style: TextStyle(
-                          fontFamily: AppTheme.fontFamily,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.text,
+                    if (transaction.source != 'goal' && transaction.id > 0)
+                      ListTile(
+                        leading: const Icon(Icons.edit_outlined, color: AppColors.mainGreen),
+                        title: Text(
+                          'تعديل العملية',
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.text,
+                          ),
                         ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                        onTap: () {
+                          Navigator.of(sheetContext).pop();
+                          showEditSheet(
+                            context: context,
+                            ref: ref,
+                            transaction: transaction,
+                          );
+                        },
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12.0),
-                      ),
-                      onTap: () {
-                        Navigator.of(sheetContext).pop();
-                        showEditSheet(
-                          context: context,
-                          ref: ref,
-                          transaction: transaction,
-                        );
-                      },
-                    ),
                     ListTile(
                       leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
                       title: const Text(
@@ -155,7 +157,7 @@ abstract final class TransactionActionsHelper {
             borderRadius: BorderRadius.circular(16.0),
           ),
           backgroundColor: AppColors.card,
-          title: const Text(
+          title: Text(
             'حذف العملية',
             style: TextStyle(
               fontFamily: AppTheme.fontFamily,
@@ -165,7 +167,7 @@ abstract final class TransactionActionsHelper {
           ),
           content: Text(
             'هل أنت متأكد من حذف عملية "${transaction.description}" بمبلغ ${NumberFormatter.formatCurrency(transaction.amount ~/ 100)} جنيه؟',
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: AppTheme.fontFamily,
               color: AppColors.secondaryText,
             ),
@@ -173,7 +175,7 @@ abstract final class TransactionActionsHelper {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogCtx).pop(false),
-              child: const Text('إلغاء', style: TextStyle(color: AppColors.secondaryText)),
+              child: Text('إلغاء', style: TextStyle(color: AppColors.secondaryText)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(dialogCtx).pop(true),
@@ -193,6 +195,14 @@ abstract final class TransactionActionsHelper {
 
     if (confirmed == true) {
       await ref.read(deleteTransactionUseCaseProvider)(transaction.id);
+      ref.invalidate(categoryTransactionsForDayProvider);
+      ref.invalidate(categoryTotalForDayProvider);
+      ref.invalidate(categoryTransactionsForMonthProvider);
+      ref.invalidate(categoryTotalForMonthProvider);
+      ref.invalidate(dayCategoryTotalsProvider);
+      ref.invalidate(monthCategoryTotalsProvider);
+      ref.invalidate(currentMonthRemainingProvider);
+      ref.invalidate(recentTransactionsProvider);
 
       if (context.mounted) {
         final messenger = ScaffoldMessenger.of(context);
@@ -212,6 +222,14 @@ abstract final class TransactionActionsHelper {
               onPressed: () async {
                 messenger.hideCurrentSnackBar();
                 await ref.read(restoreTransactionUseCaseProvider)(transaction);
+                ref.invalidate(categoryTransactionsForDayProvider);
+                ref.invalidate(categoryTotalForDayProvider);
+                ref.invalidate(categoryTransactionsForMonthProvider);
+                ref.invalidate(categoryTotalForMonthProvider);
+                ref.invalidate(dayCategoryTotalsProvider);
+                ref.invalidate(monthCategoryTotalsProvider);
+                ref.invalidate(currentMonthRemainingProvider);
+                ref.invalidate(recentTransactionsProvider);
               },
             ),
           ),
@@ -337,7 +355,7 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
         ),
         margin: EdgeInsets.only(bottom: bottomInset),
         padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.background,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24.0)),
         ),
@@ -358,7 +376,7 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'تعديل العملية',
                   style: TextStyle(
                     fontFamily: AppTheme.fontFamily,
@@ -373,6 +391,12 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
                 TextFormField(
                   controller: _amountController,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'[0-9٠-٩,،]'),
+                    ),
+                    ThousandsSeparatorInputFormatter(),
+                  ],
                   decoration: InputDecoration(
                     labelText: 'المبلغ (جنيه مصري)',
                     errorText: _amountError,
@@ -381,7 +405,7 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
                     fillColor: AppColors.card,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12.0),
-                      borderSide: const BorderSide(color: AppColors.dividers),
+                      borderSide: BorderSide(color: AppColors.dividers),
                     ),
                   ),
                 ),
@@ -397,7 +421,7 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
                     fillColor: AppColors.card,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12.0),
-                      borderSide: const BorderSide(color: AppColors.dividers),
+                      borderSide: BorderSide(color: AppColors.dividers),
                     ),
                   ),
                 ),
@@ -453,7 +477,7 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
                         fillColor: AppColors.card,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12.0),
-                          borderSide: const BorderSide(color: AppColors.dividers),
+                          borderSide: BorderSide(color: AppColors.dividers),
                         ),
                       ),
                       items: validCategories.map((c) {
@@ -508,7 +532,7 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
                     fillColor: AppColors.card,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12.0),
-                      borderSide: const BorderSide(color: AppColors.dividers),
+                      borderSide: BorderSide(color: AppColors.dividers),
                     ),
                   ),
                 ),

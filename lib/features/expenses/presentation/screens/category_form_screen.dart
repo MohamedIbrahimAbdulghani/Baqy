@@ -135,7 +135,7 @@ class _CategoryFormScreenState extends ConsumerState<CategoryFormScreen> {
                     InkWell(
                       onTap: () => context.pop(),
                       borderRadius: BorderRadius.circular(8.0),
-                      child: const Padding(
+                      child: Padding(
                         padding: EdgeInsets.all(8.0),
                         child: Icon(
                           Icons.arrow_forward_ios_rounded,
@@ -145,7 +145,7 @@ class _CategoryFormScreenState extends ConsumerState<CategoryFormScreen> {
                       ),
                     ),
                     const SizedBox(width: 8.0),
-                    const Text(
+                    Text(
                       'نوع جديد',
                       style: TextStyle(
                         fontFamily: AppTheme.fontFamily,
@@ -168,7 +168,7 @@ class _CategoryFormScreenState extends ConsumerState<CategoryFormScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // Field 1: Label "اسم النوع"
-                      const Text(
+                      Text(
                         'اسم النوع',
                         style: TextStyle(
                           fontFamily: AppTheme.fontFamily,
@@ -200,7 +200,7 @@ class _CategoryFormScreenState extends ConsumerState<CategoryFormScreen> {
                             maxLength,
                           }) =>
                               null,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: AppTheme.fontFamily,
                             fontSize: 18.0,
                             fontWeight: FontWeight.w600,
@@ -232,7 +232,7 @@ class _CategoryFormScreenState extends ConsumerState<CategoryFormScreen> {
                       const SizedBox(height: 28.0),
 
                       // Field 2: Label "الأيقونة"
-                      const Text(
+                      Text(
                         'الأيقونة',
                         style: TextStyle(
                           fontFamily: AppTheme.fontFamily,
@@ -249,7 +249,7 @@ class _CategoryFormScreenState extends ConsumerState<CategoryFormScreen> {
                       const SizedBox(height: 28.0),
 
                       // Field 3: Label "اللون"
-                      const Text(
+                      Text(
                         'اللون',
                         style: TextStyle(
                           fontFamily: AppTheme.fontFamily,
@@ -292,14 +292,14 @@ class _CategoryFormScreenState extends ConsumerState<CategoryFormScreen> {
                             widget.categoryToEdit!.isArchived
                                 ? 'إلغاء أرشفة التصنيف'
                                 : 'أرشفة التصنيف (إخفاءه من القوائم)',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: AppTheme.fontFamily,
                               color: AppColors.secondaryText,
                             ),
                           ),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12.0),
-                            side: const BorderSide(color: AppColors.dividers),
+                            side: BorderSide(color: AppColors.dividers),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12.0),
                             ),

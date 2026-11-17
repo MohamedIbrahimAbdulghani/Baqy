@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -149,7 +150,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     InkWell(
                       onTap: () => context.pop(),
                       borderRadius: BorderRadius.circular(8.0),
-                      child: const Padding(
+                      child: Padding(
                         padding: EdgeInsets.all(8.0),
                         child: Icon(
                           Icons.arrow_forward_ios_rounded,
@@ -159,7 +160,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                       ),
                     ),
                     const SizedBox(width: 8.0),
-                    const Text(
+                    Text(
                       'مصروف جديد',
                       style: TextStyle(
                         fontFamily: AppTheme.fontFamily,
@@ -221,7 +222,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           // Field 1: Label "الاسم"
-                          const Text(
+                          Text(
                             'الاسم',
                             style: TextStyle(
                               fontFamily: AppTheme.fontFamily,
@@ -253,7 +254,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                                 maxLength,
                               }) =>
                                   null,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: AppTheme.fontFamily,
                                 fontSize: 18.0,
                                 fontWeight: FontWeight.w600,
@@ -268,7 +269,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                           const SizedBox(height: 24.0),
 
                           // Field 2: Label "المبلغ"
-                          const Text(
+                          Text(
                             'المبلغ',
                             style: TextStyle(
                               fontFamily: AppTheme.fontFamily,
@@ -295,7 +296,13 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                             child: TextField(
                               controller: _amountController,
                               keyboardType: TextInputType.number,
-                              style: const TextStyle(
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(
+                                  RegExp(r'[0-9٠-٩,،]'),
+                                ),
+                                ThousandsSeparatorInputFormatter(),
+                              ],
+                              style: TextStyle(
                                 fontFamily: AppTheme.fontFamily,
                                 fontSize: 18.0,
                                 fontWeight: FontWeight.w600,
@@ -330,7 +337,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
+                              Text(
                                 'النوع',
                                 style: TextStyle(
                                   fontFamily: AppTheme.fontFamily,

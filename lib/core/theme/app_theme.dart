@@ -9,16 +9,16 @@ abstract final class AppTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       fontFamily: fontFamily,
-      scaffoldBackgroundColor: AppColors.background,
+      scaffoldBackgroundColor: AppColors.lightBackground,
       colorScheme: const ColorScheme.light(
-        primary: AppColors.darkGreen,
+        primary: AppColors.lightDarkGreen,
         secondary: AppColors.mainGreen,
-        surface: AppColors.card,
-        onSurface: AppColors.text,
+        surface: AppColors.lightCard,
+        onSurface: AppColors.lightText,
       ),
-      dividerColor: AppColors.dividers,
+      dividerColor: AppColors.lightDividers,
       dividerTheme: const DividerThemeData(
-        color: AppColors.dividers,
+        color: AppColors.lightDividers,
         thickness: 1,
         space: 1,
       ),
@@ -27,34 +27,86 @@ abstract final class AppTheme {
           fontFamily: fontFamily,
           fontSize: 44,
           fontWeight: FontWeight.w700,
-          color: AppColors.text,
+          color: AppColors.lightText,
         ),
         titleLarge: TextStyle(
           fontFamily: fontFamily,
           fontSize: 24,
           fontWeight: FontWeight.w700,
-          color: AppColors.text,
+          color: AppColors.lightText,
         ),
         bodyLarge: TextStyle(
           fontFamily: fontFamily,
           fontSize: 16,
           fontWeight: FontWeight.w400,
-          color: AppColors.text,
+          color: AppColors.lightText,
         ),
         bodyMedium: TextStyle(
           fontFamily: fontFamily,
           fontSize: 14,
           fontWeight: FontWeight.w400,
-          color: AppColors.text,
+          color: AppColors.lightText,
         ),
         bodySmall: TextStyle(
           fontFamily: fontFamily,
           fontSize: 13,
           fontWeight: FontWeight.w400,
-          color: AppColors.secondaryText,
+          color: AppColors.lightSecondaryText,
+        ),
+      ),
+    );
+  }
+
+  static ThemeData get darkTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      fontFamily: fontFamily,
+      scaffoldBackgroundColor: AppColors.darkBackground,
+      colorScheme: const ColorScheme.dark(
+        primary: AppColors.darkDarkGreen,
+        secondary: AppColors.mainGreen,
+        surface: AppColors.darkCard,
+        onSurface: AppColors.darkText,
+      ),
+      dividerColor: AppColors.darkDividers,
+      dividerTheme: const DividerThemeData(
+        color: AppColors.darkDividers,
+        thickness: 1,
+        space: 1,
+      ),
+      textTheme: const TextTheme(
+        headlineLarge: TextStyle(
+          fontFamily: fontFamily,
+          fontSize: 44,
+          fontWeight: FontWeight.w700,
+          color: AppColors.darkText,
+        ),
+        titleLarge: TextStyle(
+          fontFamily: fontFamily,
+          fontSize: 24,
+          fontWeight: FontWeight.w700,
+          color: AppColors.darkText,
+        ),
+        bodyLarge: TextStyle(
+          fontFamily: fontFamily,
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
+          color: AppColors.darkText,
+        ),
+        bodyMedium: TextStyle(
+          fontFamily: fontFamily,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          color: AppColors.darkText,
+        ),
+        bodySmall: TextStyle(
+          fontFamily: fontFamily,
+          fontSize: 13,
+          fontWeight: FontWeight.w400,
+          color: AppColors.darkSecondaryText,
         ),
       ),
     );
   }
 }
-

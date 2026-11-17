@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 /// Service responsible for managing local push notifications and permissions.
@@ -94,6 +95,8 @@ class NotificationService {
       channelDescription: channelDescription,
       importance: Importance.high,
       priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+      color: Color(0xFF4E8B7A),
       showWhen: true,
       enableVibration: true,
       playSound: true,
@@ -110,10 +113,10 @@ class NotificationService {
       iOS: iosDetails,
     );
 
-    // Show notification with the exact Arabic text required
+    // Show notification with the app name included in the title
     await _notificationsPlugin.show(
       101, // Constant ID for budget threshold warnings
-      'تنبيه الميزانية',
+      'تنبيه الميزانية - BAQY',
       'خد بالك انت قربت تخلص مصاريف الشهر ده',
       notificationDetails,
     );

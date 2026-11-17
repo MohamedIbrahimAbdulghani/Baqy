@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
@@ -48,7 +49,7 @@ class _BudgetBottomSheetState extends State<BudgetBottomSheet> {
   void initState() {
     super.initState();
     final initialText = widget.initialBudgetEgp != null && widget.initialBudgetEgp! > 0
-        ? NumberFormatter.formatCurrency(widget.initialBudgetEgp!)
+        ? NumberFormatter.formatWithCommas(widget.initialBudgetEgp!)
         : '';
     _controller = TextEditingController(text: initialText);
   }
@@ -87,7 +88,7 @@ class _BudgetBottomSheetState extends State<BudgetBottomSheet> {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24.0)),
       ),
@@ -105,7 +106,7 @@ class _BudgetBottomSheetState extends State<BudgetBottomSheet> {
           Text(
             'ميزانية شهر $monthName',
             textAlign: TextAlign.right,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: AppTheme.fontFamily,
               fontSize: 22.0,
               fontWeight: FontWeight.w700,
@@ -115,7 +116,7 @@ class _BudgetBottomSheetState extends State<BudgetBottomSheet> {
           const SizedBox(height: 8.0),
 
           // Subtitle
-          const Text(
+          Text(
             'اكتب مرتبك أو دخلك المتاح الشهر ده، تقدر تغيّره في أي وقت بالضغط على الحلقة.',
             textAlign: TextAlign.right,
             style: TextStyle(
@@ -129,7 +130,7 @@ class _BudgetBottomSheetState extends State<BudgetBottomSheet> {
           const SizedBox(height: 20.0),
 
           // Label: "المبلغ المتاح بالجنيه"
-          const Text(
+          Text(
             'المبلغ المتاح بالجنيه',
             textAlign: TextAlign.right,
             style: TextStyle(
@@ -144,10 +145,10 @@ class _BudgetBottomSheetState extends State<BudgetBottomSheet> {
           // Input field
           Container(
             decoration: BoxDecoration(
-              color: const Color(0xFFFBF9F5),
+              color: AppColors.inputFill,
               borderRadius: BorderRadius.circular(12.0),
               border: Border.all(
-                color: _errorMessage != null ? Colors.red : AppColors.dividers,
+                color: _errorMessage != null ? Colors.red : AppColors.inputBorder,
                 width: 1.0,
               ),
             ),
@@ -155,14 +156,20 @@ class _BudgetBottomSheetState extends State<BudgetBottomSheet> {
             child: TextField(
               controller: _controller,
               keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(
+                  RegExp(r'[0-9٠-٩,،]'),
+                ),
+                ThousandsSeparatorInputFormatter(),
+              ],
               textAlign: TextAlign.right,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: AppTheme.fontFamily,
                 fontSize: 18.0,
                 fontWeight: FontWeight.w700,
                 color: AppColors.text,
               ),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 border: InputBorder.none,
                 hintText: '٠',
                 hintStyle: TextStyle(

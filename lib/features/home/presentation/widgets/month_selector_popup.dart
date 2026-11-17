@@ -83,7 +83,7 @@ class _MonthSelectorPopupState extends State<MonthSelectorPopup> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 if (isSelected)
-                  const Icon(
+                  Icon(
                     Icons.check,
                     color: AppColors.darkGreen,
                     size: 20.0,
@@ -128,14 +128,14 @@ class _MonthSelectorPopupState extends State<MonthSelectorPopup> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Icon(
+                Icon(
                   Icons.keyboard_arrow_down_rounded,
                   color: AppColors.text,
                   size: 22.0,
                 ),
                 Text(
                   _activeYear.toArabicDigits(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: AppTheme.fontFamily,
                     fontSize: 18.0,
                     fontWeight: FontWeight.w700,
@@ -147,7 +147,7 @@ class _MonthSelectorPopupState extends State<MonthSelectorPopup> {
           ),
         ),
         const SizedBox(height: 6.0),
-        const Divider(
+        Divider(
           color: AppColors.dividers,
           height: 1.0,
           thickness: 1.0,
@@ -197,7 +197,7 @@ class _MonthSelectorPopupState extends State<MonthSelectorPopup> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.check,
                           color: AppColors.darkGreen,
                           size: 14.0,
@@ -205,7 +205,7 @@ class _MonthSelectorPopupState extends State<MonthSelectorPopup> {
                         const SizedBox(width: 3.0),
                         Text(
                           monthName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: AppTheme.fontFamily,
                             fontSize: 13.0,
                             fontWeight: FontWeight.w700,
@@ -230,7 +230,7 @@ class _MonthSelectorPopupState extends State<MonthSelectorPopup> {
                     fit: BoxFit.scaleDown,
                     child: Text(
                       monthName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: AppTheme.fontFamily,
                         fontSize: 13.0,
                         fontWeight: FontWeight.w600,
