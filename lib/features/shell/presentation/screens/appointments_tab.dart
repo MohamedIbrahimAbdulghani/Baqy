@@ -1,14 +1,80 @@
 import 'package:flutter/material.dart';
-import '../../../../l10n/app_localizations.dart';
-import 'tab_title_page.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../reminders/presentation/providers/reminder_providers.dart';
+import '../../../reminders/presentation/widgets/reminder_card.dart';
 
-class AppointmentsTab extends StatelessWidget {
+/// The "المواعيد" (Appointments / Reminders) tab screen.
+class AppointmentsTab extends ConsumerWidget {
   const AppointmentsTab({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final title = AppLocalizations.of(context)?.tabAppointments ?? 'المواعيد';
-    return TabTitlePage(title: title);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final remindersAsync = ref.watch(remindersStreamProvider);
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Top Title "المواعيد" matching Screenshot 1
+            Padding(
+              padding: const EdgeInsets.only(
+                left: 20.0,
+                right: 20.0,
+                top: 20.0,
+                bottom: 16.0,
+              ),
+              child: Text(
+                'المواعيد',
+                style: TextStyle(
+                  fontFamily: AppTheme.fontFamily,
+                  fontSize: 26.0,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.text,
+                ),
+              ),
+            ),
+
+            // Reminders List or Empty State
+            Expanded(
+              child: remindersAsync.when(
+                data: (reminders) {
+                  // When there are no reminders, show only the title and the "+" button
+                  if (reminders.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return ListView.separated(
+                    padding: const EdgeInsets.only(
+                      left: 20.0,
+                      right: 20.0,
+                      top: 4.0,
+                      bottom: 110.0, // Space above FAB and bottom navigation bar
+                    ),
+                    itemCount: reminders.length,
+                    separatorBuilder: (context, _) => const SizedBox(height: 12.0),
+                    itemBuilder: (context, index) {
+                      final reminder = reminders[index];
+                      return ReminderCard(
+                        reminder: reminder,
+                        onTap: () {
+                          context.push('/add-reminder', extra: reminder);
+                        },
+                      );
+                    },
+                  );
+                },
+                loading: () => const SizedBox.shrink(),
+                error: (error, _) => const SizedBox.shrink(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
-

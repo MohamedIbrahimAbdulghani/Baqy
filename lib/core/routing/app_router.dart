@@ -9,6 +9,8 @@ import '../../features/expenses/presentation/screens/month_details_screen.dart';
 import '../../features/goals/domain/models/goal_item.dart';
 import '../../features/goals/presentation/screens/add_goal_screen.dart';
 import '../../features/goals/presentation/screens/goal_details_screen.dart';
+import '../../features/reminders/domain/models/reminder_item.dart';
+import '../../features/reminders/presentation/screens/add_reminder_screen.dart';
 import '../../features/shell/presentation/screens/main_shell_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
 
@@ -68,6 +70,13 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) {
         final goalId = state.extra as int;
         return GoalDetailsScreen(goalId: goalId);
+      },
+    ),
+    GoRoute(
+      path: '/add-reminder',
+      builder: (context, state) {
+        final reminderToEdit = state.extra as ReminderItem?;
+        return AddReminderScreen(reminderToEdit: reminderToEdit);
       },
     ),
   ],

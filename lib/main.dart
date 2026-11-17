@@ -20,10 +20,9 @@ Future<void> main() async {
     }
   }
 
-  // Initialize local notifications service and request permissions
+  // Initialize local notifications service (permissions requested on first reminder)
   try {
     await NotificationService.instance.initialize();
-    await NotificationService.instance.requestPermissions();
   } catch (e) {
     if (kDebugMode) {
       debugPrint('[NOTIFICATION] Failed to initialize NotificationService: $e');
