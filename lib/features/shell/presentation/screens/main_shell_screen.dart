@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/notification_service.dart';
+import '../../../expenses/domain/models/month_remaining.dart';
+import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../../../goals/presentation/widgets/goals_speed_dial_fab.dart';
+import '../../../home/presentation/controllers/budget_monitor_controller.dart';
 import '../../../home/presentation/widgets/home_speed_dial_fab.dart';
 import '../../../reminders/presentation/providers/reminder_providers.dart';
 import '../../../reminders/presentation/widgets/reminders_speed_dial_fab.dart';
@@ -83,6 +86,18 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<MonthRemaining>>(currentMonthRemainingProvider, (prev, next) {
+      next.whenData((remaining) {
+        final double totalBudget = remaining.monthMoney / 100.0;
+        final double remainingEgp = remaining.remaining / 100.0;
+        BudgetMonitorController.evaluateAndNotify(
+          totalBudget: totalBudget,
+          remainingAmount: remainingEgp,
+          currentMonthKey: remaining.yearMonth,
+        );
+      });
+    });
+
     final themeMode = ref.watch(themeModeProvider);
     final isDark = themeMode == ThemeMode.dark;
     final int selectedIndex = ref.watch(tabIndexProvider);

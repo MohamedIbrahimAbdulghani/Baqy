@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/empty_state_welcome_card.dart';
 import '../../../reminders/presentation/providers/reminder_providers.dart';
 import '../../../reminders/presentation/widgets/reminder_card.dart';
 
@@ -43,9 +44,18 @@ class AppointmentsTab extends ConsumerWidget {
             Expanded(
               child: remindersAsync.when(
                 data: (reminders) {
-                  // When there are no reminders, show only the title and the "+" button
                   if (reminders.isEmpty) {
-                    return const SizedBox.shrink();
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 20.0),
+                        child: EmptyStateWelcomeCard(
+                          icon: Icons.event_available_rounded,
+                          title: 'نظم التزاماتك وفواتيرك',
+                          subtitle:
+                              'سجل مواعيد أقساطك وفواتيرك الدورية بالضغط على (+) والتطبيق هيفكرك بيها دايماً في ميعادها.',
+                        ),
+                      ),
+                    );
                   }
 
                   return ListView.separated(

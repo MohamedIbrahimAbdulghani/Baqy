@@ -91,6 +91,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           yearMonth: yearMonth,
           amount: budgetPiastres,
         );
+        await BudgetMonitorController.resetAlertFlag(yearMonth);
         ref.invalidate(currentMonthRemainingProvider);
         ref.invalidate(yearsWithDataProvider);
         final (year, _) = ArabicDateHelper.parseYearMonthKey(yearMonth);

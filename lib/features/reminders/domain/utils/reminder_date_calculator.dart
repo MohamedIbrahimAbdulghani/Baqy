@@ -68,6 +68,7 @@ abstract final class ReminderDateCalculator {
     required String repeat,
     required int leadDays,
     DateTime? now,
+    bool allowCatchupToday = false,
   }) {
     final reference = now ?? DateTime.now();
     final originalDay = dueDate.day;
@@ -95,6 +96,22 @@ abstract final class ReminderDateCalculator {
           notificationMoment: notificationMoment,
           occurrenceDueDate: occurrenceDueDate,
         );
+      }
+
+      // If allowCatchupToday is enabled, and the target notification day is TODAY
+      // (or past within lead window while occurrence due date is today or future),
+      // schedule for immediately (reference + 3 seconds)
+      if (allowCatchupToday) {
+        final refDay = DateTime(reference.year, reference.month, reference.day);
+        final notifDay = DateTime(notifDate.year, notifDate.month, notifDate.day);
+        final dueDay = DateTime(occurrenceDueDate.year, occurrenceDueDate.month, occurrenceDueDate.day);
+
+        if (!refDay.isBefore(notifDay) && !refDay.isAfter(dueDay)) {
+          return (
+            notificationMoment: reference.add(const Duration(seconds: 3)),
+            occurrenceDueDate: occurrenceDueDate,
+          );
+        }
       }
 
       // If the 09:00 moment of an occurrence has already passed, skip it.

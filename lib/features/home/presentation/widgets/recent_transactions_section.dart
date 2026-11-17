@@ -5,6 +5,7 @@ import '../../../../core/constants/app_dimensions.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/category_icon_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
+import '../../../../core/widgets/empty_state_welcome_card.dart';
 import '../../../expenses/domain/models/transaction_item.dart';
 import '../../../expenses/presentation/widgets/transaction_actions_sheet.dart';
 
@@ -18,6 +19,19 @@ class RecentTransactionsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (transactions.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+        child: EmptyStateWelcomeCard(
+          icon: Icons.receipt_long_rounded,
+          title: 'لسه مبدأتش مصاريفك الشهر ده',
+          subtitle:
+              'سجل أول عملية بالضغط على (+) أو بالصوت، وشوف مصاريفك بتترتب وتتحسب تلقائياً.',
+          isCompact: true,
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,

@@ -62,8 +62,8 @@ abstract final class BudgetMonitorController {
 
     if (reached) {
       if (!hasAlerted) {
-        await NotificationService.instance.showBudgetWarningNotification();
         await prefs.setBool(prefKey, true);
+        await NotificationService.instance.showBudgetWarningNotification();
       }
     } else {
       // User increased total budget or deleted expenses bringing balance back above 25%
@@ -71,6 +71,12 @@ abstract final class BudgetMonitorController {
         await prefs.setBool(prefKey, false);
       }
     }
+  }
+
+  /// Resets the alert flag for a given month key (e.g. when budget is updated)
+  static Future<void> resetAlertFlag(String currentMonthKey) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('budget_alert_sent_$currentMonthKey', false);
   }
 }
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/widgets/empty_state_welcome_card.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../goals/domain/models/goal_item.dart';
 import '../../../goals/presentation/providers/goal_providers.dart';
@@ -44,9 +45,17 @@ class GoalsTab extends ConsumerWidget {
                 child: goalsAsync.when(
                   data: (List<GoalItem> goals) {
                     if (goals.isEmpty) {
-                      // Rule: When there are no goals yet, show only the page title
-                      // and the "+" button, with no extra text.
-                      return const SizedBox.shrink();
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4.0),
+                          child: EmptyStateWelcomeCard(
+                            icon: Icons.stars_rounded,
+                            title: 'خطوتك الأولى نحو تحقيق أحلامك',
+                            subtitle:
+                                'سجل هدفك المالي (عربية، سفرية، جهاز جديد...) وتابع تقدم تحويشك خطوة بخطوة بالضغط على (+).',
+                          ),
+                        ),
+                      );
                     }
 
                     return ListView.builder(

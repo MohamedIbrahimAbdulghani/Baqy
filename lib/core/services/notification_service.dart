@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import '../../features/reminders/domain/models/reminder_item.dart';
@@ -55,14 +56,14 @@ class NotificationService {
     }
 
     const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@drawable/ic_notification');
 
     const DarwinInitializationSettings iosSettings =
         DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
-    );
+          requestAlertPermission: false,
+          requestBadgePermission: false,
+          requestSoundPermission: false,
+        );
 
     const InitializationSettings initSettings = InitializationSettings(
       android: androidSettings,
@@ -84,8 +85,8 @@ class NotificationService {
 
     // Check if app was launched directly by tapping a notification
     try {
-      final launchDetails =
-          await _notificationsPlugin.getNotificationAppLaunchDetails();
+      final launchDetails = await _notificationsPlugin
+          .getNotificationAppLaunchDetails();
       if (launchDetails != null &&
           launchDetails.didNotificationLaunchApp &&
           launchDetails.notificationResponse?.payload == 'reminders') {
@@ -96,26 +97,28 @@ class NotificationService {
     // Create notification channels on Android
     if (Platform.isAndroid) {
       final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-          _notificationsPlugin.resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
+          _notificationsPlugin
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
 
       const AndroidNotificationChannel budgetChannel =
           AndroidNotificationChannel(
-        budgetChannelId,
-        budgetChannelName,
-        description: budgetChannelDescription,
-        importance: Importance.high,
-        playSound: true,
-      );
+            budgetChannelId,
+            budgetChannelName,
+            description: budgetChannelDescription,
+            importance: Importance.high,
+            playSound: true,
+          );
 
       const AndroidNotificationChannel remindersChannel =
           AndroidNotificationChannel(
-        remindersChannelId,
-        remindersChannelName,
-        description: remindersChannelDescription,
-        importance: Importance.high,
-        playSound: true,
-      );
+            remindersChannelId,
+            remindersChannelName,
+            description: remindersChannelDescription,
+            importance: Importance.high,
+            playSound: true,
+          );
 
       await androidImplementation?.createNotificationChannel(budgetChannel);
       await androidImplementation?.createNotificationChannel(remindersChannel);
@@ -127,15 +130,19 @@ class NotificationService {
     try {
       if (Platform.isAndroid) {
         final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-            _notificationsPlugin.resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>();
-        final bool? granted =
-            await androidImplementation?.requestNotificationsPermission();
+            _notificationsPlugin
+                .resolvePlatformSpecificImplementation<
+                  AndroidFlutterLocalNotificationsPlugin
+                >();
+        final bool? granted = await androidImplementation
+            ?.requestNotificationsPermission();
         return granted ?? false;
       } else if (Platform.isIOS) {
         final IOSFlutterLocalNotificationsPlugin? iosImplementation =
-            _notificationsPlugin.resolvePlatformSpecificImplementation<
-                IOSFlutterLocalNotificationsPlugin>();
+            _notificationsPlugin
+                .resolvePlatformSpecificImplementation<
+                  IOSFlutterLocalNotificationsPlugin
+                >();
         final bool? granted = await iosImplementation?.requestPermissions(
           alert: true,
           badge: true,
@@ -186,13 +193,36 @@ class NotificationService {
       nowInCairo.second,
     );
 
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (_) {}
+
     for (final reminder in reminders) {
-      final schedule = ReminderDateCalculator.calculateNotificationSchedule(
+      final nextDue = ReminderDateCalculator.calculateNextDueDate(
+        dueDate: reminder.dueDate,
+        repeat: reminder.repeat,
+        now: nowDateTime,
+      );
+      final catchupKey =
+          'reminder_catchup_sent_${reminder.id}_${nextDue.year}_${nextDue.month}_${nextDue.day}';
+      final alreadySentCatchup = prefs?.getBool(catchupKey) ?? false;
+
+      // 1. Calculate schedule, allowing catch-up today if not already sent for this occurrence
+      var schedule = ReminderDateCalculator.calculateNotificationSchedule(
         dueDate: reminder.dueDate,
         repeat: reminder.repeat,
         leadDays: reminder.leadDays,
         now: nowDateTime,
+        allowCatchupToday: !alreadySentCatchup,
       );
+
+      // If scheduled moment is within 10 seconds (catch-up), mark as sent so it won't re-trigger on subsequent syncs today
+      if (schedule != null &&
+          schedule.notificationMoment.difference(nowDateTime).inSeconds <= 10 &&
+          prefs != null) {
+        await prefs.setBool(catchupKey, true);
+      }
 
       if (schedule != null) {
         final moment = schedule.notificationMoment;
@@ -219,8 +249,9 @@ class NotificationService {
           channelDescription: remindersChannelDescription,
           importance: Importance.high,
           priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-          color: const Color(0xFF4E8B7A),
+          icon: '@drawable/ic_notification',
+          largeIcon: const DrawableResourceAndroidBitmap('@drawable/ic_app_icon'),
+          color: const Color(0xFF2F6B5A),
           showWhen: true,
           enableVibration: true,
           playSound: true,
@@ -243,7 +274,7 @@ class NotificationService {
             content.body,
             tzMoment,
             NotificationDetails(android: androidDetails, iOS: iosDetails),
-            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
             uiLocalNotificationDateInterpretation:
                 UILocalNotificationDateInterpretation.absoluteTime,
             payload: 'reminders',
@@ -251,8 +282,26 @@ class NotificationService {
 
           scheduledDetails.add((id: reminder.id, dateTime: moment));
         } catch (e) {
-          if (kDebugMode) {
-            debugPrint('[NOTIFICATION] Error scheduling reminder ${reminder.id}: $e');
+          // Fallback to inexact if exact alarms are restricted
+          try {
+            await _notificationsPlugin.zonedSchedule(
+              reminder.id,
+              content.title,
+              content.body,
+              tzMoment,
+              NotificationDetails(android: androidDetails, iOS: iosDetails),
+              androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+              uiLocalNotificationDateInterpretation:
+                  UILocalNotificationDateInterpretation.absoluteTime,
+              payload: 'reminders',
+            );
+            scheduledDetails.add((id: reminder.id, dateTime: moment));
+          } catch (e2) {
+            if (kDebugMode) {
+              debugPrint(
+                '[NOTIFICATION] Error scheduling reminder ${reminder.id}: $e2',
+              );
+            }
           }
         }
       } else {
@@ -278,7 +327,9 @@ class NotificationService {
       final detailsStr = scheduledDetails
           .map((e) => 'id: ${e.id}, date: ${e.dateTime.toString()}')
           .join('; ');
-      debugPrint('[REMINDERS] Scheduled $count notifications${count > 0 ? ': [$detailsStr]' : ''}');
+      debugPrint(
+        '[REMINDERS] Scheduled $count notifications${count > 0 ? ': [$detailsStr]' : ''}',
+      );
     }
   }
 
@@ -286,17 +337,18 @@ class NotificationService {
   Future<void> showBudgetWarningNotification() async {
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
-      budgetChannelId,
-      budgetChannelName,
-      channelDescription: budgetChannelDescription,
-      importance: Importance.high,
-      priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
-      color: Color(0xFF4E8B7A),
-      showWhen: true,
-      enableVibration: true,
-      playSound: true,
-    );
+          budgetChannelId,
+          budgetChannelName,
+          channelDescription: budgetChannelDescription,
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@drawable/ic_notification',
+          largeIcon: DrawableResourceAndroidBitmap('@drawable/ic_app_icon'),
+          color: Color(0xFF2F6B5A),
+          showWhen: true,
+          enableVibration: true,
+          playSound: true,
+        );
 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
       presentAlert: true,
@@ -308,6 +360,10 @@ class NotificationService {
       android: androidDetails,
       iOS: iosDetails,
     );
+
+    try {
+      await _notificationsPlugin.cancel(101);
+    } catch (_) {}
 
     await _notificationsPlugin.show(
       101, // Constant ID for budget threshold warnings
