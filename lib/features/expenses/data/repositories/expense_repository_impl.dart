@@ -1063,6 +1063,11 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
       }
     }
 
+    final existingTx = await (_db.select(_db.transactions)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+    if (existingTx != null && (existingTx.source == 'debt' || existingTx.source == 'goal')) {
+      throw UnsupportedError('لا يمكن تعديل معاملات الديون أو الأهداف من قسم المصاريف. يرجى إدارتها من شاشتها الخاصة.');
+    }
+
     await (_db.update(_db.transactions)..where((tbl) => tbl.id.equals(id))).write(
       TransactionsCompanion(
         amount: Value(amount),
@@ -1082,6 +1087,10 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
       final savingId = -id;
       await (_db.delete(_db.goalSavings)..where((s) => s.id.equals(savingId))).go();
       return;
+    }
+    final existingTx = await (_db.select(_db.transactions)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+    if (existingTx != null && existingTx.source == 'debt') {
+      throw UnsupportedError('لا يمكن حذف معاملات الديون من قسم المصاريف. يرجى إدارتها من شاشتها الخاصة.');
     }
     await (_db.delete(_db.transactions)..where((tbl) => tbl.id.equals(id))).go();
   }

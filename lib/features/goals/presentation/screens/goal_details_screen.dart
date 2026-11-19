@@ -8,6 +8,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/utils/goal_icon_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
+import '../../../../core/widgets/action_feedback_dialog.dart';
 import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../../domain/models/goal_item.dart';
 import '../providers/goal_providers.dart';
@@ -82,6 +83,14 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
   }
 
   Future<void> _confirmDeleteGoal(BuildContext context, GoalItem goal) async {
+    final isAchieved = goal.isAchieved;
+
+    final String title = isAchieved ? 'حذف نهائي؟' : 'حذف الهدف؟';
+    final String content = isAchieved
+        ? 'سيتم حذف الهدف بالكامل من التطبيق ولا يمكن الرجوع له مرة أخرى.'
+        : 'هيتحذف الهدف وكل اللي حوّشته فيه هيرجع للباقي.';
+    final String confirmBtnText = isAchieved ? 'حذف نهائياً' : 'حذف';
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
@@ -91,16 +100,16 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
             borderRadius: BorderRadius.circular(16.0),
           ),
           backgroundColor: AppColors.card,
-          title: const Text(
-            'حذف الهدف؟',
-            style: TextStyle(
+          title: Text(
+            title,
+            style: const TextStyle(
               fontFamily: AppTheme.fontFamily,
               fontWeight: FontWeight.bold,
             ),
           ),
-          content: const Text(
-            'هيتحذف الهدف وكل اللي حوّشته فيه هيرجع للباقي.',
-            style: TextStyle(
+          content: Text(
+            content,
+            style: const TextStyle(
               fontFamily: AppTheme.fontFamily,
               fontSize: 14.0,
             ),
@@ -126,9 +135,9 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                 ),
                 elevation: 0,
               ),
-              child: const Text(
-                'حذف',
-                style: TextStyle(
+              child: Text(
+                confirmBtnText,
+                style: const TextStyle(
                   fontFamily: AppTheme.fontFamily,
                   fontWeight: FontWeight.bold,
                 ),
@@ -140,6 +149,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
     );
 
     if (confirmed == true && mounted) {
+      final goalName = goal.name;
       await ref.read(goalRepositoryProvider).deleteGoal(goal.id);
       if (context.mounted) {
         final router = GoRouter.maybeOf(context);
@@ -148,6 +158,15 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
         } else if (Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
         }
+
+        await ActionFeedbackDialog.show(
+          context: context,
+          type: ActionFeedbackType.deleted,
+          title: isAchieved ? 'تم الحذف نهائياً' : 'تم حذف الهدف',
+          subtitle: isAchieved
+              ? 'تم حذف هدف "$goalName" نهائياً من التطبيق.'
+              : 'اتحذف هدف "$goalName" ورجعت مدخراته للباقي.',
+        );
       }
     }
   }
@@ -427,18 +446,20 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                           ),
                         ),
                       ),
-                      // Pencil (Edit)
-                      IconButton(
-                        onPressed: () => _openEditGoal(context, goal),
-                        icon: Icon(
-                          Icons.edit_outlined,
-                          size: 22.0,
-                          color: AppColors.text,
+                      // Pencil (Edit) - only if NOT achieved
+                      if (!goal.isAchieved) ...[
+                        IconButton(
+                          onPressed: () => _openEditGoal(context, goal),
+                          icon: Icon(
+                            Icons.edit_outlined,
+                            size: 22.0,
+                            color: AppColors.text,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                          constraints: const BoxConstraints(),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                        constraints: const BoxConstraints(),
-                      ),
-                      const SizedBox(width: 8.0),
+                        const SizedBox(width: 8.0),
+                      ],
                       // Trash (Delete)
                       IconButton(
                         onPressed: () => _confirmDeleteGoal(context, goal),
@@ -463,147 +484,101 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                           GoalProgressChartCard(goal: goal),
                           const SizedBox(height: 14.0),
 
-                          // Card 2: المتبقي معاك الشهر ده: X جنيه (Live from repository)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20.0,
-                              vertical: 18.0,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.card,
-                              borderRadius: BorderRadius.circular(16.0),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0x0C000000),
-                                  blurRadius: 8.0,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'المتبقي معاك الشهر ده',
-                                  style: TextStyle(
-                                    fontFamily: AppTheme.fontFamily,
-                                    fontSize: 14.0,
-                                    color: AppColors.secondaryText,
-                                  ),
-                                ),
-                                Text(
-                                  '${_thousands.format(remainingEgp)} جنيه',
-                                  style: TextStyle(
-                                    fontFamily: AppTheme.fontFamily,
-                                    fontSize: 16.0,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.text,
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: 0,
-                                  height: 0,
-                                  child: Opacity(
-                                    opacity: 0,
-                                    child: Text(
-                                      '${NumberFormatter.formatCurrency(remainingEgp)} جنيه',
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 18.0),
-
-                          // Field 3: هتوفر كام في الشهر؟
-                          Text(
-                            'هتوفر كام في الشهر؟',
-                            style: TextStyle(
-                              fontFamily: AppTheme.fontFamily,
-                              fontSize: 13.5,
-                              color: AppColors.secondaryText,
-                            ),
-                          ),
-                          const SizedBox(height: 8.0),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.inputFill,
-                              borderRadius: BorderRadius.circular(14.0),
-                              border: Border.all(
-                                color: _savingError != null
-                                    ? Colors.redAccent
-                                    : AppColors.inputBorder,
-                                width: 1.0,
-                              ),
-                            ),
-                            child: TextField(
-                              controller: _savingController,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.allow(
-                                  RegExp(r'[0-9٠-٩,،]'),
-                                ),
-                                ThousandsSeparatorInputFormatter(),
-                              ],
-                              onChanged: (val) => _onSavingChanged(val, goal),
-                              decoration: const InputDecoration(
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 16.0,
-                                  vertical: 14.0,
-                                ),
-                              ),
-                              style: TextStyle(
-                                fontFamily: AppTheme.fontFamily,
-                                fontSize: 16.0,
-                                color: AppColors.text,
-                              ),
-                            ),
-                          ),
-                          if (_savingError != null) ...[
-                            const SizedBox(height: 4.0),
-                            Text(
-                              _savingError!,
-                              style: const TextStyle(
-                                fontFamily: AppTheme.fontFamily,
-                                fontSize: 12.0,
-                                color: Colors.redAccent,
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 16.0),
-
-                          // Card 4: Result ("هتوصل لهدفك في N شهر")
-                          // If saving is empty/invalid, show nothing for the result
-                          if (monthsResult != null && _savingError == null)
+                          if (goal.isAchieved) ...[
+                            // Achieved History Card
                             Container(
                               padding: const EdgeInsets.symmetric(
+                                horizontal: 20.0,
                                 vertical: 22.0,
-                                horizontal: 16.0,
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.lightGreen,
+                                color: AppColors.card,
                                 borderRadius: BorderRadius.circular(16.0),
+                                border: Border.all(
+                                  color: AppColors.inputBorder.withValues(alpha: 0.5),
+                                  width: 1.0,
+                                ),
                               ),
                               child: Column(
-                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Text(
-                                    'هتوصل لهدفك في',
+                                  Container(
+                                    width: 52.0,
+                                    height: 52.0,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.celebration_rounded,
+                                        color: Color(0xFF2E7D32),
+                                        size: 28.0,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12.0),
+                                  Text(
+                                    'تم تحقيق الهدف بنجاح! 🎉',
+                                    textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontFamily: AppTheme.fontFamily,
-                                      fontSize: 14.0,
-                                      color: AppColors.mainGreen,
+                                      fontSize: 18.0,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.text,
                                     ),
                                   ),
                                   const SizedBox(height: 6.0),
                                   Text(
-                                    '${_thousands.format(monthsResult)} شهر',
-                                    style: const TextStyle(
+                                    'مبروك! حققت هدفك بالكامل وحوّشت ${NumberFormatter.formatCurrency(goal.targetEgp)} جنيه. هذا السجل محفوظ كإنجاز وتاريخ فقط.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
                                       fontFamily: AppTheme.fontFamily,
-                                      fontSize: 32.0,
+                                      fontSize: 13.5,
+                                      color: AppColors.secondaryText,
+                                      height: 1.45,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16.0),
+                          ] else ...[
+                            // Active Goal Fields: Monthly Saving & Months to Goal
+                            // Card 2: المتبقي معاك الشهر ده: X جنيه (Live from repository)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20.0,
+                                vertical: 18.0,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.card,
+                                borderRadius: BorderRadius.circular(16.0),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x0C000000),
+                                    blurRadius: 8.0,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'المتبقي معاك الشهر ده',
+                                    style: TextStyle(
+                                      fontFamily: AppTheme.fontFamily,
+                                      fontSize: 14.0,
+                                      color: AppColors.secondaryText,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${_thousands.format(remainingEgp)} جنيه',
+                                    style: TextStyle(
+                                      fontFamily: AppTheme.fontFamily,
+                                      fontSize: 16.0,
                                       fontWeight: FontWeight.bold,
-                                      color: AppColors.mainGreen,
+                                      color: AppColors.text,
                                     ),
                                   ),
                                   SizedBox(
@@ -612,79 +587,219 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                                     child: Opacity(
                                       opacity: 0,
                                       child: Text(
-                                        '${NumberFormatter.formatCurrency(monthsResult)} شهر',
+                                        '${NumberFormatter.formatCurrency(remainingEgp)} جنيه',
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          const SizedBox(height: 16.0),
+                            const SizedBox(height: 18.0),
+
+                            // Field 3: هتوفر كام في الشهر؟
+                            Text(
+                              'هتوفر كام في الشهر؟',
+                              style: TextStyle(
+                                fontFamily: AppTheme.fontFamily,
+                                fontSize: 13.5,
+                                color: AppColors.secondaryText,
+                              ),
+                            ),
+                            const SizedBox(height: 8.0),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.inputFill,
+                                borderRadius: BorderRadius.circular(14.0),
+                                border: Border.all(
+                                  color: _savingError != null
+                                      ? Colors.redAccent
+                                      : AppColors.inputBorder,
+                                  width: 1.0,
+                                ),
+                              ),
+                              child: TextField(
+                                controller: _savingController,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(
+                                    RegExp(r'[0-9٠-٩,،]'),
+                                  ),
+                                  ThousandsSeparatorInputFormatter(),
+                                ],
+                                onChanged: (val) => _onSavingChanged(val, goal),
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 16.0,
+                                    vertical: 14.0,
+                                  ),
+                                ),
+                                style: TextStyle(
+                                  fontFamily: AppTheme.fontFamily,
+                                  fontSize: 16.0,
+                                  color: AppColors.text,
+                                ),
+                              ),
+                            ),
+                            if (_savingError != null) ...[
+                              const SizedBox(height: 4.0),
+                              Text(
+                                _savingError!,
+                                style: const TextStyle(
+                                  fontFamily: AppTheme.fontFamily,
+                                  fontSize: 12.0,
+                                  color: Colors.redAccent,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 16.0),
+
+                            // Card 4: Result ("هتوصل لهدفك في N شهر")
+                            // If saving is empty/invalid, show nothing for the result
+                            if (monthsResult != null && _savingError == null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 22.0,
+                                  horizontal: 16.0,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.lightGreen,
+                                  borderRadius: BorderRadius.circular(16.0),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      'هتوصل لهدفك في',
+                                      style: TextStyle(
+                                        fontFamily: AppTheme.fontFamily,
+                                        fontSize: 14.0,
+                                        color: AppColors.mainGreen,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6.0),
+                                    Text(
+                                      '${_thousands.format(monthsResult)} شهر',
+                                      style: const TextStyle(
+                                        fontFamily: AppTheme.fontFamily,
+                                        fontSize: 32.0,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.mainGreen,
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 0,
+                                      height: 0,
+                                      child: Opacity(
+                                        opacity: 0,
+                                        child: Text(
+                                          '${NumberFormatter.formatCurrency(monthsResult)} شهر',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            const SizedBox(height: 16.0),
+                          ],
                         ],
                       ),
                     ),
                   ),
 
-                  // Action Buttons: "حوّشت" and "سحب"
+                  // Bottom Area: Settled history badge if achieved, OR action buttons if active
                   Padding(
                     padding: const EdgeInsets.only(top: 8.0, bottom: 12.0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 52.0,
-                            child: ElevatedButton(
-                              onPressed: () =>
-                                  _handleHawasht(context, goal, remainingEgp),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.mainGreen,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14.0),
-                                ),
-                                elevation: 0,
-                              ),
-                              child: const Text(
-                                'حوّشت',
-                                style: TextStyle(
-                                  fontFamily: AppTheme.fontFamily,
-                                  fontSize: 16.0,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                    child: goal.isAchieved
+                        ? Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 16.0),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2E7D32).withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(14.0),
+                              border: Border.all(
+                                color: const Color(0xFF2E7D32).withValues(alpha: 0.30),
+                                width: 1.0,
                               ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 12.0),
-                        Expanded(
-                          child: SizedBox(
-                            height: 52.0,
-                            child: OutlinedButton(
-                              onPressed: () =>
-                                  _openSaveBottomSheet(context, goal, remainingEgp, isWithdrawal: true),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.isDark ? AppColors.coinGold : const Color(0xFFB5883E),
-                                side: BorderSide(
-                                  color: AppColors.isDark ? AppColors.coinGold : const Color(0xFFB5883E),
-                                  width: 1.5,
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.check_circle_rounded,
+                                  color: Color(0xFF2E7D32),
+                                  size: 20.0,
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14.0),
+                                SizedBox(width: 8.0),
+                                Text(
+                                  'تم تحقيق هذا الهدف بالكامل (سجل محفوظ)',
+                                  style: TextStyle(
+                                    fontFamily: AppTheme.fontFamily,
+                                    fontSize: 14.0,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF2E7D32),
+                                  ),
                                 ),
-                              ),
-                              child: const Text(
-                                'سحب',
-                                style: TextStyle(
-                                  fontFamily: AppTheme.fontFamily,
-                                  fontSize: 16.0,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                              ],
                             ),
+                          )
+                        : Row(
+                            children: [
+                              Expanded(
+                                child: SizedBox(
+                                  height: 52.0,
+                                  child: ElevatedButton(
+                                    onPressed: () =>
+                                        _handleHawasht(context, goal, remainingEgp),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.mainGreen,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14.0),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    child: const Text(
+                                      'حوّشت',
+                                      style: TextStyle(
+                                        fontFamily: AppTheme.fontFamily,
+                                        fontSize: 16.0,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12.0),
+                              Expanded(
+                                child: SizedBox(
+                                  height: 52.0,
+                                  child: OutlinedButton(
+                                    onPressed: () =>
+                                        _openSaveBottomSheet(context, goal, remainingEgp, isWithdrawal: true),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppColors.isDark ? AppColors.coinGold : const Color(0xFFB5883E),
+                                      side: BorderSide(
+                                        color: AppColors.isDark ? AppColors.coinGold : const Color(0xFFB5883E),
+                                        width: 1.5,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14.0),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'سحب',
+                                      style: TextStyle(
+                                        fontFamily: AppTheme.fontFamily,
+                                        fontSize: 16.0,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
                   ),
                 ],
               ),

@@ -80,32 +80,21 @@ class _TransactionCard extends ConsumerWidget {
     final iconData = CategoryIconHelper.getIcon(transaction.category?.icon);
     final categoryColor =
         CategoryIconHelper.parseColor(transaction.category?.color);
-    final isVirtualSavings = transaction.categoryId < 0 ||
-        (transaction.category?.id != null &&
-            transaction.category!.id < 0) ||
-        transaction.category?.name == 'تحويش' ||
-        transaction.kind == 'saving' ||
-        transaction.source == 'goal';
-
     final String amountText = amountEgp < 0
         ? '-${NumberFormatter.formatCurrency(amountEgp.abs())} جنيه'
         : '${NumberFormatter.formatCurrency(amountEgp)} جنيه';
 
     return InkWell(
-      onTap: isVirtualSavings
-          ? null
-          : () => TransactionActionsHelper.showEditSheet(
-                context: context,
-                ref: ref,
-                transaction: transaction,
-              ),
-      onLongPress: isVirtualSavings
-          ? null
-          : () => TransactionActionsHelper.showActionsBottomSheet(
-                context: context,
-                ref: ref,
-                transaction: transaction,
-              ),
+      onTap: () => TransactionActionsHelper.showEditSheet(
+        context: context,
+        ref: ref,
+        transaction: transaction,
+      ),
+      onLongPress: () => TransactionActionsHelper.showActionsBottomSheet(
+        context: context,
+        ref: ref,
+        transaction: transaction,
+      ),
       borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12.0),

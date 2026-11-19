@@ -46,5 +46,8 @@ class GoalItem {
     if (monthlySavingEgp <= 0) return null;
     return (targetEgp / monthlySavingEgp).ceil();
   }
+
+  /// Whether the goal target has been fully achieved or exceeded
+  bool get isAchieved => targetAmount > 0 && totalSaved >= targetAmount;
 }
 

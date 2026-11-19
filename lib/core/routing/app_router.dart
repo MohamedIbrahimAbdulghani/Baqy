@@ -1,5 +1,8 @@
 import 'package:go_router/go_router.dart';
 import '../utils/arabic_date_helper.dart';
+import '../../features/debts/domain/models/debt_item.dart';
+import '../../features/debts/presentation/screens/add_debt_screen.dart';
+import '../../features/debts/presentation/screens/debt_details_screen.dart';
 import '../../features/expenses/domain/models/category_details_args.dart';
 import '../../features/expenses/domain/models/category_item.dart';
 import '../../features/expenses/presentation/screens/add_expense_screen.dart';
@@ -77,6 +80,25 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) {
         final reminderToEdit = state.extra as ReminderItem?;
         return AddReminderScreen(reminderToEdit: reminderToEdit);
+      },
+    ),
+    GoRoute(
+      path: '/add-debt',
+      builder: (context, state) {
+        final extra = state.extra;
+        if (extra is DebtItem) {
+          return AddDebtScreen(debtToEdit: extra);
+        } else if (extra is String) {
+          return AddDebtScreen(initialDirection: extra);
+        }
+        return const AddDebtScreen();
+      },
+    ),
+    GoRoute(
+      path: '/debt-details',
+      builder: (context, state) {
+        final debtId = state.extra as int;
+        return DebtDetailsScreen(debtId: debtId);
       },
     ),
   ],

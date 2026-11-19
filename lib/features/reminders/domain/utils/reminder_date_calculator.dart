@@ -173,6 +173,75 @@ abstract final class ReminderDateCalculator {
     );
   }
 
+  /// Formats notification title and multi-line body for a debt:
+  /// Title: "باقي"
+  /// Body:
+  /// For "عليا": "عليك `<remaining>` جنيه لـ `<personName>` كمان `<leadText>`"
+  /// For "ليا": "ليك `<remaining>` جنيه عند `<personName>` كمان `<leadText>`"
+  /// Line 2: "`<remaining>` جنيه · `<weekday>` `<date>`"
+  static ({String title, String body}) formatDebtNotificationContent({
+    required String personName,
+    required String direction,
+    required int remainingPiastres,
+    required DateTime dueDate,
+    int leadDays = 2,
+  }) {
+    final leadText = formatLeadDaysText(leadDays);
+    final int remainingEgp = remainingPiastres ~/ 100;
+    final remainingStr = NumberFormatter.formatCurrency(remainingEgp);
+    final weekday = ArabicDateHelper.getWeekdayName(dueDate.weekday);
+    final day = dueDate.day.toArabicDigits();
+    final month = ArabicDateHelper.getMonthName(dueDate.month);
+
+    final line1 = direction == 'owe'
+        ? 'عليك $remainingStr جنيه لـ $personName كمان $leadText'
+        : 'ليك $remainingStr جنيه عند $personName كمان $leadText';
+    final line2 = '$remainingStr جنيه · $weekday $day $month';
+
+    return (
+      title: 'باقي',
+      body: '$line1\n$line2',
+    );
+  }
+
+  /// Calculates the notification moment for a debt.
+  /// Fires at 09:00 on (dueDate - leadDays).
+  /// If the 09:00 moment has already passed:
+  /// - If [allowCatchupToday] is false: returns null.
+  /// - If [allowCatchupToday] is true and today is within the lead window: returns [reference + 3s].
+  static DateTime? calculateDebtNotificationMoment({
+    required DateTime dueDate,
+    int leadDays = 2,
+    DateTime? now,
+    bool allowCatchupToday = false,
+  }) {
+    final reference = now ?? DateTime.now();
+    final notifDate = dueDate.subtract(Duration(days: leadDays));
+    final notificationMoment = DateTime(
+      notifDate.year,
+      notifDate.month,
+      notifDate.day,
+      9, // 09:00
+      0,
+      0,
+    );
+    if (notificationMoment.isAfter(reference)) {
+      return notificationMoment;
+    }
+
+    if (allowCatchupToday) {
+      final refDay = DateTime(reference.year, reference.month, reference.day);
+      final notifDay = DateTime(notifDate.year, notifDate.month, notifDate.day);
+      final dueDay = DateTime(dueDate.year, dueDate.month, dueDate.day);
+
+      if (!refDay.isBefore(notifDay) && !refDay.isAfter(dueDay)) {
+        return reference.add(const Duration(seconds: 3));
+      }
+    }
+
+    return null;
+  }
+
   /// Sorts reminders list:
   /// Active reminders sorted soonest first by next due date.
   /// Past one-time reminders placed faded at the end of the list.

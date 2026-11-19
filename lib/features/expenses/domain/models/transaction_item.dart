@@ -27,6 +27,17 @@ class TransactionItem {
   final DateTime createdAt; // UTC timestamp
   final CategoryItem? category;
 
+  /// Whether this transaction originates from debts or goals, and therefore
+  /// cannot be edited or deleted from general expense views (Home or Month/Category Details).
+  bool get isLockedFromExpenses =>
+      id < 0 ||
+      source == 'debt' ||
+      source == 'goal' ||
+      kind == 'saving' ||
+      categoryId < 0 ||
+      category?.name == 'تحويش' ||
+      (category?.id != null && category!.id < 0);
+
   TransactionItem copyWith({
     int? id,
     int? amount,

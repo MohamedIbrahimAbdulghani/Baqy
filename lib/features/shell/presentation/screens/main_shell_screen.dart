@@ -9,6 +9,8 @@ import '../../../home/presentation/controllers/budget_monitor_controller.dart';
 import '../../../home/presentation/widgets/home_speed_dial_fab.dart';
 import '../../../reminders/presentation/providers/reminder_providers.dart';
 import '../../../reminders/presentation/widgets/reminders_speed_dial_fab.dart';
+import '../../../debts/presentation/providers/debt_providers.dart';
+import '../../../debts/presentation/widgets/debts_fab.dart';
 import '../providers/tab_provider.dart';
 import '../widgets/custom_bottom_nav_bar.dart';
 import '../../../../core/theme/theme_provider.dart';
@@ -61,10 +63,13 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
         ref.read(tabIndexProvider.notifier).selectTab(pending);
       }
 
-      // Reschedule reminders when app opens
+      // Reschedule reminders and debts when app opens
       if (mounted) {
         ref.read(reminderRepositoryProvider).getReminders().then((reminders) {
           NotificationService.instance.rescheduleReminders(reminders);
+        });
+        ref.read(debtRepositoryProvider).getDebts().then((debts) {
+          NotificationService.instance.rescheduleDebts(debts);
         });
       }
     });
@@ -117,7 +122,9 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
           ? const HomeSpeedDialFab()
           : (selectedIndex == 1
               ? const GoalsSpeedDialFab()
-              : (selectedIndex == 2 ? const RemindersSpeedDialFab() : null)),
+              : (selectedIndex == 2
+                  ? const RemindersSpeedDialFab()
+                  : (selectedIndex == 3 ? const DebtsFab() : null))),
       floatingActionButtonLocation: const AboveBottomBarFabLocation(gap: 14.0),
       bottomNavigationBar: CustomBottomNavBar(
         currentIndex: selectedIndex,

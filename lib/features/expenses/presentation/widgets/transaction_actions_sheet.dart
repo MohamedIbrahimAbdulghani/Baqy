@@ -5,11 +5,14 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/category_icon_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
+import '../../../shell/presentation/providers/tab_provider.dart';
 import '../../domain/models/transaction_item.dart';
 import '../providers/expense_providers.dart';
 
 abstract final class TransactionActionsHelper {
-  /// Shows options bottom sheet (تعديل / حذف) on Long Press
+  /// Shows options bottom sheet on Tap or Long Press.
+  /// If the transaction belongs to debts or goals, it displays an explanatory card
+  /// preventing edit/delete and directing the user to the dedicated screen.
   static Future<void> showActionsBottomSheet({
     required BuildContext context,
     required WidgetRef ref,
@@ -19,6 +22,9 @@ abstract final class TransactionActionsHelper {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
+        final isDebt = transaction.source == 'debt';
+        final isLocked = transaction.isLockedFromExpenses;
+
         return Directionality(
           textDirection: TextDirection.rtl,
           child: Material(
@@ -71,7 +77,99 @@ abstract final class TransactionActionsHelper {
                       ),
                     ],
                     const SizedBox(height: 20),
-                    if (transaction.source != 'goal' && transaction.id > 0)
+
+                    if (isLocked) ...[
+                      // Locked Transaction Info Card: strictly no edit or delete from general expenses
+                      Container(
+                        padding: const EdgeInsets.all(14.0),
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          borderRadius: BorderRadius.circular(14.0),
+                          border: Border.all(
+                            color: AppColors.inputBorder.withValues(alpha: 0.6),
+                            width: 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 36.0,
+                              height: 36.0,
+                              decoration: BoxDecoration(
+                                color: AppColors.mainGreen.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 20.0,
+                                  color: AppColors.mainGreen,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12.0),
+                            Expanded(
+                              child: Text(
+                                isDebt
+                                    ? 'هذه المعاملة مسجلة كدفعة دين. لتعديلها أو حذفها، يمكنك ذلك من شاشة «الديون» فقط للحفاظ على صحة حساباتك.'
+                                    : 'هذه المعاملة مسجلة كتحويش لهدف. لإدارتها، يمكنك ذلك من شاشة «الأهداف» فقط للحفاظ على صحة الأهداف.',
+                                style: TextStyle(
+                                  fontFamily: AppTheme.fontFamily,
+                                  fontSize: 13.0,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.secondaryText,
+                                  height: 1.45,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16.0),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 46.0,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.of(sheetContext).pop();
+                            if (isDebt) {
+                              ref.read(tabIndexProvider.notifier).selectTab(3);
+                            } else {
+                              ref.read(tabIndexProvider.notifier).selectTab(1);
+                            }
+                            if (context.mounted && Navigator.of(context).canPop()) {
+                              Navigator.of(context).popUntil((route) => route.isFirst);
+                            }
+                          },
+                          icon: Icon(
+                            isDebt
+                                ? Icons.payments_outlined
+                                : Icons.flag_outlined,
+                            size: 18.0,
+                          ),
+                          label: Text(
+                            isDebt
+                                ? 'الذهاب إلى صفحة الديون'
+                                : 'الذهاب إلى صفحة الأهداف',
+                            style: const TextStyle(
+                              fontFamily: AppTheme.fontFamily,
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.mainGreen,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      // Regular Expense: Edit & Delete available
                       ListTile(
                         leading: const Icon(Icons.edit_outlined, color: AppColors.mainGreen),
                         title: Text(
@@ -94,28 +192,29 @@ abstract final class TransactionActionsHelper {
                           );
                         },
                       ),
-                    ListTile(
-                      leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                      title: const Text(
-                        'حذف العملية',
-                        style: TextStyle(
-                          fontFamily: AppTheme.fontFamily,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.redAccent,
+                      ListTile(
+                        leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                        title: const Text(
+                          'حذف العملية',
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.redAccent,
+                          ),
                         ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                        onTap: () {
+                          Navigator.of(sheetContext).pop();
+                          confirmAndDelete(
+                            context: context,
+                            ref: ref,
+                            transaction: transaction,
+                          );
+                        },
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12.0),
-                      ),
-                      onTap: () {
-                        Navigator.of(sheetContext).pop();
-                        confirmAndDelete(
-                          context: context,
-                          ref: ref,
-                          transaction: transaction,
-                        );
-                      },
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -126,12 +225,21 @@ abstract final class TransactionActionsHelper {
     );
   }
 
-  /// Shows the Edit Transaction Sheet on Normal Tap
+  /// Shows the Edit Transaction Sheet on Normal Tap.
+  /// If transaction is locked from general expenses, opens the explanatory sheet instead.
   static Future<void> showEditSheet({
     required BuildContext context,
     required WidgetRef ref,
     required TransactionItem transaction,
   }) {
+    if (transaction.isLockedFromExpenses) {
+      return showActionsBottomSheet(
+        context: context,
+        ref: ref,
+        transaction: transaction,
+      );
+    }
+
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -148,6 +256,9 @@ abstract final class TransactionActionsHelper {
     required WidgetRef ref,
     required TransactionItem transaction,
   }) async {
+    if (transaction.isLockedFromExpenses) {
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => Directionality(

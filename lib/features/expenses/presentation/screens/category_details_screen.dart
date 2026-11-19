@@ -221,22 +221,17 @@ class CategoryDetailsScreen extends ConsumerWidget {
                           final String timeText = args.isMonthMode
                               ? ArabicDateHelper.formatDateTime(tx.createdAt)
                               : ArabicDateHelper.formatTime(tx.createdAt);
-                          final isGoalSaving = tx.id < 0 ||
-                              tx.source == 'goal' ||
-                              args.category.id < 0;
 
                           final String txAmountText = txAmountEgp < 0
                               ? '-${NumberFormatter.formatCurrency(txAmountEgp.abs())} جنيه'
                               : '${NumberFormatter.formatCurrency(txAmountEgp)} جنيه';
 
                           return InkWell(
-                            onTap: isGoalSaving
-                                ? null
-                                : () => TransactionActionsHelper.showEditSheet(
-                                      context: context,
-                                      ref: ref,
-                                      transaction: tx,
-                                    ),
+                            onTap: () => TransactionActionsHelper.showEditSheet(
+                              context: context,
+                              ref: ref,
+                              transaction: tx,
+                            ),
                             onLongPress: () =>
                                 TransactionActionsHelper.showActionsBottomSheet(
                               context: context,

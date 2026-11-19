@@ -84,6 +84,7 @@ class Debts extends Table {
   TextColumn get direction => text()(); // "owe" or "owed"
   IntColumn get totalAmount => integer()(); // piastres
   DateTimeColumn get dueDate => dateTime().nullable()(); // UTC
+  IntColumn get leadDays => integer().withDefault(const Constant(2))(); // 1, 2 or 3
   BoolColumn get reminderEnabled => boolean().withDefault(const Constant(false))();
   BoolColumn get archived => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime()(); // UTC
@@ -95,5 +96,6 @@ class DebtPayments extends Table {
   IntColumn get debtId => integer().references(Debts, #id)();
   IntColumn get amount => integer()(); // piastres
   DateTimeColumn get paidAt => dateTime()(); // UTC
+  IntColumn get transactionId => integer().nullable().references(Transactions, #id)();
 }
 

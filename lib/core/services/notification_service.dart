@@ -5,6 +5,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import '../../features/debts/domain/models/debt_item.dart';
 import '../../features/reminders/domain/models/reminder_item.dart';
 import '../../features/reminders/domain/utils/reminder_date_calculator.dart';
 
@@ -79,6 +80,12 @@ class NotificationService {
           } else {
             pendingTabSelection = 2;
           }
+        } else if (response.payload == 'debts') {
+          if (onSelectTab != null) {
+            onSelectTab!(3);
+          } else {
+            pendingTabSelection = 3;
+          }
         }
       },
     );
@@ -87,10 +94,12 @@ class NotificationService {
     try {
       final launchDetails = await _notificationsPlugin
           .getNotificationAppLaunchDetails();
-      if (launchDetails != null &&
-          launchDetails.didNotificationLaunchApp &&
-          launchDetails.notificationResponse?.payload == 'reminders') {
-        pendingTabSelection = 2;
+      if (launchDetails != null && launchDetails.didNotificationLaunchApp) {
+        if (launchDetails.notificationResponse?.payload == 'reminders') {
+          pendingTabSelection = 2;
+        } else if (launchDetails.notificationResponse?.payload == 'debts') {
+          pendingTabSelection = 3;
+        }
       }
     } catch (_) {}
 
@@ -329,6 +338,167 @@ class NotificationService {
           .join('; ');
       debugPrint(
         '[REMINDERS] Scheduled $count notifications${count > 0 ? ': [$detailsStr]' : ''}',
+      );
+    }
+  }
+
+  /// Cancels notification for a specific debt ID.
+  Future<void> cancelDebtNotification(int debtId) async {
+    try {
+      await _notificationsPlugin.cancel(200000 + debtId);
+      await _notificationsPlugin.cancel(debtId);
+    } catch (_) {}
+  }
+
+  /// Reschedules all debt notifications.
+  /// A debt notification exists if (and only if) a due date is set: no due date means no notification.
+  /// It fires at 09:00 Africa/Cairo, 2 days before the due date (fixed), with the standard inexact scheduling.
+  /// If the 09:00 moment has already passed, it is skipped.
+  /// Cancelled when the debt is archived or deleted.
+  /// DEBUG ONLY (kDebugMode): prints one line with the number of scheduled notifications
+  /// and, for each one, only its id and the scheduled date and time. Never print names or amounts.
+  Future<void> rescheduleDebts(List<DebtItem> debts) async {
+    final scheduledDetails = <({int id, DateTime dateTime})>[];
+    tz.Location cairoLocation;
+    try {
+      tz.initializeTimeZones();
+      cairoLocation = tz.getLocation('Africa/Cairo');
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[NOTIFICATION] Timezone not available for scheduling debts: $e');
+      }
+      return;
+    }
+
+    final nowInCairo = tz.TZDateTime.now(cairoLocation);
+    final nowDateTime = DateTime(
+      nowInCairo.year,
+      nowInCairo.month,
+      nowInCairo.day,
+      nowInCairo.hour,
+      nowInCairo.minute,
+      nowInCairo.second,
+    );
+
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (_) {}
+
+    for (final debt in debts) {
+      if (debt.archived || debt.dueDate == null || debt.remaining <= 0) {
+        try {
+          await _notificationsPlugin.cancel(200000 + debt.id);
+          await _notificationsPlugin.cancel(debt.id);
+        } catch (_) {}
+        continue;
+      }
+
+      final dueDate = debt.dueDate!;
+      final catchupKey =
+          'debt_catchup_sent_${debt.id}_${dueDate.year}_${dueDate.month}_${dueDate.day}';
+      final alreadySentCatchup = prefs?.getBool(catchupKey) ?? false;
+
+      final notifMoment = ReminderDateCalculator.calculateDebtNotificationMoment(
+        dueDate: dueDate,
+        leadDays: debt.leadDays,
+        now: nowDateTime,
+        allowCatchupToday: !alreadySentCatchup,
+      );
+
+      if (notifMoment == null) {
+        try {
+          await _notificationsPlugin.cancel(200000 + debt.id);
+          await _notificationsPlugin.cancel(debt.id);
+        } catch (_) {}
+        continue;
+      }
+
+      if (notifMoment.difference(nowDateTime).inSeconds <= 10 && prefs != null) {
+        await prefs.setBool(catchupKey, true);
+      }
+
+      final tzMoment = tz.TZDateTime(
+        cairoLocation,
+        notifMoment.year,
+        notifMoment.month,
+        notifMoment.day,
+        notifMoment.hour,
+        notifMoment.minute,
+        notifMoment.second,
+      );
+
+      final content = ReminderDateCalculator.formatDebtNotificationContent(
+        personName: debt.personName,
+        direction: debt.direction,
+        remainingPiastres: debt.remaining,
+        dueDate: dueDate,
+        leadDays: debt.leadDays,
+      );
+
+      final androidDetails = AndroidNotificationDetails(
+        remindersChannelId,
+        remindersChannelName,
+        channelDescription: remindersChannelDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@drawable/ic_notification',
+        largeIcon: const DrawableResourceAndroidBitmap('@drawable/ic_app_icon'),
+        color: const Color(0xFF2F6B5A),
+        showWhen: true,
+        enableVibration: true,
+        playSound: true,
+        styleInformation: BigTextStyleInformation(
+          content.body,
+          contentTitle: content.title,
+        ),
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      final notifId = 200000 + debt.id;
+      try {
+        await _notificationsPlugin.zonedSchedule(
+          notifId,
+          content.title,
+          content.body,
+          tzMoment,
+          NotificationDetails(android: androidDetails, iOS: iosDetails),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: 'debts',
+        );
+        scheduledDetails.add((id: debt.id, dateTime: notifMoment));
+      } catch (e) {
+        try {
+          await _notificationsPlugin.zonedSchedule(
+            notifId,
+            content.title,
+            content.body,
+            tzMoment,
+            NotificationDetails(android: androidDetails, iOS: iosDetails),
+            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+            payload: 'debts',
+          );
+          scheduledDetails.add((id: debt.id, dateTime: notifMoment));
+        } catch (_) {}
+      }
+    }
+
+    if (kDebugMode) {
+      final count = scheduledDetails.length;
+      final detailsStr = scheduledDetails
+          .map((e) => 'id: ${e.id}, date: ${e.dateTime.toString()}')
+          .join('; ');
+      debugPrint(
+        '[DEBTS] Scheduled $count notifications${count > 0 ? ': [$detailsStr]' : ''}',
       );
     }
   }

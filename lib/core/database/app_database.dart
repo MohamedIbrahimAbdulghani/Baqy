@@ -20,7 +20,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? openEncryptedConnection());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 8;
 
   static const List<({String name, String icon, String color, int sortOrder})>
       defaultCategoryDefinitions = [
@@ -261,6 +261,43 @@ class AppDatabase extends _$AppDatabase {
             }
           } else {
             await m.createTable(goals);
+          }
+        }
+
+        if (from < 7) {
+          if (kDebugMode) {
+            debugPrint('[DB_DEBUG] onUpgrade (v6->v7): adding transaction_id column to debt_payments');
+          }
+          if (await tableExists('debt_payments')) {
+            final dpCols = await getColumns('debt_payments');
+            if (!dpCols.contains('transaction_id')) {
+              await m.addColumn(debtPayments, debtPayments.transactionId);
+            }
+          } else {
+            await m.createTable(debtPayments);
+          }
+          if (!await tableExists('debts')) {
+            await m.createTable(debts);
+          }
+          final catRows = await customSelect("SELECT id FROM categories WHERE name = 'ديون';").get();
+          if (catRows.isEmpty) {
+            final nowSec = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+            await customStatement(
+              "INSERT INTO categories (name, icon, color, is_default, sort_order, created_by_ai, created_at) "
+              "VALUES ('ديون', 'debts', '#C0644B', 1, 22, 0, $nowSec);",
+            );
+          }
+        }
+
+        if (from < 8) {
+          if (kDebugMode) {
+            debugPrint('[DB_DEBUG] onUpgrade (v7->v8): adding lead_days column to debts');
+          }
+          if (await tableExists('debts')) {
+            final debtCols = await getColumns('debts');
+            if (!debtCols.contains('lead_days')) {
+              await m.addColumn(debts, debts.leadDays);
+            }
           }
         }
 

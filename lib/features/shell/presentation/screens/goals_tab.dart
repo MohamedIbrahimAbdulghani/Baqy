@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
@@ -7,6 +8,7 @@ import '../../../../core/widgets/empty_state_welcome_card.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../goals/domain/models/goal_item.dart';
 import '../../../goals/presentation/providers/goal_providers.dart';
+import '../../../goals/presentation/widgets/completed_goals_section.dart';
 import '../../../goals/presentation/widgets/goal_card.dart';
 
 class GoalsTab extends ConsumerWidget {
@@ -58,13 +60,26 @@ class GoalsTab extends ConsumerWidget {
                       );
                     }
 
-                    return ListView.builder(
+                    final activeGoals = goals.where((g) => !g.isAchieved).toList();
+                    final completedGoals = goals.where((g) => g.isAchieved).toList();
+
+                    return ListView(
                       padding: const EdgeInsets.only(bottom: 90.0),
-                      itemCount: goals.length,
-                      itemBuilder: (context, index) {
-                        final goal = goals[index];
-                        return GoalCard(goal: goal);
-                      },
+                      children: [
+                        // Active Goals
+                        ...activeGoals.map((goal) => GoalCard(goal: goal)),
+
+                        // Completed Goals Section (Accordion like Settled Debts)
+                        if (completedGoals.isNotEmpty) ...[
+                          const SizedBox(height: 8.0),
+                          CompletedGoalsSection(
+                            completedGoals: completedGoals,
+                            onGoalTap: (goal) {
+                              context.push('/goal-details', extra: goal.id);
+                            },
+                          ),
+                        ],
+                      ],
                     );
                   },
                   loading: () => const Center(
