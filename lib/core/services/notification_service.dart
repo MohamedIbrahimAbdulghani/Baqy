@@ -57,7 +57,7 @@ class NotificationService {
     }
 
     const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@drawable/ic_notification');
+        AndroidInitializationSettings('@mipmap/ic_launcher');
 
     const DarwinInitializationSettings iosSettings =
         DarwinInitializationSettings(
@@ -258,9 +258,9 @@ class NotificationService {
           channelDescription: remindersChannelDescription,
           importance: Importance.high,
           priority: Priority.high,
-          icon: '@drawable/ic_notification',
-          largeIcon: const DrawableResourceAndroidBitmap('@drawable/ic_app_icon'),
-          color: const Color(0xFF2F6B5A),
+          icon: '@mipmap/ic_launcher',
+          largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+          color: Color(0xFF2F6B5A),
           showWhen: true,
           enableVibration: true,
           playSound: true,
@@ -442,8 +442,8 @@ class NotificationService {
         channelDescription: remindersChannelDescription,
         importance: Importance.high,
         priority: Priority.high,
-        icon: '@drawable/ic_notification',
-        largeIcon: const DrawableResourceAndroidBitmap('@drawable/ic_app_icon'),
+        icon: '@mipmap/ic_launcher',
+        largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
         color: const Color(0xFF2F6B5A),
         showWhen: true,
         enableVibration: true,
@@ -512,8 +512,8 @@ class NotificationService {
           channelDescription: budgetChannelDescription,
           importance: Importance.high,
           priority: Priority.high,
-          icon: '@drawable/ic_notification',
-          largeIcon: DrawableResourceAndroidBitmap('@drawable/ic_app_icon'),
+          icon: '@mipmap/ic_launcher',
+          largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
           color: Color(0xFF2F6B5A),
           showWhen: true,
           enableVibration: true,

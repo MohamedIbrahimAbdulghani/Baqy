@@ -420,7 +420,7 @@ void main() {
           remainingPiastres: 400000, // 4,000 EGP
           dueDate: dueDate,
         );
-        expect(contentOwe.title, equals('باقي'));
+        expect(contentOwe.title, equals('Baqy'));
         expect(
           contentOwe.body.split('\n')[0],
           equals('عليك ٤,٠٠٠ جنيه لـ أحمد كمان يومين'),
@@ -438,7 +438,7 @@ void main() {
               remainingPiastres: 150000, // 1,500 EGP
               dueDate: dueDate,
             );
-        expect(contentOwed.title, equals('باقي'));
+        expect(contentOwed.title, equals('Baqy'));
         expect(
           contentOwed.body.split('\n')[0],
           equals('ليك ١,٥٠٠ جنيه عند سارة كمان يومين'),

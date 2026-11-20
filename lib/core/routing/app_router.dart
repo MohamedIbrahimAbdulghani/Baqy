@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../utils/arabic_date_helper.dart';
 import '../../features/debts/domain/models/debt_item.dart';
@@ -14,15 +15,28 @@ import '../../features/goals/presentation/screens/add_goal_screen.dart';
 import '../../features/goals/presentation/screens/goal_details_screen.dart';
 import '../../features/reminders/domain/models/reminder_item.dart';
 import '../../features/reminders/presentation/screens/add_reminder_screen.dart';
+import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/shell/presentation/screens/main_shell_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
+import '../../features/auth/presentation/screens/sign_in_screen.dart';
+
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final GoRouter appRouter = GoRouter(
+  navigatorKey: rootNavigatorKey,
   initialLocation: '/',
   routes: [
     GoRoute(
       path: '/',
       builder: (context, state) => const SplashScreen(),
+    ),
+    GoRoute(
+      path: '/sign-in',
+      builder: (context, state) => const SignInScreen(),
+    ),
+    GoRoute(
+      path: '/settings',
+      builder: (context, state) => const SettingsScreen(),
     ),
     GoRoute(
       path: '/main',

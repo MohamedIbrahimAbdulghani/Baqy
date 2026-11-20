@@ -48,6 +48,7 @@ abstract final class AppColors {
   static const Color mainGreen = Color(0xFF4E8B7A);
   static const Color coinGold = Color(0xFFF2BE5A);
   static const Color coinBronze = Color(0xFFD9941F);
+  static const Color errorRed = Color(0xFFE74C3C);
 
   // Category colors (remain vivid across both light and dark themes)
   static const Color categoryFood = Color(0xFF4E8B7A);

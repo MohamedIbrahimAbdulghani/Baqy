@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../expenses/domain/models/month_remaining.dart';
 import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../controllers/budget_monitor_controller.dart';
@@ -40,11 +41,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     int monthNumber,
     MonthRemaining remaining,
   ) {
+    // Never auto-open budget if user is not signed in / logging out
+    if (ref.read(activeUserIdProvider) == null) return;
+
     if (remaining.budget <= 0) {
       final promptedMonths = ref.read(hasAutoOpenedBudgetForMonthProvider);
       if (!promptedMonths.contains(yearMonth)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
+          if (mounted && ref.read(activeUserIdProvider) != null) {
             final currentPrompted = ref.read(
               hasAutoOpenedBudgetForMonthProvider,
             );
@@ -65,6 +69,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     int monthNumber,
     int currentBudgetPiastres,
   ) async {
+    if (!mounted || ref.read(activeUserIdProvider) == null) return;
+
     int? initialBudgetEgp;
 
     if (currentBudgetPiastres > 0) {
@@ -80,7 +86,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }
     }
 
-    if (!mounted) return;
+    if (!mounted || ref.read(activeUserIdProvider) == null) return;
 
     await BudgetBottomSheet.show(
       context: context,

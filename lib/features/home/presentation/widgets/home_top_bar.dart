@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_dimensions.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -40,31 +41,58 @@ class HomeTopBar extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Left: Theme mode toggle button (Light <-> Dark)
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => ref.read(themeModeProvider.notifier).toggleTheme(),
-              borderRadius: BorderRadius.circular(12.0),
-              child: Container(
-                width: 42.0,
-                height: 42.0,
-                decoration: BoxDecoration(
-                  color: AppColors.card,
+          // Left: Theme toggle and Settings gear buttons
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => ref.read(themeModeProvider.notifier).toggleTheme(),
                   borderRadius: BorderRadius.circular(12.0),
-                  boxShadow: AppDimensions.cardShadow,
-                ),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: Icon(
-                    isDark ? Icons.wb_sunny_rounded : Icons.wb_sunny_outlined,
-                    key: ValueKey<bool>(isDark),
-                    color: isDark ? AppColors.coinGold : AppColors.darkGreen,
-                    size: 22.0,
+                  child: Container(
+                    width: 42.0,
+                    height: 42.0,
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(12.0),
+                      boxShadow: AppDimensions.cardShadow,
+                    ),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      child: Icon(
+                        isDark ? Icons.wb_sunny_rounded : Icons.wb_sunny_outlined,
+                        key: ValueKey<bool>(isDark),
+                        color: isDark ? AppColors.coinGold : AppColors.darkGreen,
+                        size: 22.0,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+              const SizedBox(width: 8.0),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => context.push('/settings'),
+                  borderRadius: BorderRadius.circular(12.0),
+                  child: Container(
+                    width: 42.0,
+                    height: 42.0,
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(12.0),
+                      boxShadow: AppDimensions.cardShadow,
+                    ),
+                    child: Icon(
+                      Icons.settings_outlined,
+                      color: AppColors.darkGreen,
+                      size: 22.0,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
 
           // Right: "صباح الخير" / "مساء الخير" & Month Selector

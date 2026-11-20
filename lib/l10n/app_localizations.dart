@@ -133,6 +133,282 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'الديون'**
   String get tabDebts;
+
+  /// No description provided for @signInTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'أهلاً بيك في Baqy'**
+  String get signInTitle;
+
+  /// No description provided for @signInSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'سجّل دخولك وابدأ تتابع مصاريفك بصوتك'**
+  String get signInSubtitle;
+
+  /// No description provided for @signInWithGoogle.
+  ///
+  /// In ar, this message translates to:
+  /// **'الدخول بحساب جوجل'**
+  String get signInWithGoogle;
+
+  /// No description provided for @signInError.
+  ///
+  /// In ar, this message translates to:
+  /// **'مقدرتش أسجّلك، جرّب تاني'**
+  String get signInError;
+
+  /// No description provided for @privacyLine.
+  ///
+  /// In ar, this message translates to:
+  /// **'بياناتك بتتحفظ على موبايلك إنت بس، ومفيش حد في الفريق يقدر يشوفها.'**
+  String get privacyLine;
+
+  /// No description provided for @settingsTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'الإعدادات'**
+  String get settingsTitle;
+
+  /// No description provided for @languageLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'اللغة'**
+  String get languageLabel;
+
+  /// No description provided for @langArabic.
+  ///
+  /// In ar, this message translates to:
+  /// **'عربي'**
+  String get langArabic;
+
+  /// No description provided for @langEnglish.
+  ///
+  /// In ar, this message translates to:
+  /// **'English'**
+  String get langEnglish;
+
+  /// No description provided for @budgetForMonth.
+  ///
+  /// In ar, this message translates to:
+  /// **'ميزانية شهر'**
+  String get budgetForMonth;
+
+  /// No description provided for @edit.
+  ///
+  /// In ar, this message translates to:
+  /// **'تعديل'**
+  String get edit;
+
+  /// No description provided for @privacyTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'خصوصيتك'**
+  String get privacyTitle;
+
+  /// No description provided for @privacyDescription.
+  ///
+  /// In ar, this message translates to:
+  /// **'بياناتك بتتحفظ على موبايلك إنت بس، ومفيش حد في الفريق يقدر يشوفها.'**
+  String get privacyDescription;
+
+  /// No description provided for @feedbackTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'ابعتلنا رأيك'**
+  String get feedbackTitle;
+
+  /// No description provided for @feedbackDescription.
+  ///
+  /// In ar, this message translates to:
+  /// **'عندك فكرة أو مشكلة؟ ابعتهالنا عشان نحسّن التطبيق.'**
+  String get feedbackDescription;
+
+  /// No description provided for @gmail.
+  ///
+  /// In ar, this message translates to:
+  /// **'جيميل'**
+  String get gmail;
+
+  /// No description provided for @whatsapp.
+  ///
+  /// In ar, this message translates to:
+  /// **'واتساب'**
+  String get whatsapp;
+
+  /// No description provided for @signOut.
+  ///
+  /// In ar, this message translates to:
+  /// **'تسجيل الخروج'**
+  String get signOut;
+
+  /// No description provided for @madeBy.
+  ///
+  /// In ar, this message translates to:
+  /// **'صُنع بواسطة محمد إبراهيم'**
+  String get madeBy;
+
+  /// No description provided for @currencyEgp.
+  ///
+  /// In ar, this message translates to:
+  /// **'جنيه'**
+  String get currencyEgp;
+
+  /// No description provided for @goodMorning.
+  ///
+  /// In ar, this message translates to:
+  /// **'صباح الخير'**
+  String get goodMorning;
+
+  /// No description provided for @goodEvening.
+  ///
+  /// In ar, this message translates to:
+  /// **'مساء الخير'**
+  String get goodEvening;
+
+  /// No description provided for @save.
+  ///
+  /// In ar, this message translates to:
+  /// **'حفظ'**
+  String get save;
+
+  /// No description provided for @cancel.
+  ///
+  /// In ar, this message translates to:
+  /// **'إلغاء'**
+  String get cancel;
+
+  /// No description provided for @delete.
+  ///
+  /// In ar, this message translates to:
+  /// **'حذف'**
+  String get delete;
+
+  /// No description provided for @confirm.
+  ///
+  /// In ar, this message translates to:
+  /// **'تأكيد'**
+  String get confirm;
+
+  /// No description provided for @addExpense.
+  ///
+  /// In ar, this message translates to:
+  /// **'إضافة مصاريف'**
+  String get addExpense;
+
+  /// No description provided for @recentExpenses.
+  ///
+  /// In ar, this message translates to:
+  /// **'آخر المصاريف'**
+  String get recentExpenses;
+
+  /// No description provided for @remaining.
+  ///
+  /// In ar, this message translates to:
+  /// **'المتبقي'**
+  String get remaining;
+
+  /// No description provided for @spent.
+  ///
+  /// In ar, this message translates to:
+  /// **'صرفت'**
+  String get spent;
+
+  /// No description provided for @saved.
+  ///
+  /// In ar, this message translates to:
+  /// **'حوّشت'**
+  String get saved;
+
+  /// No description provided for @totalBudget.
+  ///
+  /// In ar, this message translates to:
+  /// **'الميزانية'**
+  String get totalBudget;
+
+  /// No description provided for @savings.
+  ///
+  /// In ar, this message translates to:
+  /// **'تحويش'**
+  String get savings;
+
+  /// No description provided for @debt.
+  ///
+  /// In ar, this message translates to:
+  /// **'ديون'**
+  String get debt;
+
+  /// No description provided for @monthJan.
+  ///
+  /// In ar, this message translates to:
+  /// **'يناير'**
+  String get monthJan;
+
+  /// No description provided for @monthFeb.
+  ///
+  /// In ar, this message translates to:
+  /// **'فبراير'**
+  String get monthFeb;
+
+  /// No description provided for @monthMar.
+  ///
+  /// In ar, this message translates to:
+  /// **'مارس'**
+  String get monthMar;
+
+  /// No description provided for @monthApr.
+  ///
+  /// In ar, this message translates to:
+  /// **'أبريل'**
+  String get monthApr;
+
+  /// No description provided for @monthMay.
+  ///
+  /// In ar, this message translates to:
+  /// **'مايو'**
+  String get monthMay;
+
+  /// No description provided for @monthJun.
+  ///
+  /// In ar, this message translates to:
+  /// **'يونيو'**
+  String get monthJun;
+
+  /// No description provided for @monthJul.
+  ///
+  /// In ar, this message translates to:
+  /// **'يوليو'**
+  String get monthJul;
+
+  /// No description provided for @monthAug.
+  ///
+  /// In ar, this message translates to:
+  /// **'أغسطس'**
+  String get monthAug;
+
+  /// No description provided for @monthSep.
+  ///
+  /// In ar, this message translates to:
+  /// **'سبتمبر'**
+  String get monthSep;
+
+  /// No description provided for @monthOct.
+  ///
+  /// In ar, this message translates to:
+  /// **'أكتوبر'**
+  String get monthOct;
+
+  /// No description provided for @monthNov.
+  ///
+  /// In ar, this message translates to:
+  /// **'نوفمبر'**
+  String get monthNov;
+
+  /// No description provided for @monthDec.
+  ///
+  /// In ar, this message translates to:
+  /// **'ديسمبر'**
+  String get monthDec;
 }
 
 class _AppLocalizationsDelegate

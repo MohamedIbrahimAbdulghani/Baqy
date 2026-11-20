@@ -18,17 +18,22 @@ extension ArabicIndicDigits on Object {
 abstract final class NumberFormatter {
   static final NumberFormat _thousands = NumberFormat('#,##0', 'en_US');
 
+  /// Global locale tracking for numeric formatting ('ar' for Arabic-Indic digits, 'en' for Western digits)
+  static String currentLocaleCode = 'ar';
+
   /// Formats an integer amount (in EGP) with thousands separators in English digits.
   /// Example: 10000 -> "10,000", 1000000 -> "1,000,000"
   static String formatWithCommas(int amount) {
     return _thousands.format(amount);
   }
 
-  /// Formats an integer amount (in EGP) with thousands separators in Arabic-Indic digits.
-  /// Example: 9000 -> "٩,٠٠٠", 10000 -> "١٠,٠٠٠", 150 -> "١٥٠"
-  static String formatCurrency(int amount) {
+  /// Formats an integer amount (in EGP) with thousands separators.
+  /// Uses Arabic-Indic digits if locale is 'ar', or Western digits if 'en'.
+  /// Example: 9000 -> "٩,٠٠٠" (ar) or "9,000" (en).
+  static String formatCurrency(int amount, {bool? isArabic}) {
     final formatted = _thousands.format(amount);
-    return formatted.toArabicDigits();
+    final useArabic = isArabic ?? (currentLocaleCode == 'ar');
+    return useArabic ? formatted.toArabicDigits() : formatted;
   }
 
   /// Parses an Arabic or English digits string, removing commas and validating positive integer.

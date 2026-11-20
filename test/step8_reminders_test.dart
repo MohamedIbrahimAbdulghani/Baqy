@@ -244,7 +244,7 @@ void main() {
         leadDays: 1,
         occurrenceDueDate: DateTime(2026, 11, 10), // Tuesday
       );
-      expect(n1.title, equals('باقي'));
+      expect(n1.title, equals('Baqy'));
       expect(n1.body, equals('فاتورة النت هيتدفع كمان يوم\n٣٥٠ جنيه · الثلاثاء ١٠ نوفمبر'));
 
       // Lead 2: "يومين" (matching Screenshot 3)
@@ -254,7 +254,7 @@ void main() {
         leadDays: 2,
         occurrenceDueDate: DateTime(2026, 11, 11), // Wednesday
       );
-      expect(n2.title, equals('باقي'));
+      expect(n2.title, equals('Baqy'));
       expect(n2.body, equals('اشتراك جيم هيتدفع كمان يومين\n٦٠٠ جنيه · الأربعاء ١١ نوفمبر'));
 
       // Lead 3: "٣ أيام"
@@ -264,7 +264,7 @@ void main() {
         leadDays: 3,
         occurrenceDueDate: DateTime(2026, 11, 20), // Friday
       );
-      expect(n3.title, equals('باقي'));
+      expect(n3.title, equals('Baqy'));
       expect(n3.body, equals('جمعية هيتدفع كمان ٣ أيام\n١,٥٠٠ جنيه · الجمعة ٢٠ نوفمبر'));
     });
 

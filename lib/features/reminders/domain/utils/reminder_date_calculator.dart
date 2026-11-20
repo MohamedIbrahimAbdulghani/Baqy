@@ -168,13 +168,13 @@ abstract final class ReminderDateCalculator {
     final line2 = '$amountStr جنيه · $weekday $day $month';
 
     return (
-      title: 'باقي',
+      title: 'Baqy',
       body: '$line1\n$line2',
     );
   }
 
   /// Formats notification title and multi-line body for a debt:
-  /// Title: "باقي"
+  /// Title: "Baqy"
   /// Body:
   /// For "عليا": "عليك `<remaining>` جنيه لـ `<personName>` كمان `<leadText>`"
   /// For "ليا": "ليك `<remaining>` جنيه عند `<personName>` كمان `<leadText>`"
@@ -199,7 +199,7 @@ abstract final class ReminderDateCalculator {
     final line2 = '$remainingStr جنيه · $weekday $day $month';
 
     return (
-      title: 'باقي',
+      title: 'Baqy',
       body: '$line1\n$line2',
     );
   }

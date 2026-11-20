@@ -53,7 +53,13 @@ import '../../domain/usecases/set_month_budget_usecase.dart';
 import '../../domain/usecases/update_category_usecase.dart';
 import '../../domain/usecases/update_transaction_usecase.dart';
 
+import '../../../auth/presentation/providers/auth_providers.dart';
+
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  final activeDb = ref.watch(activeDatabaseProvider);
+  if (activeDb != null) {
+    return activeDb;
+  }
   final db = AppDatabase();
   ref.onDispose(() => db.close());
   return db;
@@ -416,6 +422,10 @@ class HasAutoOpenedBudgetNotifier extends Notifier<Set<String>> {
 
   void markOpened(String yearMonth) {
     state = {...state, yearMonth};
+  }
+
+  void reset() {
+    state = {};
   }
 }
 

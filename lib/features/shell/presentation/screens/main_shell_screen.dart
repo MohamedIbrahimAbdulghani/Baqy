@@ -1,7 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/services/notification_service.dart';
+import '../../../auth/domain/models/account_status.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../auth/presentation/widgets/account_status_dialog.dart';
 import '../../../expenses/domain/models/month_remaining.dart';
 import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../../../goals/presentation/widgets/goals_speed_dial_fab.dart';
@@ -47,6 +53,10 @@ class MainShellScreen extends ConsumerStatefulWidget {
 
 class _MainShellScreenState extends ConsumerState<MainShellScreen>
     with WidgetsBindingObserver {
+  Timer? _securityCheckTimer;
+  bool _isCheckingSecurity = false;
+  bool _hasTriggeredSecurityDialog = false;
+
   @override
   void initState() {
     super.initState();
@@ -72,11 +82,71 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
           NotificationService.instance.rescheduleDebts(debts);
         });
       }
+
+      // Check security status on launch and start periodic monitor
+      _checkSecurityStatus();
+      _startSecurityMonitor();
     });
+  }
+
+  void _startSecurityMonitor() {
+    _securityCheckTimer?.cancel();
+    _securityCheckTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      _checkSecurityStatus();
+    });
+  }
+
+  Future<void> _checkSecurityStatus() async {
+    if (!mounted || _isCheckingSecurity || _hasTriggeredSecurityDialog) return;
+    _isCheckingSecurity = true;
+    try {
+      final repo = ref.read(authRepositoryProvider);
+      final status = await repo.checkAccountStatus();
+      if (!mounted) return;
+
+      if (status == AccountStatus.disabled || status == AccountStatus.deleted) {
+        _hasTriggeredSecurityDialog = true;
+        _securityCheckTimer?.cancel();
+        _securityCheckTimer = null;
+
+        // Dismiss any existing bottom sheet or open popup first
+        final navState = rootNavigatorKey.currentState;
+        if (navState != null && navState.canPop()) {
+          navState.popUntil((route) => route.isFirst);
+        }
+
+        // Pop up the dialog FIRST on the current screen without navigating away
+        final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+        if (targetContext != null && targetContext.mounted) {
+          await AccountStatusDialog.show(
+            targetContext,
+            status: status,
+            buttonText: 'تسجيل الخروج',
+            onDismissed: () async {
+              // Sign out and redirect to sign-in ONLY when the user taps "تسجيل الخروج"
+              await ref.read(authControllerProvider.notifier).signOut();
+              ref.read(hasAutoOpenedBudgetForMonthProvider.notifier).reset();
+              final exitNav = rootNavigatorKey.currentState;
+              if (exitNav != null && exitNav.canPop()) {
+                exitNav.popUntil((route) => route.isFirst);
+              }
+              final navContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+              if (navContext != null && navContext.mounted) {
+                navContext.go('/sign-in');
+              }
+            },
+          );
+        }
+      }
+    } catch (_) {
+    } finally {
+      _isCheckingSecurity = false;
+    }
   }
 
   @override
   void dispose() {
+    _securityCheckTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     NotificationService.onSelectTab = null;
     super.dispose();
@@ -86,6 +156,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && mounted) {
       setState(() {});
+      _checkSecurityStatus();
     }
   }
 
