@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/baqy_logo.dart';
-import '../../../../l10n/app_localizations.dart';
 import '../../../auth/domain/models/account_status.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../auth/presentation/widgets/account_status_dialog.dart';
@@ -78,10 +77,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final String title = l10n?.appTitle ?? 'باقي';
-    final String subTitle = l10n?.appNameSub ?? 'BAQY';
-
     return Scaffold(
       backgroundColor: AppColors.darkGreen,
       body: Center(
@@ -94,7 +89,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             ),
             const SizedBox(height: 28),
             Text(
-              title,
+              'Baqy',
               style: TextStyle(
                 fontFamily: AppTheme.fontFamily,
                 fontWeight: FontWeight.w700,
@@ -104,9 +99,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Text(
-              subTitle,
-              style: const TextStyle(
+            const Text(
+              'BAQY',
+              style: TextStyle(
                 fontFamily: AppTheme.fontFamily,
                 fontWeight: FontWeight.w600,
                 fontSize: 16,

@@ -41,18 +41,25 @@ abstract final class BudgetMonitorController {
 
   /// Evaluates the budget status and dispatches a local push notification once per budget cycle.
   /// Anti-spam logic:
-  /// - Only alerts once per monthKey crossing the 25% threshold.
-  /// - If the user increases the budget so that remaining > 25%, the flag is reset so that
-  ///   subsequent drops can trigger an alert again.
+  /// - Only alerts once per month crossing the 25% threshold.
+  /// - Once sent, it will NEVER send again for that month, even if the app or account is closed and reopened.
   static Future<void> evaluateAndNotify({
     required double totalBudget,
     required double remainingAmount,
     required String currentMonthKey,
+    String? userId,
   }) async {
     if (totalBudget <= 0) return;
 
+    final now = DateTime.now();
+    final actualCurrentMonthKey =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    // Only alert for the active current month, never past historical months
+    if (currentMonthKey != actualCurrentMonthKey) return;
+
     final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final String prefKey = 'budget_alert_sent_$currentMonthKey';
+    final String userPrefix = (userId != null && userId.isNotEmpty) ? '${userId}_' : '';
+    final String prefKey = 'budget_alert_sent_$userPrefix$currentMonthKey';
     final bool hasAlerted = prefs.getBool(prefKey) ?? false;
 
     final bool reached = isThresholdReached(
@@ -66,17 +73,18 @@ abstract final class BudgetMonitorController {
         await NotificationService.instance.showBudgetWarningNotification();
       }
     } else {
-      // User increased total budget or deleted expenses bringing balance back above 25%
+      // If the remaining balance rises back above 25% (extra money/income received or budget increased):
+      // re-arm the alert flag so that when remaining drops to 25% again, a new alert is sent!
       if (hasAlerted) {
         await prefs.setBool(prefKey, false);
       }
     }
   }
 
-  /// Resets the alert flag for a given month key (e.g. when budget is updated)
-  static Future<void> resetAlertFlag(String currentMonthKey) async {
+  /// Resets the alert flag for a given month key only when the user explicitly modifies the budget
+  static Future<void> resetAlertFlag(String currentMonthKey, {String? userId}) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('budget_alert_sent_$currentMonthKey', false);
+    final String userPrefix = (userId != null && userId.isNotEmpty) ? '${userId}_' : '';
+    await prefs.setBool('budget_alert_sent_$userPrefix$currentMonthKey', false);
   }
 }
-

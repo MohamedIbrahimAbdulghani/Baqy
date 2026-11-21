@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:baqy/core/database/app_database.dart';
 import 'package:baqy/core/utils/category_matcher.dart';
 import 'package:baqy/core/utils/number_formatter.dart';
+import 'package:baqy/core/widgets/action_feedback_dialog.dart';
 import 'package:baqy/features/expenses/data/repositories/expense_repository_impl.dart';
 import 'package:baqy/features/expenses/data/services/gemini_expense_parser.dart';
 import 'package:baqy/features/expenses/domain/models/category_item.dart';
@@ -978,8 +979,8 @@ void main() {
     });
   });
 
-  group('Issue 1: SnackBar Deletion & Undo Invariant', () {
-    testWidgets('Delete SnackBar has duration=5s, persist=false, and hides on undo', (tester) async {
+  group('Issue 1: Unified ActionFeedbackDialog Deletion & Undo Invariant', () {
+    testWidgets('Delete shows ActionFeedbackDialog with undo and restores transaction', (tester) async {
       final db = AppDatabase(NativeDatabase.memory());
       addTearDown(db.close);
       final repo = ExpenseRepositoryImpl(db);
@@ -1044,17 +1045,15 @@ void main() {
       final afterDelete = await (db.select(db.transactions)..where((t) => t.id.equals(txId))).getSingleOrNull();
       expect(afterDelete, isNull);
 
-      // Verify SnackBar attributes
-      final snackBarFinder = find.byType(SnackBar);
-      expect(snackBarFinder, findsOneWidget);
-      final snackBarWidget = tester.widget<SnackBar>(snackBarFinder);
-      expect(snackBarWidget.duration, equals(const Duration(seconds: 5)));
-      expect(snackBarWidget.persist, isFalse);
+      // Verify ActionFeedbackDialog popup attributes
+      final dialogFinder = find.byType(ActionFeedbackDialog);
+      expect(dialogFinder, findsOneWidget);
+      expect(find.text('تم حذف المعاملة'), findsOneWidget);
+      expect(find.text('تراجع'), findsOneWidget);
 
-      // Verify Undo button tap closes SnackBar and restores transaction
+      // Verify Undo button tap closes dialog and restores transaction
       await tester.tap(find.text('تراجع'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
 
       final restored = await (db.select(db.transactions)..where((t) => t.id.equals(txId))).getSingleOrNull();
       expect(restored, isNotNull);

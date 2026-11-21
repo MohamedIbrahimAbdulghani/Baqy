@@ -563,7 +563,7 @@ void main() {
       await tester.tap(find.text('Show Dialog'));
       await tester.pumpAndSettle();
 
-      expect(find.text('تم حفظ الموعد بنجاح! 🎉'), findsOneWidget);
+      expect(find.text('تم حفظ الموعد بنجاح'), findsOneWidget);
       expect(find.text('٦٠٠ جنيه'), findsOneWidget);
       expect(find.text('اشتراك جيم'), findsOneWidget);
       expect(find.text('تمام'), findsOneWidget);
@@ -571,7 +571,7 @@ void main() {
       await tester.tap(find.text('تمام'));
       await tester.pumpAndSettle();
 
-      expect(find.text('تم حفظ الموعد بنجاح! 🎉'), findsNothing);
+      expect(find.text('تم حفظ الموعد بنجاح'), findsNothing);
     });
   });
 }

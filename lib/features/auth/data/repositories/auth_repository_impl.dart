@@ -53,9 +53,11 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<AuthUser?> signInWithGoogle() async {
+    String? userEmail;
     try {
       await _ensureInitialized();
       final account = await _googleSignIn.authenticate();
+      userEmail = account.email;
       final idToken = account.authentication.idToken;
 
       final credential = GoogleAuthProvider.credential(idToken: idToken);
@@ -66,6 +68,22 @@ class AuthRepositoryImpl implements AuthRepository {
         throw Exception('User is null after sign in');
       }
 
+      // Check account status immediately with Firebase server
+      final status = await checkAccountStatus();
+      if (status == AccountStatus.disabled) {
+        await signOut();
+        throw AccountDisabledException(
+          'لا يمكنك تسجيل الدخول بهذا الحساب، لأن هذا البريد الإلكتروني معطّل حالياً من قِبل إدارة التطبيق.\n\nإذا كنت تعتقد أن هذا الإجراء تم بالخطأ، يُرجى التواصل مع إدارة التطبيق عبر واتساب أو جيميل لإعادة تفعيله.',
+          userEmail,
+        );
+      } else if (status == AccountStatus.deleted) {
+        await signOut();
+        throw AccountDeletedException(
+          'لا يمكنك تسجيل الدخول بهذا الحساب، لأن هذا البريد الإلكتروني تم حذفه نهائياً من قِبل إدارة التطبيق.',
+          userEmail,
+        );
+      }
+
       return AuthUser(
         uid: user.uid,
         displayName: user.displayName,
@@ -74,9 +92,15 @@ class AuthRepositoryImpl implements AuthRepository {
       );
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-disabled') {
-        throw const AccountDisabledException();
+        throw AccountDisabledException(
+          'لا يمكنك تسجيل الدخول بهذا الحساب، لأن هذا البريد الإلكتروني معطّل حالياً من قِبل إدارة التطبيق.\n\nإذا كنت تعتقد أن هذا الإجراء تم بالخطأ، يُرجى التواصل مع إدارة التطبيق عبر واتساب أو جيميل لإعادة تفعيله.',
+          userEmail,
+        );
       } else if (e.code == 'user-not-found') {
-        throw const AccountDeletedException();
+        throw AccountDeletedException(
+          'لا يمكنك تسجيل الدخول بهذا الحساب، لأن هذا البريد الإلكتروني تم حذفه نهائياً من قِبل إدارة التطبيق.',
+          userEmail,
+        );
       }
       rethrow;
     } on GoogleSignInException catch (e) {
@@ -104,6 +128,7 @@ class AuthRepositoryImpl implements AuthRepository {
     }
     try {
       await user.reload();
+      await user.getIdToken(true);
       final freshUser = _firebaseAuth.currentUser;
       if (freshUser == null) {
         return AccountStatus.deleted;
@@ -116,7 +141,14 @@ class AuthRepositoryImpl implements AuthRepository {
         return AccountStatus.deleted;
       }
       return AccountStatus.active;
-    } catch (_) {
+    } catch (e) {
+      final str = e.toString().toLowerCase();
+      if (str.contains('user-disabled') || str.contains('disabled')) {
+        return AccountStatus.disabled;
+      }
+      if (str.contains('user-not-found') || str.contains('deleted')) {
+        return AccountStatus.deleted;
+      }
       return AccountStatus.active;
     }
   }

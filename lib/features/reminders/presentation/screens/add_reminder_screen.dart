@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../../core/utils/reminder_icon_helper.dart';
+import '../../../../core/widgets/action_feedback_dialog.dart';
 import '../../domain/models/reminder_item.dart';
 import '../providers/reminder_providers.dart';
 import '../widgets/reminder_success_dialog.dart';
@@ -151,10 +153,20 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
     );
 
     if (confirmed == true && mounted) {
+      final reminderName = widget.reminderToEdit!.name;
       final repo = ref.read(reminderRepositoryProvider);
       await repo.deleteReminder(widget.reminderToEdit!.id);
       if (mounted) {
         context.pop();
+        final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+        if (targetContext != null && targetContext.mounted) {
+          await ActionFeedbackDialog.show(
+            context: targetContext,
+            type: ActionFeedbackType.deleted,
+            title: 'تم حذف الموعد',
+            subtitle: 'تم حذف موعد "$reminderName" وإلغاء الإشعار الخاص به.',
+          );
+        }
       }
     }
   }
@@ -245,13 +257,28 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
       }
 
       if (mounted) {
-        await ReminderSuccessDialog.show(
-          context: context,
-          reminder: savedItem,
-          isEdit: widget.reminderToEdit != null,
-        );
-        if (mounted) {
+        final isEdit = widget.reminderToEdit != null;
+        if (isEdit) {
           context.pop();
+          final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+          if (targetContext != null && targetContext.mounted) {
+            final formatted = '${NumberFormatter.formatCurrency(amountEgp)} جنيه';
+            await ActionFeedbackDialog.show(
+              context: targetContext,
+              type: ActionFeedbackType.updated,
+              title: 'تم تعديل الموعد بنجاح',
+              subtitle: 'تم تحديث موعد "$sanitizedName" بمبلغ $formatted.',
+            );
+          }
+        } else {
+          await ReminderSuccessDialog.show(
+            context: context,
+            reminder: savedItem,
+            isEdit: false,
+          );
+          if (mounted) {
+            context.pop();
+          }
         }
       }
     } catch (e) {

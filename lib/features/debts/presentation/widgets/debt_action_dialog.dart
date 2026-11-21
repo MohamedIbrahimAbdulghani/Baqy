@@ -125,14 +125,14 @@ class _DebtActionDialogState extends State<DebtActionDialog> {
         icon = Icons.check_circle_rounded;
         iconColor = AppColors.mainGreen;
         iconBgColor = AppColors.mainGreen.withValues(alpha: 0.12);
-        title = 'تم تسجيل الدين بنجاح! 🎉';
+        title = 'تم تسجيل الدين بنجاح';
         subtitle = isOwe
             ? 'تم حفظ دين عليك لـ ${widget.personName}${formattedAmount != null ? ' بمبلغ $formattedAmount' : ''}'
             : 'تم حفظ دين لك عند ${widget.personName}${formattedAmount != null ? ' بمبلغ $formattedAmount' : ''}';
         break;
 
       case DebtActionType.updated:
-        icon = Icons.edit_note_rounded;
+        icon = Icons.check_circle_rounded;
         iconColor = AppColors.mainGreen;
         iconBgColor = AppColors.mainGreen.withValues(alpha: 0.12);
         title = 'تم تعديل الدين بنجاح';
@@ -148,20 +148,20 @@ class _DebtActionDialogState extends State<DebtActionDialog> {
         break;
 
       case DebtActionType.paymentRecorded:
-        icon = Icons.task_alt_rounded;
+        icon = Icons.check_circle_rounded;
         iconColor = AppColors.mainGreen;
         iconBgColor = AppColors.mainGreen.withValues(alpha: 0.12);
-        title = 'تم تسجيل الدفعة بنجاح! 👏';
+        title = 'تم تسجيل الدفعة بنجاح';
         subtitle = isOwe
             ? 'اتخصمت الدفعة${formattedAmount != null ? ' ($formattedAmount)' : ''} من ميزانية الشهر وتحدث المتبقي.'
             : 'اتضافت الدفعة${formattedAmount != null ? ' ($formattedAmount)' : ''} لميزانية الشهر وتحدث المتبقي.';
         break;
 
       case DebtActionType.settled:
-        icon = Icons.celebration_rounded;
+        icon = Icons.check_circle_rounded;
         iconColor = const Color(0xFF2E7D32);
         iconBgColor = const Color(0xFF2E7D32).withValues(alpha: 0.14);
-        title = 'مبروك! تم سداد الدين بالكامل 🎊';
+        title = 'مبروك! تم سداد الدين بالكامل';
         subtitle = isOwe
             ? 'سددت كل اللي عليك لـ ${widget.personName}، واتنقل لقائمة تم سدادها.'
             : 'استلمت كل اللي ليك عند ${widget.personName}، واتنقل لقائمة تم سدادها.';

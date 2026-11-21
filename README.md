@@ -1,247 +1,289 @@
 <div align="center">
 
-# باقي | Baqy
+# 💰 باقي | Baqy
 
-**تطبيق أندرويد لتتبع المصاريف الشهرية الشخصية، بالعربي وبالصوت بالعامية المصرية.**
+**تطبيق أندرويد لتتبع المصاريف الشهرية، الميزانية، والأهداف المالية — بالعربي وبالصوت بالعامية المصرية.**
 
-*An Android app for personal monthly expense tracking, Arabic-first (RTL), with Egyptian-Arabic voice entry.*
+*An intuitive, privacy-first Android expense tracker with Egyptian-Arabic voice logging, local SQLite encryption, and smart monthly budgeting.*
 
-![Flutter](https://img.shields.io/badge/Flutter-stable-02569B?logo=flutter)
-![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android)
-![Language](https://img.shields.io/badge/language-Arabic%20%7C%20English-4E8B7A)
-![Status](https://img.shields.io/badge/status-in%20development-E8A83A)
+<br/>
+
+[![Flutter](https://img.shields.io/badge/Flutter-3.x%20Stable-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
+[![Architecture](https://img.shields.io/badge/Architecture-Clean%20Architecture-4E8B7A?style=for-the-badge)](https://blog.cleancoder.com/)
+[![State Management](https://img.shields.io/badge/State-Riverpod-00599C?style=for-the-badge)](https://riverpod.dev)
+[![Database](https://img.shields.io/badge/Database-Drift%20%2B%20SQLCipher-E8A83A?style=for-the-badge)](https://drift.simonbinder.eu/)
+[![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://android.com)
 
 </div>
 
 ---
 
-## فكرة التطبيق
+## 🌟 نبذة عن التطبيق
 
-باقي بيجاوب على سؤال واحد: **"فاضلي كام الشهر ده؟"**
+تطبيق **باقي** معمول عشان يجاوب على أهم سؤال بيشغل بالك طول الشهر: **"فاضلي كام الشهر ده؟"**
 
-- بتحدد ميزانية الشهر، والحلقة في الرئيسية بتوريك الباقي لحظة بلحظة.
-- بتسجل مصروفك **بالكتابة** أو **بالصوت بالعامية المصرية** (مثلاً: "اتغديت بتمانين واتعشيت بخمسة وسبعين").
-- بتتابع الأهداف والمواعيد (اشتراكات وأقساط) والديون في مكان واحد.
-- بياناتك المالية بتتخزن **على موبايلك فقط**، في قاعدة بيانات مشفّرة.
+- 🎯 **ميزانية ذكية وحلقة تفاعلية:** بتحدد ميزانيتك الشهرية، وحلقة الشاشة الرئيسية بتعرضلك المتبقي ونسبة الصرف والتحويش لحظة بلحظة.
+- 🎙️ **تسجيل المصاريف بالصوت (عامية مصرية):** بضغطة زرار على المايك اتكلم بطبيعتك (مثلاً: *"اتغديت بتمانين وركبت مواصلات بخمسة وعشرين"*) والذكاء الاصطناعي بيوزع المصاريف ويسجلها فوراً دون أي تعقيد.
+- 🔒 **أمان وخصوصية 100%:** جميع بياناتك المالية بتتسجل محلياً على جهازك داخل قاعدة بيانات مشفرة بالكامل بـ **SQLCipher**، ومفتاح التشفير محفوظ داخل **Android Keystore**.
+- 🏆 **أهداف مالية وتحويش:** خطط لأهدافك وحوش فيها أو اسحب منها بسهولة مع حساب فوري للمتبقي ومعدل التوفير.
+- ⏰ **مواعيد واشتراكات:** مواعيد دورية أو لمرة واحدة مع إشعارات تذكير ذكية على جهازك قبل موعد الاستحقاق.
+- 🤝 **سجل الديون:** إدارة كاملة للديون (عليا / ليا) ومتابعة دفعات السداد الجزئي والكامل وأرشيف الديون المسددة.
 
 ---
 
-## الحالة الحالية
+## 📱 معرض شاشات التطبيق (Screenshots)
 
-| # | الخطوة | الحالة |
+### ١. البداية وتسجيل الدخول
+<table align="center">
+  <tr>
+    <td align="center"><b>شاشة البداية (Splash)</b></td>
+    <td align="center"><b>تسجيل الدخول (Google Sign-In)</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/01_splash.png" width="260" alt="Splash Screen" /></td>
+    <td><img src="docs/screenshots/02_sign_in.png" width="260" alt="Sign In Screen" /></td>
+  </tr>
+</table>
+
+<br/>
+
+### ٢. الشاشة الرئيسية والميزانية
+<table align="center">
+  <tr>
+    <td align="center"><b>الرئيسية وحلقة الميزانية</b></td>
+    <td align="center"><b>قائمة الإجراءات السريعة (+)</b></td>
+    <td align="center"><b>تعديل ميزانية الشهر</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/03_home.png" width="240" alt="Home Screen" /></td>
+    <td><img src="docs/screenshots/04_home_quick_actions.png" width="240" alt="Quick Actions Menu" /></td>
+    <td><img src="docs/screenshots/05_home_edit_budget.png" width="240" alt="Edit Budget" /></td>
+  </tr>
+</table>
+
+<br/>
+
+### ٣. تصفح التواريخ والشهور
+<table align="center">
+  <tr>
+    <td align="center"><b>قائمة الشهور</b></td>
+    <td align="center"><b>قائمة السنين</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/06_home_month_picker.png" width="260" alt="Month Picker" /></td>
+    <td><img src="docs/screenshots/07_home_year_picker.png" width="260" alt="Year Picker" /></td>
+  </tr>
+</table>
+
+<br/>
+
+### ٤. التسجيل الصوتي بالعامية المصرية
+<table align="center">
+  <tr>
+    <td align="center"><b>أثناء التسجيل الصوتي</b></td>
+    <td align="center"><b>بعد المعالجة والحفظ التلقائي</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/08_voice_recording.png" width="260" alt="Voice Recording" /></td>
+    <td><img src="docs/screenshots/09_voice_success.png" width="260" alt="Voice Success" /></td>
+  </tr>
+</table>
+
+<br/>
+
+### ٥. إضافة المصاريف والتصنيفات
+<table align="center">
+  <tr>
+    <td align="center"><b>إضافة مصروف بالكتابة</b></td>
+    <td align="center"><b>إنشاء تصنيف جديد مخصص</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/10_add_expense_manual.png" width="260" alt="Add Expense Manual" /></td>
+    <td><img src="docs/screenshots/11_add_category.png" width="260" alt="New Category" /></td>
+  </tr>
+</table>
+
+<br/>
+
+### ٦. تفاصيل وتحليلات الشهر
+<table align="center">
+  <tr>
+    <td align="center"><b>تفاصيل الشهر ومصاريف اليوم</b></td>
+    <td align="center"><b>التنقل بين الأيام السابقة</b></td>
+    <td align="center"><b>تفاصيل مصاريف النوع المحدد</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/12_month_details_today.png" width="240" alt="Month Details Today" /></td>
+    <td><img src="docs/screenshots/13_month_details_by_day.png" width="240" alt="Month Details By Day" /></td>
+    <td><img src="docs/screenshots/14_category_breakdown.png" width="240" alt="Category Breakdown" /></td>
+  </tr>
+</table>
+
+<br/>
+
+### ٧. الأهداف المالية والتحويش
+<table align="center">
+  <tr>
+    <td align="center"><b>قائمة الأهداف</b></td>
+    <td align="center"><b>إضافة هدف جديد</b></td>
+    <td align="center"><b>تفاصيل الهدف والتحويش والسحب</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/15_goals_list.png" width="240" alt="Goals List" /></td>
+    <td><img src="docs/screenshots/16_add_goal.png" width="240" alt="Add Goal" /></td>
+    <td><img src="docs/screenshots/17_goal_details.png" width="240" alt="Goal Details" /></td>
+  </tr>
+</table>
+
+<br/>
+
+### ٨. المواعيد والإشعارات المجدولة
+<table align="center">
+  <tr>
+    <td align="center"><b>قائمة المواعيد والالتزامات</b></td>
+    <td align="center"><b>إضافة موعد أو قسط</b></td>
+    <td align="center"><b>إشعار التذكير المحلي</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/18_reminders_list.png" width="240" alt="Reminders List" /></td>
+    <td><img src="docs/screenshots/19_add_reminder.png" width="240" alt="Add Reminder" /></td>
+    <td><img src="docs/screenshots/20_notification_reminder.png" width="240" alt="Notification Reminder" /></td>
+  </tr>
+</table>
+
+<br/>
+
+### ٩. إدارة الديون والالتزامات
+<table align="center">
+  <tr>
+    <td align="center"><b>سجل الديون (عليا / ليا)</b></td>
+    <td align="center"><b>إضافة دين جديد</b></td>
+    <td align="center"><b>تفاصيل الدين ودفعات السداد</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/21_debts_list.png" width="240" alt="Debts List" /></td>
+    <td><img src="docs/screenshots/22_add_debt.png" width="240" alt="Add Debt" /></td>
+    <td><img src="docs/screenshots/23_debt_details.png" width="240" alt="Debt Details" /></td>
+  </tr>
+</table>
+
+<br/>
+
+### ١٠. الإعدادات وتخصيص المظهر (Dark & Light Mode)
+<table align="center">
+  <tr>
+    <td align="center"><b>شاشة الإعدادات، الثيم، والحساب</b></td>
+    <td align="center"><b>الوضع الليلي (Dark Mode)</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/24_settings.png" width="260" alt="Settings Screen" /></td>
+    <td><img src="docs/screenshots/home_dark_mode.png" width="260" alt="Dark Mode Home" /></td>
+  </tr>
+</table>
+
+---
+
+## 🛠️ التقنيات المستخدمة (Tech Stack)
+
+| الغرض / الميزة | التقنية / المكتبة | الوصف |
 |---|---|---|
-| 1 | الأساس: المشروع، الألوان والخط، شاشة البداية، الشريط السفلي | ✅ خلصت |
-| 2 | قاعدة البيانات المشفّرة والأنواع الافتراضية | ✅ خلصت (٩ اختبارات ناجحة) |
-| 3 | الرئيسية: الحلقة، آخر المصاريف، قوايم السنين والشهور، الميزانية، قايمة "+" | ✅ خلصت |
-| 4 | إضافة مصروف بالكتابة وإنشاء نوع جديد | 🚧 شغّال عليها |
-| 5 | تفاصيل الشهر: الرسم، أسهم الأيام، تفاصيل النوع | ⏳ |
-| 6 | التسجيل بالصوت وفهم العامية المصرية | ⏳ |
-| 7 | الأهداف | ⏳ |
-| 8 | المواعيد والإشعارات | ⏳ |
-| 9 | الديون | ⏳ |
-| 10 | الإعدادات وتسجيل الدخول بجوجل | ⏳ |
-| 11 | مراجعة الأمان والسرعة وتجهيز النشر | ⏳ |
+| **الإطار الأساسي** | `Flutter` & `Dart` | بناء التطبيق بأداء عالي وتجربة Native سلسة |
+| **المعمارية** | `Clean Architecture` | تقسيم المشروع لـ Presentation, Domain, Data مع Feature-First |
+| **إدارة الحالة** | `Riverpod` (`flutter_riverpod`) | إدارة تدفق البيانات وتحديث الواجهات بكفاءة واختبارية عالية |
+| **قاعدة البيانات** | `Drift` + `SQLCipher` | قاعدة بيانات محلية Relational فائقة السرعة مع تشفير كامل 256-bit |
+| **تخزين المفاتيح** | `flutter_secure_storage` | حفظ مفتاح التشفير داخل بيئة Android Keystore المشفرة |
+| **التنقل والروابط** | `go_router` | نظام توجيه مسارات مركزي وDeclartive Routing |
+| **فهم الصوت والذكاء الاصطناعي** | `speech_to_text` + Gemini AI & Pure Dart Regex Engine | التعرف على الصوت وتحليل اللهجة العامية المصرية مع Fallback محلي كامل |
+| **الإشعارات المجدولة** | `flutter_local_notifications` + `timezone` | جدولة التنبيهات المحلية بدقة حسب التوقيت المحلي (Africa/Cairo) |
+| **الهوية والمصادقة** | `Firebase Auth` + `Google Sign In` | تسجيل دخول آمن بالهوية فقط دون رفع أي بيانات مالية |
+| **الخط والتصميم** | خط `Cairo` وتنسيق RTL أصيل | خط عربي أنيق مدمج مع دعم كامل للأرقام العربية المشرقية والإنجليزية |
 
 ---
 
-## الشاشات
+## 🏗️ هيكل المشروع (Project Structure)
 
-> الصور موجودة في `docs/screenshots/`، والروابط التالية تستخدم أسماء الملفات الموجودة حاليًا داخل المشروع.
-
-### البداية وتسجيل الدخول
-
-| البداية | تسجيل الدخول |
-|:--:|:--:|
-| ![Splash](docs/screenshots/%D8%A7%D9%84%D8%A8%D8%AF%D8%A7%D9%8A%D8%A9.png) | ![Sign in](docs/screenshots/%D8%AA%D8%B3%D8%AC%D9%8A%D9%84%20%D8%A7%D9%84%D8%AF%D8%AE%D9%88%D9%84.png) |
-
-### الرئيسية
-
-| الرئيسية | قايمة السنين | قايمة الشهور |
-|:--:|:--:|:--:|
-| __HOME__ | ![Years](docs/screenshots/%D8%A7%D9%84%D8%B1%D8%A6%D9%8A%D8%B3%D9%8A%D8%A9%20%D9%82%D8%A7%D8%A6%D9%85%D8%A9%20%D8%A7%D9%84%D8%B3%D9%86%D9%8A%D9%86.png) | ![Months](docs/screenshots/%D8%A7%D9%84%D8%B1%D8%A6%D9%8A%D8%B3%D9%8A%D8%A9%20%D9%82%D8%A7%D8%A6%D9%85%D8%A9%20%D8%A7%D9%84%D8%B4%D9%87%D9%88%D8%B1.png) |
-
-| تعديل الميزانية | بعد الضغط على + | أثناء التسجيل | بعد التسجيل |
-|:--:|:--:|:--:|:--:|
-| ![Budget](docs/screenshots/%D8%A7%D9%84%D8%B1%D8%A6%D9%8A%D8%B3%D9%8A%D8%A9%20%D8%AA%D8%B9%D8%AF%D9%8A%D9%84%20%D8%A7%D9%84%D9%85%D9%8A%D8%B2%D8%A7%D9%86%D9%8A%D8%A9.png) | ![Plus](docs/screenshots/%D8%A7%D9%84%D8%B1%D8%A6%D9%8A%D8%B3%D9%8A%D8%A9%20%2B%20%D8%A8%D8%B9%D8%AF%20%D8%A7%D9%84%D8%B6%D8%BA%D8%B7%20%D8%B9%D9%84%D9%89.png) | ![Recording](docs/screenshots/%D8%A7%D9%84%D8%B1%D8%A6%D9%8A%D8%B3%D9%8A%D8%A9%20%D8%A3%D8%AB%D9%86%D8%A7%D8%A1%20%D8%A7%D9%84%D8%AA%D8%B3%D8%AC%D9%8A%D9%84.png) | ![Home](docs/screenshots/%D8%A7%D9%84%D8%B1%D8%A6%D9%8A%D8%B3%D9%8A%D8%A9%20%D8%A8%D8%B9%D8%AF%20%D8%A7%D9%84%D8%AA%D8%B3%D8%AC%D9%8A%D9%84.png) |
-
-### إضافة مصروف وأنواع
-
-| إضافة مصروف بالكتابة | نوع جديد |
-|:--:|:--:|
-| ![Add expense](docs/screenshots/%D8%A5%D8%B6%D8%A7%D9%81%D8%A9%20%D9%85%D8%B5%D8%B1%D9%88%D9%81%20%D8%A8%D8%A7%D9%84%D9%83%D8%AA%D8%A7%D8%A8%D8%A9.png) | ![New category](docs/screenshots/%D9%86%D9%88%D8%B9%20%D8%AC%D8%AF%D9%8A%D8%AF.png) |
-
-### تفاصيل الشهر
-
-| النهارده | بعد الضغط على السهم | تفاصيل النوع |
-|:--:|:--:|:--:|
-| ![Month today](docs/screenshots/%D8%AA%D9%81%D8%A7%D8%B5%D9%8A%D9%84%20%D8%A7%D9%84%D8%B4%D9%87%D8%B1%20%D8%A7%D9%84%D9%86%D9%87%D8%A7%D8%B1%D8%AF%D9%87.png) | ![Month arrow](docs/screenshots/%D8%AA%D9%81%D8%A7%D8%B5%D9%8A%D9%84%20%D8%A7%D9%84%D8%B4%D9%87%D8%B1%20%D8%A8%D8%B9%D8%AF%20%D8%A7%D9%84%D8%B6%D8%BA%D8%B7%20%D8%B9%D9%84%D9%89%20%D8%A7%D9%84%D8%B3%D9%87%D9%85.png) | ![Category details](docs/screenshots/%D8%AA%D9%81%D8%A7%D8%B5%D9%8A%D9%84%20%D8%A7%D9%84%D9%86%D9%88%D8%B9.png) |
-
-### الأهداف
-
-| الأهداف | إضافة هدف | تفاصيل الهدف |
-|:--:|:--:|:--:|
-| ![Goals](docs/screenshots/%D8%A7%D9%84%D8%A3%D9%87%D8%AF%D8%A7%D9%81.png) | ![Add goal](docs/screenshots/%D8%A5%D8%B6%D8%A7%D9%81%D8%A9%20%D9%87%D8%AF%D9%81.png) | ![Goal details](docs/screenshots/%D8%AA%D9%81%D8%A7%D8%B5%D9%8A%D9%84%20%D8%A7%D9%84%D9%87%D8%AF%D9%81.png) |
-
-### المواعيد والإشعارات
-
-| المواعيد | إضافة موعد | إشعار التذكير |
-|:--:|:--:|:--:|
-| ![Reminders](docs/screenshots/%D8%A7%D9%84%D9%85%D9%88%D8%A7%D8%B9%D9%8A%D8%AF.png) | ![Add reminder](docs/screenshots/%D8%A5%D8%B6%D8%A7%D9%81%D8%A9%20%D9%85%D9%88%D8%B9%D8%AF.png) | ![Reminder notification](docs/screenshots/%D8%A7%D8%B4%D8%B9%D8%A7%D8%B1%20%D8%A7%D9%84%D8%AA%D8%B0%D9%83%D9%8A%D8%B1.png) |
-
-### الديون
-
-| الديون | تفاصيل الدين | إضافة دين |
-|:--:|:--:|:--:|
-| ![Debts](docs/screenshots/%D8%A7%D9%84%D8%AF%D9%8A%D9%88%D9%86.png) | ![Debt details](docs/screenshots/%D8%AA%D9%81%D8%A7%D8%B5%D9%8A%D9%84%20%D8%A7%D9%84%D8%AF%D9%8A%D9%86.png) | ![Add debt](docs/screenshots/%D8%A5%D8%B6%D8%A7%D9%81%D8%A9%20%D8%AF%D9%8A%D9%86.png) |
-
-### الإعدادات
-
-| الإعدادات |
-|:--:|
-| ![Settings](docs/screenshots/%D8%A7%D9%84%D8%A5%D8%B9%D8%AF%D8%A7%D8%AF%D8%A7%D8%AA.png) |
-
----
-
-## المميزات
-
-- **الميزانية الشهرية:** بتتغير كل شهر، وبتتملى تلقائي بميزانية الشهر اللي فات.
-- **الحلقة:** نسبة الباقي من فلوس الشهر (الميزانية + أي دخل).
-- **تسجيل بالصوت:** بتدوس المايك وتتكلم، والتطبيق يفهم العامية ويوزّع المصاريف على الأنواع من غير ما يعرض نص ولا يفتح شاشة جديدة.
-- **أنواع ثابتة ومخصصة:** أكل، مواصلات، فواتير، صدقات، اشتراكات، ديون، أخرى، وتقدر تضيف أنواعك.
-- **تفاصيل الشهر:** رسم أعمدة لكل نوع، وتنقل بين الأيام، وتفاصيل كل نوع.
-- **الأهداف:** تحسب هتوصل للهدف في كام شهر حسب اللي هتوفره.
-- **المواعيد:** إشعار محلي قبل الاستحقاق بيوم أو يومين أو ٣ أيام، شهري أو مرة واحدة.
-- **الديون:** "عليا" و"ليا"، دفعات، وأرشيف "تم سدادها".
-- **عربي وإنجليزي:** العربي هو الأساسي (RTL)، مع أرقام عربية (٠١٢٣٤٥٦٧٨٩).
-
----
-
-## فهم العامية المصرية (الـParser)
-
-كلاس مستقل (Pure Dart) بيحوّل الجملة لقايمة مصاريف `{المبلغ، الوصف، النوع}`:
-
-| الجملة | النتيجة |
-|---|---|
-| صرفت ١٥٠ جنيه غدا | أكل ١٥٠ |
-| ركبت ميكروباص بعشرة ورجعت بخمستاشر | مواصلات ١٠ + مواصلات ١٥ |
-| اشتريت جزمة بالف ومية | أخرى ١١٠٠ |
-| دفعت نص الف للكهربا | فواتير ٥٠٠ |
-| صرفت الف ونص على الايجار | فواتير ١٥٠٠ |
-| فاتورة الكهربا ميت وخمسين | فواتير ١٥٠ |
-
-بيدعم: أرقام العامية (ميتين، تلتمية، خمستاشر…)، "نص" و"ربع"، "ونص"، السوابق (ب، ل، و)، أكتر من مصروف في جملة واحدة، والمبلغ قبل أو بعد الوصف.
-
-لو مفيش مبلغ: ما بيتحفظش حاجة وتظهر رسالة "ماسمعتش مبلغ، جرّب تاني".
-
----
-
-## التقنيات
-
-| الغرض | الأداة |
-|---|---|
-| الإطار | Flutter / Dart (stable) |
-| التنقل | `go_router` |
-| إدارة الحالة | `riverpod` |
-| اللغات | `flutter_localizations` + `intl` (ملفات ARB) |
-| قاعدة البيانات | `drift` + SQLCipher (`sqlcipher_flutter_libs`) |
-| تخزين مفتاح التشفير | `flutter_secure_storage` (Android Keystore) |
-| الصوت | `speech_to_text` (`ar_EG`) |
-| الإشعارات | `flutter_local_notifications` + `timezone` (Africa/Cairo) |
-| تسجيل الدخول | Google Sign-In عبر Firebase Auth (هوية فقط) |
-| الخط | Cairo (مضمّن داخل التطبيق) |
-
----
-
-## قاعدة البيانات
-
-الجداول: `categories`، `transactions`، `month_budgets`، `goals`، `reminders`، `debts`، `debt_payments`.
-
-- الفلوس بتتخزن كـ **أرقام صحيحة بالقروش** (مفيش كسور عشرية).
-- التواريخ بتتخزن بتوقيت **UTC**.
-- فهارس: `transactions(created_at)` و`transactions(category_id, created_at)`.
-- **فلوس الشهر** = ميزانية الشهر + دخل الشهر، و**الباقي** = فلوس الشهر − مصاريف الشهر.
-
----
-
-## الأمان والخصوصية
-
-- قاعدة البيانات مشفّرة بـ SQLCipher، والمفتاح عشوائي ومتخزن في Android Keystore فقط.
-- مفيش مفاتيح أو أسرار داخل الكود.
-- مفيش تسجيل (logging) لأي بيانات مالية أو شخصية.
-- كل الاستعلامات Parameterized، وكل المدخلات بتتراجع وطولها محدود.
-- بياناتك المالية بتفضل على الموبايل، وFirebase بيستخدم للهوية فقط (بدون Firestore أو Storage أو Analytics).
-- الصوت بيتحول لنص بواسطة نظام أندرويد/جوجل على الجهاز، والتطبيق **لا يحفظ الصوت ولا النص**.
-
-> ⚠️ **مهم قبل الرفع على GitHub:** لا ترفع `google-services.json` ولا ملفات `key.properties` ولا ملف التوقيع `.jks` ولا أي مفتاح. تأكد إنهم موجودين في `.gitignore`.
-
----
-
-## اللون والتصميم
-
-| العنصر | اللون |
-|---|---|
-| الخلفية | `#F8F6F1` |
-| الأخضر الأساسي | `#4E8B7A` |
-| الأخضر الغامق | `#2F6B5A` |
-| الأخضر الفاتح | `#E3EEE9` |
-| النص | `#1F2420` |
-| النص الثانوي | `#5F675F` |
-| الفواصل | `#E8E3D8` |
-
-ألوان الأنواع: أكل `#4E8B7A`، مواصلات `#E8A83A`، فواتير `#8FA3BD`، صدقات `#D6A19A`، اشتراكات `#7C6FA8`، ديون `#C0644B`، أخرى `#9A9488`.
-
----
-
-## هيكل المشروع
+تم بناء المشروع باتباع مبادئ **Clean Architecture** و**Feature-First Pattern**:
 
 ```text
 lib/
 ├── core/
-│   ├── constants/
-│   ├── database/        # drift + SQLCipher + مفتاح التشفير
-│   ├── routing/         # go_router
-│   ├── theme/
-│   ├── utils/
-│   └── widgets/         # اللوجو وعناصر مشتركة
+│   ├── constants/        # ألوان التطبيق، الثوابت، وأيقونات النظام
+│   ├── database/         # إعداد Drift وSQLCipher وإدارة اتصالات الحسابات
+│   ├── errors/           # كلاسات الفشل والأخطاء الموحدة (Failures)
+│   ├── network/          # عميل الشبكة والمزامنة
+│   ├── routing/          # تعريف المسارات عبر GoRouter
+│   ├── services/         # خدمات الإشعارات، الصوت، والنسخ الاحتياطي
+│   ├── theme/            # ثيم التطبيق والألوان (Light & Dark)
+│   ├── utils/            # منسق الأرقام، مساعد الأيقونات، والتاريخ
+│   └── widgets/          # عناصر الواجهة المشتركة والقابلة لإعادة الاستخدام
+│
 ├── features/
-├── l10n/                # app_ar.arb / app_en.arb
-└── main.dart
-assets/
-├── fonts/               # Cairo 400 / 600 / 700
-└── images/              # logo.svg / logo_splash.svg
-docs/
-└── screenshots/
+│   ├── auth/             # تسجيل الدخول بجوجل وإدارة حالة الحساب
+│   ├── debts/            # إدارة الديون وسجل الدفعات
+│   ├── expenses/         # إضافة المصروف، التصنيفات، ومحلل الصوت المصري
+│   ├── goals/            # الأهداف المالية، التحويش، والسحب
+│   ├── home/             # الشاشة الرئيسية، حلقة الميزانية، وتصفح الشهور
+│   ├── month_details/    # تحليلات الشهر، الرسم البياني، ومصاريف الأيام
+│   ├── reminders/        # المواعيد، الاشتراكات، وجدولة الإشعارات
+│   ├── security/         # فحص أمان الجهاز وحماية الجلسة
+│   ├── settings/         # الإعدادات، الثيم، ومسح وتصدير البيانات
+│   ├── shell/            # الإطار الخارجي وشريط التنقل السفلي
+│   └── splash/           # شاشة البداية وفحص التوجيه الأولي
+│
+└── main.dart             # نقطة انطلاق التطبيق وتهيئة الخدمات
 ```
 
 ---
 
-## تشغيل المشروع
+## 🔐 الأمان والخصوصية (Privacy & Security)
 
-المتطلبات: Flutter SDK (stable)، Android Studio، ومحاكي أو موبايل أندرويد.
-
-```bash
-git clone <رابط-المشروع>
-cd Baqy
-flutter pub get
-flutter run
-```
-
-تشغيل الاختبارات:
-
-```bash
-flutter test
-```
+- 🔒 **تشفير كامل للبيانات:** قاعدة البيانات مشفرة باستخدام معيار AES-256 عبر SQLCipher.
+- 🔑 **مفاتيح التشفير:** يتم توليد مفتاح عشوائي فريد لكل جهاز، ويُخزن في Android Keystore الآمن، ولا يمكن استخراجه أو الوصول إليه خارج التطبيق.
+- 🛡️ **Offline-First:** جميع معاملاتك المالية وحساباتك وأهدافك لا تغادر هاتفك إطلاقاً، وتظل ملكاً لك وحدك.
+- 👤 **تسجيل الدخول:** يتم استخدام Google Auth فقط لتأكيد الهوية وعزل قاعدة بيانات كل حساب على الجهاز.
 
 ---
 
-## خطة النشر
+## 🚀 طريقة تشغيل المشروع محلياً (Getting Started)
 
-- تغيير الـ Application ID من `com.example.baqy` لاسم خاص بيك قبل النشر على Google Play.
-- Release build مع R8 وDart obfuscation.
-- مراجعة أمان وسرعة كاملة (الخطوة ١١) قبل الرفع.
+### المتطلبات الأساسية
+- مثبت **Flutter SDK** (الإصدار 3.24+ أو أحدث).
+- بيئة **Android Studio** مع Android SDK وJava 17.
+- هاتف أندرويد حقيقي أو محاكي (Android Emulator).
+
+### خطوات التثبيت والتشغيل
+
+1. **استنساخ المستودع (Clone Repository):**
+   ```bash
+   git clone https://github.com/your-username/Baqy.git
+   cd Baqy
+   ```
+
+2. **تثبيت الحزم والاعتماديات:**
+   ```bash
+   flutter pub get
+   ```
+
+3. **توليد ملفات الكود المساعد (Drift & Code Generation):**
+   ```bash
+   dart run build_runner build --delete-conflicting-outputs
+   ```
+
+4. **تشغيل الفحص الآلي للاختبارات:**
+   ```bash
+   flutter test
+   ```
+
+5. **تشغيل التطبيق على الهاتف / المحاكي:**
+   ```bash
+   flutter run
+   ```
 
 ---
 
-## صُنع بواسطة
+## 👨‍💻 المطور (Author)
 
-**محمد إبراهيم**
+**محمد إبراهيم (Mohamed Ibrahim)**
+- تخصص: تطوير تطبيقات الهاتف المحمول باستخدام Flutter.
+- رؤية المشروع: تقديم حل مالي عربي بسيط، أنيق، وسريع يعتمد على الخصوصية والذكاء وسهولة الاستخدام اليومي.

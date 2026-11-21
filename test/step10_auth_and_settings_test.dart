@@ -315,10 +315,13 @@ void main() {
         find.textContaining('تم تعطيل هذا الحساب من قِبل إدارة التطبيق'),
         findsOneWidget,
       );
-      expect(find.text('تسجيل الخروج'), findsOneWidget);
+      expect(find.text('تواصل مع الإدارة لإعادة تفعيل الحساب:'), findsOneWidget);
+      expect(find.text('واتساب'), findsOneWidget);
+      expect(find.text('جيميل'), findsOneWidget);
+      expect(find.text('حسناً'), findsOneWidget);
 
       // Dismiss dialog
-      await tester.tap(find.text('تسجيل الخروج'));
+      await tester.tap(find.text('حسناً'));
       await tester.pumpAndSettle();
 
       expect(find.byType(AccountStatusDialog), findsNothing);
@@ -354,8 +357,13 @@ void main() {
         findsOneWidget,
       );
 
+      expect(find.text('تواصل مع الإدارة لإعادة تفعيل الحساب:'), findsOneWidget);
+      expect(find.text('واتساب'), findsOneWidget);
+      expect(find.text('جيميل'), findsOneWidget);
+      expect(find.text('حسناً'), findsOneWidget);
+
       // Dismiss dialog
-      await tester.tap(find.text('تسجيل الخروج'));
+      await tester.tap(find.text('حسناً'));
       await tester.pumpAndSettle();
 
       expect(find.byType(AccountStatusDialog), findsNothing);

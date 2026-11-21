@@ -5,10 +5,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_dimensions.dart';
 import '../../../../core/localization/locale_provider.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
+import '../../../../core/widgets/action_feedback_dialog.dart';
 import '../../../../core/widgets/whatsapp_icon.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
@@ -59,6 +61,7 @@ class SettingsScreen extends ConsumerWidget {
 
     if (!context.mounted) return;
 
+    int? savedBudgetPiastres;
     await BudgetBottomSheet.show(
       context: context,
       monthNumber: monthNumber,
@@ -68,13 +71,27 @@ class SettingsScreen extends ConsumerWidget {
           yearMonth: yearMonth,
           amount: budgetPiastres,
         );
-        await BudgetMonitorController.resetAlertFlag(yearMonth);
+        savedBudgetPiastres = budgetPiastres;
+        final userId = ref.read(activeUserIdProvider);
+        await BudgetMonitorController.resetAlertFlag(yearMonth, userId: userId);
         ref.invalidate(currentMonthRemainingProvider);
         ref.invalidate(yearsWithDataProvider);
         final (year, _) = ArabicDateHelper.parseYearMonthKey(yearMonth);
         ref.invalidate(monthsWithDataProvider(year));
       },
     );
+
+    if (savedBudgetPiastres != null && context.mounted) {
+      final monthName = ArabicDateHelper.getMonthName(monthNumber);
+      final formatted = '${NumberFormatter.formatCurrency(savedBudgetPiastres! ~/ 100)} جنيه';
+      final targetContext = rootNavigatorKey.currentContext ?? context;
+      await ActionFeedbackDialog.show(
+        context: targetContext,
+        type: ActionFeedbackType.updated,
+        title: 'تم تعديل الميزانية بنجاح',
+        subtitle: 'تم ضبط ميزانية شهر $monthName بمبلغ $formatted وتحديث الحسابات.',
+      );
+    }
   }
 
   @override
@@ -550,10 +567,19 @@ class SettingsScreen extends ConsumerWidget {
                                     mode: PinSetupMode.create,
                                   );
                                 } else {
-                                  await PinSetupSheet.show(
+                                  final disabled = await PinSetupSheet.show(
                                     context,
                                     mode: PinSetupMode.disable,
                                   );
+                                  if (disabled == true && context.mounted) {
+                                    final targetContext = rootNavigatorKey.currentContext ?? context;
+                                    await ActionFeedbackDialog.show(
+                                      context: targetContext,
+                                      type: ActionFeedbackType.deleted,
+                                      title: 'تم إيقاف قفل التطبيق',
+                                      subtitle: 'تم حذف رمز المرور وإلغاء القفل بنجاح.',
+                                    );
+                                  }
                                 }
                               },
                             ),
@@ -566,11 +592,20 @@ class SettingsScreen extends ConsumerWidget {
                           Divider(color: AppColors.dividers, height: 1),
                           const SizedBox(height: 10),
                           InkWell(
-                            onTap: () {
-                              PinSetupSheet.show(
+                            onTap: () async {
+                              final changed = await PinSetupSheet.show(
                                 context,
                                 mode: PinSetupMode.change,
                               );
+                              if (changed == true && context.mounted) {
+                                final targetContext = rootNavigatorKey.currentContext ?? context;
+                                await ActionFeedbackDialog.show(
+                                  context: targetContext,
+                                  type: ActionFeedbackType.updated,
+                                  title: 'تم تغيير رمز المرور',
+                                  subtitle: 'تم تحديث رمز المرور بنجاح.',
+                                );
+                              }
                             },
                             borderRadius: BorderRadius.circular(10),
                             child: Padding(
@@ -851,9 +886,11 @@ class SettingsScreen extends ConsumerWidget {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: () {
-                    // Navigate immediately for instant feel with zero UI delay
-                    context.go('/sign-in');
+                    // Navigate immediately with smooth fade animation
+                    appRouter.go('/sign-in');
                     ref.read(authControllerProvider.notifier).signOut();
+                    ref.read(hasAutoOpenedBudgetForMonthProvider.notifier).reset();
+                    appAuthNotifier.notifyAuthChanged();
                   },
                   borderRadius: BorderRadius.circular(16.0),
                   child: Container(

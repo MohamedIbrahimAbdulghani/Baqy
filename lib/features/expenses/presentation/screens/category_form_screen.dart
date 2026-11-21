@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/category_icon_helper.dart';
+import '../../../../core/widgets/action_feedback_dialog.dart';
 import '../../domain/models/category_item.dart';
 import '../providers/expense_providers.dart';
 
@@ -105,7 +107,19 @@ class _CategoryFormScreenState extends ConsumerState<CategoryFormScreen> {
       ref.invalidate(categoriesProvider);
 
       if (mounted) {
+        final isEdit = widget.categoryToEdit != null;
         context.pop(resultCategoryId);
+        final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+        if (targetContext != null && targetContext.mounted) {
+          await ActionFeedbackDialog.show(
+            context: targetContext,
+            type: isEdit ? ActionFeedbackType.updated : ActionFeedbackType.added,
+            title: isEdit ? 'تم تعديل التصنيف بنجاح' : 'تم إضافة التصنيف بنجاح',
+            subtitle: isEdit
+                ? 'تم تحديث بيانات تصنيف "$sanitizedName".'
+                : 'تمت إضافة تصنيف "$sanitizedName" إلى قائمة التصنيفات.',
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -268,7 +282,8 @@ class _CategoryFormScreenState extends ConsumerState<CategoryFormScreen> {
                         OutlinedButton.icon(
                           onPressed: () async {
                             final id = widget.categoryToEdit!.id;
-                            if (widget.categoryToEdit!.isArchived) {
+                            final isArchived = widget.categoryToEdit!.isArchived;
+                            if (isArchived) {
                               await ref
                                   .read(archiveCategoryUseCaseProvider)
                                   .unarchive(id);
@@ -280,6 +295,17 @@ class _CategoryFormScreenState extends ConsumerState<CategoryFormScreen> {
                             ref.invalidate(categoriesProvider);
                             if (context.mounted) {
                               context.pop();
+                              final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+                              if (targetContext != null && targetContext.mounted) {
+                                await ActionFeedbackDialog.show(
+                                  context: targetContext,
+                                  type: isArchived ? ActionFeedbackType.updated : ActionFeedbackType.deleted,
+                                  title: isArchived ? 'تم إلغاء أرشفة التصنيف' : 'تم أرشفة التصنيف',
+                                  subtitle: isArchived
+                                      ? 'تمت إعادة تصنيف "${widget.categoryToEdit!.name}" إلى القوائم النشطة.'
+                                      : 'تمت أرشفة تصنيف "${widget.categoryToEdit!.name}" وإخفاؤه من القوائم.',
+                                );
+                              }
                             }
                           },
                           icon: Icon(

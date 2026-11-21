@@ -12,7 +12,13 @@ import '../../features/reminders/domain/utils/reminder_date_calculator.dart';
 /// Service responsible for managing local push notifications, reminder scheduling, and permissions.
 class NotificationService {
   NotificationService._internal();
-  static final NotificationService instance = NotificationService._internal();
+  static NotificationService instance = NotificationService._internal();
+
+  /// Visible setter for unit testing
+  @visibleForTesting
+  static set testInstance(NotificationService service) {
+    instance = service;
+  }
 
   /// Visible constructor for unit testing
   @visibleForTesting

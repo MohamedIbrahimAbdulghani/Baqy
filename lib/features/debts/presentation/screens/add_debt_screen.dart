@@ -156,7 +156,7 @@ class _AddDebtScreenState extends ConsumerState<AddDebtScreen> {
         await ActionFeedbackDialog.show(
           context: context,
           type: isEdit ? ActionFeedbackType.updated : ActionFeedbackType.added,
-          title: isEdit ? 'تم تعديل الدين بنجاح' : 'تم حفظ الدين بنجاح! 🎉',
+          title: isEdit ? 'تم تعديل الدين بنجاح' : 'تم حفظ الدين بنجاح',
           subtitle: isEdit
               ? 'تم تحديث بيانات الدين الخاص بـ $sanitizedName'
               : (isOwe

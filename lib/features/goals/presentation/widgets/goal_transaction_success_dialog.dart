@@ -125,7 +125,7 @@ class _GoalTransactionSuccessDialogState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Top Animated-style Badge
+            // Top Animated-style Badge with Goal's Icon
             Container(
               width: 68.0,
               height: 68.0,
@@ -133,14 +133,31 @@ class _GoalTransactionSuccessDialogState
                 color: themeColor.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: Center(
-                child: Icon(
-                  widget.isWithdrawal
-                      ? Icons.arrow_downward_rounded
-                      : Icons.check_circle_rounded,
-                  color: themeColor,
-                  size: 38.0,
-                ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(
+                    iconData,
+                    color: themeColor,
+                    size: 34.0,
+                  ),
+                  Positioned(
+                    right: 4,
+                    bottom: 4,
+                    child: Container(
+                      padding: const EdgeInsets.all(2.0),
+                      decoration: BoxDecoration(
+                        color: AppColors.card,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.check_circle_rounded,
+                        color: themeColor,
+                        size: 16.0,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 16.0),
@@ -149,7 +166,7 @@ class _GoalTransactionSuccessDialogState
             Text(
               widget.isWithdrawal
                   ? 'تم السحب من الهدف بنجاح'
-                  : 'تم التحويش بنجاح! 🎉',
+                  : 'تم التحويش بنجاح',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: AppTheme.fontFamily,
@@ -222,7 +239,7 @@ class _GoalTransactionSuccessDialogState
             Text(
               widget.isWithdrawal
                   ? 'المحوّش الحالي في الهدف: ${_thousands.format((widget.goal.totalSavedEgp - widget.amountEgp).clamp(0, double.infinity).toInt())} جنيه'
-                  : 'خطوة ممتازة نحو هدفك! متبقي ${_thousands.format((widget.goal.remainingToTargetEgp - widget.amountEgp).clamp(0, double.infinity).toInt())} جنيه 🚀',
+                  : 'خطوة ممتازة نحو هدفك! متبقي ${_thousands.format((widget.goal.remainingToTargetEgp - widget.amountEgp).clamp(0, double.infinity).toInt())} جنيه',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: AppTheme.fontFamily,

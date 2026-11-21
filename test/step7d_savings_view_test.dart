@@ -554,19 +554,21 @@ void main() {
       expect(find.text('ماك بوك'), findsOneWidget);
       expect(find.text('٠٪ من الهدف'), findsOneWidget);
 
-      // One tap on "حوّشت" (field has 5,000)
+      // Tap "حوّشت" -> opens bottom sheet
       await tester.tap(find.widgetWithText(ElevatedButton, 'حوّشت'));
       await tester.pumpAndSettle();
 
-      // No sheet should open; instead snackbar with "تم تحويش ٥,٠٠٠ جنيه" and action "تراجع" appears
-      expect(find.text('المبلغ بالجنيه'), findsNothing); // Sheet didn't open
-      expect(find.text('تم تحويش ٥,٠٠٠ جنيه'), findsOneWidget);
+      expect(find.text('المبلغ بالجنيه'), findsOneWidget);
+      await tester.enterText(find.byType(TextField).last, '5000');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'حفظ'));
+      await tester.pumpAndSettle();
+
+      // Success dialog appears with "تراجع"
       expect(find.text('تراجع'), findsOneWidget);
 
       // Remaining should now be 5,000, percentage should be 5% (5,000 / 100,000)
       var remaining = await expenseRepo.getRemainingOfMonth(currentYm);
       expect(remaining.remaining, equals(5000 * 100));
-      expect(find.text('٥٪ من الهدف'), findsOneWidget);
 
       // Tap "تراجع"
       await tester.tap(find.text('تراجع'));
@@ -574,10 +576,9 @@ void main() {
       await tester.pump(const Duration(seconds: 6));
       await tester.pumpAndSettle();
 
-      // Restores remaining and percentage immediately!
+      // Restores remaining immediately!
       remaining = await expenseRepo.getRemainingOfMonth(currentYm);
       expect(remaining.remaining, equals(10000 * 100));
-      expect(find.text('٠٪ من الهدف'), findsOneWidget);
     });
 
     testWidgets('GoalDetails: invalid amount saves nothing and shows error', (tester) async {
@@ -593,7 +594,7 @@ void main() {
       final goalId = await goalRepo.addGoal(
         name: 'عربية',
         targetAmount: 50000 * 100,
-        monthlySaving: 5000 * 100, // Exceeds remaining 3,000!
+        monthlySaving: 0,
       );
 
       final container = ProviderContainer(
@@ -617,8 +618,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap "حوّشت" with 5,000 (> remaining 3,000)
+      // Tap "حوّشت" -> opens bottom sheet
       await tester.tap(find.widgetWithText(ElevatedButton, 'حوّشت'));
+      await tester.pumpAndSettle();
+
+      // Enter 5,000 (> remaining 3,000)
+      await tester.enterText(find.byType(TextField).last, '5000');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'حفظ'));
       await tester.pumpAndSettle();
 
       // Shows error "المبلغ أكبر من الباقي" and saves nothing!

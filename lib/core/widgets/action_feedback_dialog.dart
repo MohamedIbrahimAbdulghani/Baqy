@@ -21,6 +21,7 @@ class ActionFeedbackDialog extends StatefulWidget {
     required this.type,
     required this.title,
     required this.subtitle,
+    this.icon,
     this.onUndo,
     this.undoLabel = 'تراجع',
   });
@@ -28,6 +29,7 @@ class ActionFeedbackDialog extends StatefulWidget {
   final ActionFeedbackType type;
   final String title;
   final String subtitle;
+  final IconData? icon;
   final VoidCallback? onUndo;
   final String undoLabel;
 
@@ -37,6 +39,7 @@ class ActionFeedbackDialog extends StatefulWidget {
     required ActionFeedbackType type,
     required String title,
     required String subtitle,
+    IconData? icon,
     VoidCallback? onUndo,
     String undoLabel = 'تراجع',
     Duration duration = const Duration(milliseconds: 2600),
@@ -61,6 +64,7 @@ class ActionFeedbackDialog extends StatefulWidget {
             type: type,
             title: title,
             subtitle: subtitle,
+            icon: icon,
             onUndo: onUndo,
             undoLabel: undoLabel,
           ),
@@ -117,31 +121,31 @@ class _ActionFeedbackDialogState extends State<ActionFeedbackDialog> {
 
     switch (widget.type) {
       case ActionFeedbackType.deleted:
-        icon = Icons.delete_outline_rounded;
+        icon = widget.icon ?? Icons.delete_outline_rounded;
         iconColor = Colors.redAccent;
         iconBgColor = Colors.redAccent.withValues(alpha: 0.12);
         break;
 
       case ActionFeedbackType.updated:
-        icon = Icons.edit_note_rounded;
+        icon = widget.icon ?? Icons.check_circle_rounded;
         iconColor = AppColors.mainGreen;
         iconBgColor = AppColors.mainGreen.withValues(alpha: 0.12);
         break;
 
       case ActionFeedbackType.added:
-        icon = Icons.check_circle_rounded;
+        icon = widget.icon ?? Icons.check_circle_rounded;
         iconColor = AppColors.mainGreen;
         iconBgColor = AppColors.mainGreen.withValues(alpha: 0.12);
         break;
 
       case ActionFeedbackType.paymentRecorded:
-        icon = Icons.task_alt_rounded;
+        icon = widget.icon ?? Icons.check_circle_rounded;
         iconColor = AppColors.mainGreen;
         iconBgColor = AppColors.mainGreen.withValues(alpha: 0.12);
         break;
 
       case ActionFeedbackType.settled:
-        icon = Icons.celebration_rounded;
+        icon = widget.icon ?? Icons.check_circle_rounded;
         iconColor = const Color(0xFF2E7D32);
         iconBgColor = const Color(0xFF2E7D32).withValues(alpha: 0.14);
         break;

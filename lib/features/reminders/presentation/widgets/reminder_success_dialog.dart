@@ -136,8 +136,8 @@ class _ReminderSuccessDialogState extends State<ReminderSuccessDialog> {
             // Title
             Text(
               widget.isEdit
-                  ? 'تم تعديل الموعد بنجاح!'
-                  : 'تم حفظ الموعد بنجاح! 🎉',
+                  ? 'تم تعديل الموعد بنجاح'
+                  : 'تم حفظ الموعد بنجاح',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: AppTheme.fontFamily,

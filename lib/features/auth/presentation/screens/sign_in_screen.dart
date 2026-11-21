@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/baqy_logo.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -20,7 +20,8 @@ class SignInScreen extends ConsumerWidget {
     if (!context.mounted) return;
 
     if (success) {
-      context.go('/main');
+      appAuthNotifier.notifyAuthChanged();
+      appRouter.go('/main');
     } else {
       final authState = ref.read(authControllerProvider);
       if (authState.hasError) {
@@ -30,6 +31,9 @@ class SignInScreen extends ConsumerWidget {
             context,
             status: AccountStatus.disabled,
             customReason: error.message,
+            userEmail: error.email,
+            buttonText: 'حسناً',
+            showContactOptions: true,
           );
           return;
         } else if (error is AccountDeletedException) {
@@ -37,6 +41,9 @@ class SignInScreen extends ConsumerWidget {
             context,
             status: AccountStatus.deleted,
             customReason: error.message,
+            userEmail: error.email,
+            buttonText: 'حسناً',
+            showContactOptions: true,
           );
           return;
         }

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/services/notification_service.dart';
@@ -56,10 +55,12 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
   Timer? _securityCheckTimer;
   bool _isCheckingSecurity = false;
   bool _hasTriggeredSecurityDialog = false;
+  String? _cachedUserEmail;
 
   @override
   void initState() {
     super.initState();
+    _cachedUserEmail = ref.read(authRepositoryProvider).currentUser?.email;
     WidgetsBinding.instance.addObserver(this);
     NotificationService.onSelectTab = (int tabIndex) {
       if (mounted) {
@@ -91,7 +92,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
 
   void _startSecurityMonitor() {
     _securityCheckTimer?.cancel();
-    _securityCheckTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+    _securityCheckTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       _checkSecurityStatus();
     });
   }
@@ -99,6 +100,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
   Future<void> _checkSecurityStatus() async {
     if (!mounted || _isCheckingSecurity || _hasTriggeredSecurityDialog) return;
     _isCheckingSecurity = true;
+    isCheckingAccountSecurity = true;
     try {
       final repo = ref.read(authRepositoryProvider);
       final status = await repo.checkAccountStatus();
@@ -106,34 +108,30 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
 
       if (status == AccountStatus.disabled || status == AccountStatus.deleted) {
         _hasTriggeredSecurityDialog = true;
+        isAccountSuspended = true;
         _securityCheckTimer?.cancel();
         _securityCheckTimer = null;
-
-        // Dismiss any existing bottom sheet or open popup first
-        final navState = rootNavigatorKey.currentState;
-        if (navState != null && navState.canPop()) {
-          navState.popUntil((route) => route.isFirst);
-        }
 
         // Pop up the dialog FIRST on the current screen without navigating away
         final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
         if (targetContext != null && targetContext.mounted) {
+          final userEmail = _cachedUserEmail ?? repo.currentUser?.email;
           await AccountStatusDialog.show(
             targetContext,
             status: status,
-            buttonText: 'تسجيل الخروج',
-            onDismissed: () async {
-              // Sign out and redirect to sign-in ONLY when the user taps "تسجيل الخروج"
-              await ref.read(authControllerProvider.notifier).signOut();
+            userEmail: userEmail,
+            buttonText: 'خروج',
+            buttonColor: AppColors.errorRed,
+            showContactOptions: false,
+            onDismissed: () {
+              isAccountSuspended = false;
+              // 1. Instantly transition smoothly to /sign-in so user NEVER sees the screen behind
+              appRouter.go('/sign-in');
+
+              // 2. Perform sign out and cleanup in parallel
+              ref.read(authControllerProvider.notifier).signOut();
               ref.read(hasAutoOpenedBudgetForMonthProvider.notifier).reset();
-              final exitNav = rootNavigatorKey.currentState;
-              if (exitNav != null && exitNav.canPop()) {
-                exitNav.popUntil((route) => route.isFirst);
-              }
-              final navContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
-              if (navContext != null && navContext.mounted) {
-                navContext.go('/sign-in');
-              }
+              appAuthNotifier.notifyAuthChanged();
             },
           );
         }
@@ -141,6 +139,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
     } catch (_) {
     } finally {
       _isCheckingSecurity = false;
+      isCheckingAccountSecurity = false;
     }
   }
 
@@ -162,14 +161,17 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
 
   @override
   Widget build(BuildContext context) {
+
     ref.listen<AsyncValue<MonthRemaining>>(currentMonthRemainingProvider, (prev, next) {
       next.whenData((remaining) {
+        final userId = ref.read(activeUserIdProvider);
         final double totalBudget = remaining.monthMoney / 100.0;
         final double remainingEgp = remaining.remaining / 100.0;
         BudgetMonitorController.evaluateAndNotify(
           totalBudget: totalBudget,
           remainingAmount: remainingEgp,
           currentMonthKey: remaining.yearMonth,
+          userId: userId,
         );
       });
     });

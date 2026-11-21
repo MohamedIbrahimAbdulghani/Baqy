@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../../core/widgets/action_feedback_dialog.dart';
+import '../../../shell/presentation/providers/tab_provider.dart';
 import '../../domain/models/debt_item.dart';
 import '../../domain/models/debt_payment_item.dart';
 import '../providers/debt_providers.dart';
@@ -18,6 +20,18 @@ class DebtDetailsScreen extends ConsumerWidget {
   });
 
   final int debtId;
+
+  void _popOrGoToDebts(BuildContext context, WidgetRef ref) {
+    ref.read(tabIndexProvider.notifier).selectTab(3);
+    final router = GoRouter.maybeOf(context);
+    if (router != null && router.canPop()) {
+      router.pop();
+    } else if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else if (router != null) {
+      router.go('/main');
+    }
+  }
 
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref, DebtItem debt) async {
     final isOwe = debt.direction == 'owe';
@@ -97,7 +111,7 @@ class DebtDetailsScreen extends ConsumerWidget {
       final name = debt.personName;
       await ref.read(debtRepositoryProvider).deleteDebt(debtId);
       if (context.mounted) {
-        context.pop();
+        _popOrGoToDebts(context, ref);
 
         final String feedbackTitle;
         final String feedbackSubtitle;
@@ -113,18 +127,24 @@ class DebtDetailsScreen extends ConsumerWidget {
           feedbackSubtitle = 'اتحذف المبلغ المستحق عند $name ورجعت الحسابات زي ما كانت.';
         }
 
-        await ActionFeedbackDialog.show(
-          context: context,
-          type: ActionFeedbackType.deleted,
-          title: feedbackTitle,
-          subtitle: feedbackSubtitle,
-        );
+        final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+        if (targetContext != null && targetContext.mounted) {
+          await ActionFeedbackDialog.show(
+            context: targetContext,
+            type: ActionFeedbackType.deleted,
+            title: feedbackTitle,
+            subtitle: feedbackSubtitle,
+          );
+        }
       }
     }
   }
 
   void _showRecordPaymentSheet(BuildContext context, WidgetRef ref, DebtItem debt) {
     if (debt.remaining <= 0) return;
+
+    int? recordedPaymentId;
+    int? recordedAmountPiastres;
 
     RecordPaymentSheet.show(
       context: context,
@@ -135,33 +155,52 @@ class DebtDetailsScreen extends ConsumerWidget {
               amount: amountPiastres,
               paidAt: DateTime.now(),
             );
+        recordedPaymentId = paymentId;
+        recordedAmountPiastres = amountPiastres;
+      },
+    ).then((_) async {
+      if (recordedPaymentId == null || recordedAmountPiastres == null) return;
+      if (!context.mounted) return;
 
-        final newRemaining = debt.remaining - amountPiastres;
-        if (context.mounted) {
-          final isOwe = debt.direction == 'owe';
-          final formattedAmount = '${NumberFormatter.formatCurrency(amountPiastres ~/ 100)} جنيه';
+      final amountPiastres = recordedAmountPiastres!;
+      final paymentId = recordedPaymentId!;
+      final newRemaining = debt.remaining - amountPiastres;
+      final isOwe = debt.direction == 'owe';
+      final formattedAmount = '${NumberFormatter.formatCurrency(amountPiastres ~/ 100)} جنيه';
+
+      if (newRemaining <= 0) {
+        // سداد الدين بالكامل: تحويل تلقائي لصفحة الديون مع إظهار نافذة التهنئة
+        _popOrGoToDebts(context, ref);
+
+        final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+        if (targetContext != null && targetContext.mounted) {
           await ActionFeedbackDialog.show(
-            context: context,
-            type: newRemaining <= 0
-                ? ActionFeedbackType.settled
-                : ActionFeedbackType.paymentRecorded,
-            title: newRemaining <= 0
-                ? 'مبروك! تم سداد الدين بالكامل 🎊'
-                : 'تم تسجيل الدفعة بنجاح! 👏',
-            subtitle: newRemaining <= 0
-                ? (isOwe
-                    ? 'سددت كل اللي عليك لـ ${debt.personName}، واتنقل لقائمة تم سدادها.'
-                    : 'استلمت كل اللي ليك عند ${debt.personName}، واتنقل لقائمة تم سدادها.')
-                : (isOwe
-                    ? 'اتخصمت الدفعة ($formattedAmount) من ميزانية الشهر وتحدث المتبقي.'
-                    : 'اتضافت الدفعة ($formattedAmount) لميزانية الشهر وتحدث المتبقي.'),
+            context: targetContext,
+            type: ActionFeedbackType.settled,
+            title: 'مبروك! تم سداد الدين بالكامل',
+            subtitle: isOwe
+                ? 'سددت كل اللي عليك لـ ${debt.personName}، واتنقل لقائمة تم سدادها.'
+                : 'استلمت كل اللي ليك عند ${debt.personName}، واتنقل لقائمة تم سدادها.',
             onUndo: () async {
               await ref.read(debtRepositoryProvider).undoPayment(paymentId);
             },
           );
         }
-      },
-    );
+      } else {
+        // دفعة جزئية: البقاء في تفاصيل الدين مع تأكيد تسجيل الدفعة
+        await ActionFeedbackDialog.show(
+          context: context,
+          type: ActionFeedbackType.paymentRecorded,
+          title: 'تم تسجيل الدفعة بنجاح',
+          subtitle: isOwe
+              ? 'اتخصمت الدفعة ($formattedAmount) من ميزانية الشهر وتحدث المتبقي.'
+              : 'اتضافت الدفعة ($formattedAmount) لميزانية الشهر وتحدث المتبقي.',
+          onUndo: () async {
+            await ref.read(debtRepositoryProvider).undoPayment(paymentId);
+          },
+        );
+      }
+    });
   }
 
   void _showEditPaymentSheet(
@@ -170,6 +209,9 @@ class DebtDetailsScreen extends ConsumerWidget {
     DebtItem debt,
     DebtPaymentItem payment,
   ) {
+    int? updatedNewAmount;
+    final initialRemaining = debt.remaining;
+
     RecordPaymentSheet.show(
       context: context,
       title: 'تعديل الدفعة',
@@ -180,17 +222,39 @@ class DebtDetailsScreen extends ConsumerWidget {
               paymentId: payment.id,
               newAmount: newAmount,
             );
-        if (context.mounted) {
-          final formatted = '${NumberFormatter.formatCurrency(newAmount ~/ 100)} جنيه';
+        updatedNewAmount = newAmount;
+      },
+    ).then((_) async {
+      if (updatedNewAmount == null || !context.mounted) return;
+
+      final newAmount = updatedNewAmount!;
+      final newRemaining = (initialRemaining + payment.amount) - newAmount;
+      final isOwe = debt.direction == 'owe';
+
+      if (newRemaining <= 0) {
+        _popOrGoToDebts(context, ref);
+
+        final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+        if (targetContext != null && targetContext.mounted) {
           await ActionFeedbackDialog.show(
-            context: context,
-            type: ActionFeedbackType.updated,
-            title: 'تم تعديل الدفعة بنجاح',
-            subtitle: 'تم تعديل مبلغ الدفعة إلى $formatted وتحديث المتبقي وميزانية الشهر.',
+            context: targetContext,
+            type: ActionFeedbackType.settled,
+            title: 'مبروك! تم سداد الدين بالكامل',
+            subtitle: isOwe
+                ? 'سددت كل اللي عليك لـ ${debt.personName}، واتنقل لقائمة تم سدادها.'
+                : 'استلمت كل اللي ليك عند ${debt.personName}، واتنقل لقائمة تم سدادها.',
           );
         }
-      },
-    );
+      } else {
+        final formatted = '${NumberFormatter.formatCurrency(newAmount ~/ 100)} جنيه';
+        await ActionFeedbackDialog.show(
+          context: context,
+          type: ActionFeedbackType.updated,
+          title: 'تم تعديل الدفعة بنجاح',
+          subtitle: 'تم تعديل مبلغ الدفعة إلى $formatted وتحديث المتبقي وميزانية الشهر.',
+        );
+      }
+    });
   }
 
   Future<void> _confirmDeletePayment(

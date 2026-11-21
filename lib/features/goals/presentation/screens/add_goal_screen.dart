@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/utils/number_formatter.dart';
+import '../../../../core/widgets/action_feedback_dialog.dart';
 import '../../domain/models/goal_item.dart';
 import '../../data/repositories/goal_repository_impl.dart';
 import '../providers/goal_providers.dart';
@@ -122,7 +124,20 @@ class _AddGoalScreenState extends ConsumerState<AddGoalScreen> {
       }
 
       if (mounted) {
+        final isEdit = widget.goalToEdit != null;
         context.pop();
+        final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+        if (targetContext != null && targetContext.mounted) {
+          final formatted = '${NumberFormatter.formatCurrency(parsedAmount)} جنيه';
+          await ActionFeedbackDialog.show(
+            context: targetContext,
+            type: isEdit ? ActionFeedbackType.updated : ActionFeedbackType.added,
+            title: isEdit ? 'تم تعديل الهدف بنجاح' : 'تم حفظ الهدف بنجاح',
+            subtitle: isEdit
+                ? 'تم تحديث بيانات هدف "$sanitizedName" بمبلغ مستهدف $formatted.'
+                : 'تم تسجيل هدف جديد "$sanitizedName" بمبلغ مستهدف $formatted.',
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -154,8 +169,8 @@ class _AddGoalScreenState extends ConsumerState<AddGoalScreen> {
                   IconButton(
                     onPressed: () => context.pop(),
                     icon: Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 20.0,
+                      Icons.chevron_left_rounded,
+                      size: 28.0,
                       color: AppColors.text,
                     ),
                     padding: EdgeInsets.zero,

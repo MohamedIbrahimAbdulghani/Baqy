@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/connection/account_database_manager.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/models/auth_user.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -56,6 +57,8 @@ class AuthController extends AsyncNotifier<void> {
   FutureOr<void> build() {}
 
   Future<bool> signInWithGoogle() async {
+    isAccountSuspended = false;
+    isCheckingAccountSecurity = false;
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final repo = ref.read(authRepositoryProvider);
@@ -83,6 +86,8 @@ class AuthController extends AsyncNotifier<void> {
   }
 
   Future<void> signOut() async {
+    isAccountSuspended = false;
+    isCheckingAccountSecurity = false;
     final currentDb = ref.read(activeDatabaseProvider);
     ref.read(activeDatabaseProvider.notifier).setDatabase(null);
     ref.read(activeUserIdProvider.notifier).setUserId(null);

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/utils/goal_icon_helper.dart';
@@ -29,54 +29,7 @@ class GoalDetailsScreen extends ConsumerStatefulWidget {
 }
 
 class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
-  final TextEditingController _savingController = TextEditingController();
-  bool _isControllerInitialized = false;
-  String? _savingError;
-
-  @override
-  void dispose() {
-    _savingController.dispose();
-    super.dispose();
-  }
-
   static final NumberFormat _thousands = NumberFormat('#,##0', 'en_US');
-
-  void _initControllerIfNeeded(GoalItem goal) {
-    if (!_isControllerInitialized) {
-      if (goal.monthlySavingEgp > 0) {
-        _savingController.text =
-            _thousands.format(goal.monthlySavingEgp);
-      }
-      _isControllerInitialized = true;
-    }
-  }
-
-  Future<void> _onSavingChanged(String text, GoalItem goal) async {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty) {
-      setState(() => _savingError = null);
-      await ref
-          .read(goalRepositoryProvider)
-          .updateMonthlySaving(id: goal.id, monthlySaving: 0);
-      return;
-    }
-
-    final parsed = NumberFormatter.parsePositiveInteger(trimmed);
-    if (parsed == null || parsed <= 0) {
-      setState(() => _savingError = 'يرجى إدخال مبلغ صحيح');
-      return;
-    }
-
-    if (parsed > goal.targetEgp) {
-      setState(() => _savingError = 'المبلغ لا يمكن أن يزيد عن الهدف');
-      return;
-    }
-
-    setState(() => _savingError = null);
-    await ref
-        .read(goalRepositoryProvider)
-        .updateMonthlySaving(id: goal.id, monthlySaving: parsed * 100);
-  }
 
   void _openEditGoal(BuildContext context, GoalItem goal) {
     context.push('/add-goal', extra: goal);
@@ -159,68 +112,30 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
           Navigator.of(context).pop();
         }
 
-        await ActionFeedbackDialog.show(
-          context: context,
-          type: ActionFeedbackType.deleted,
-          title: isAchieved ? 'تم الحذف نهائياً' : 'تم حذف الهدف',
-          subtitle: isAchieved
-              ? 'تم حذف هدف "$goalName" نهائياً من التطبيق.'
-              : 'اتحذف هدف "$goalName" ورجعت مدخراته للباقي.',
-        );
+        final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+        if (targetContext != null && targetContext.mounted) {
+          await ActionFeedbackDialog.show(
+            context: targetContext,
+            type: ActionFeedbackType.deleted,
+            title: isAchieved ? 'تم الحذف نهائياً' : 'تم حذف الهدف',
+            subtitle: isAchieved
+                ? 'تم حذف هدف "$goalName" نهائياً من التطبيق.'
+                : 'اتحذف هدف "$goalName" ورجعت مدخراته للباقي.',
+          );
+        }
       }
     }
   }
 
-  void _showUndoFeedback(BuildContext context) {
-    ScaffoldMessenger.of(context).removeCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'تم التراجع عن عملية التحويش بنجاح',
-                style: TextStyle(
-                  fontFamily: AppTheme.fontFamily,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14.0,
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFF2C3E50),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12.0),
-        ),
-        duration: const Duration(seconds: 4),
-      ),
-    );
-  }
-
-  Future<void> _resetMonthlySavingAndPopToGoals(int goalId) async {
-    // 1. Zero out the planned monthly saving in repository
-    await ref
-        .read(goalRepositoryProvider)
-        .updateMonthlySaving(id: goalId, monthlySaving: 0);
-
-    // 2. Clear the controller and reset error
-    if (mounted) {
-      _savingController.clear();
-      setState(() => _savingError = null);
-    }
-
-    // 3. Navigate back to the goals page
-    if (mounted) {
-      final router = GoRouter.maybeOf(context);
-      if (router != null && router.canPop()) {
-        router.pop();
-      } else if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
+  Future<void> _showUndoFeedback(BuildContext context) async {
+    final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+    if (targetContext != null && targetContext.mounted) {
+      await ActionFeedbackDialog.show(
+        context: targetContext,
+        type: ActionFeedbackType.deleted,
+        title: 'تم التراجع عن التحويش',
+        subtitle: 'تم إلغاء عملية التحويش وإرجاع المبلغ للباقي وتحديث الهدف.',
+      );
     }
   }
 
@@ -261,9 +176,6 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
               goal: goal,
               amountEgp: amountPiastres ~/ 100,
               isWithdrawal: false,
-              onDone: () async {
-                await _resetMonthlySavingAndPopToGoals(goal.id);
-              },
               onUndo: () async {
                 await ref
                     .read(goalRepositoryProvider)
@@ -271,87 +183,10 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                 if (context.mounted) {
                   _showUndoFeedback(context);
                 }
-                await _resetMonthlySavingAndPopToGoals(goal.id);
               },
             );
           }
         }
-      },
-    );
-  }
-
-  Future<void> _handleHawasht(
-    BuildContext context,
-    GoalItem goal,
-    int remainingEgp,
-  ) async {
-    final text = _savingController.text.trim();
-    if (text.isEmpty) {
-      _openSaveBottomSheet(context, goal, remainingEgp, isWithdrawal: false);
-      return;
-    }
-
-    final parsed = NumberFormatter.parsePositiveInteger(text);
-    if (parsed == null || parsed <= 0) {
-      _openSaveBottomSheet(context, goal, remainingEgp, isWithdrawal: false);
-      return;
-    }
-
-    // Validations:
-    if (parsed > remainingEgp) {
-      setState(() => _savingError = 'المبلغ أكبر من الباقي');
-      ScaffoldMessenger.of(context).removeCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'المبلغ أكبر من الباقي',
-            style: TextStyle(fontFamily: AppTheme.fontFamily),
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    if (parsed > goal.remainingToTargetEgp) {
-      setState(() => _savingError = 'المبلغ أكبر من المتبقي للهدف');
-      ScaffoldMessenger.of(context).removeCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'المبلغ أكبر من المتبقي للهدف',
-            style: TextStyle(fontFamily: AppTheme.fontFamily),
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    setState(() => _savingError = null);
-
-    final amountPiastres = parsed * 100;
-    final savingId = await ref.read(goalRepositoryProvider).addGoalSaving(
-          goalId: goal.id,
-          amount: amountPiastres,
-        );
-
-    if (!context.mounted) return;
-
-    GoalTransactionSuccessDialog.show(
-      context: context,
-      goal: goal,
-      amountEgp: parsed,
-      isWithdrawal: false,
-      onDone: () async {
-        await _resetMonthlySavingAndPopToGoals(goal.id);
-      },
-      onUndo: () async {
-        await ref.read(goalRepositoryProvider).deleteGoalSaving(savingId);
-        if (context.mounted) {
-          _showUndoFeedback(context);
-        }
-        await _resetMonthlySavingAndPopToGoals(goal.id);
       },
     );
   }
@@ -379,13 +214,9 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
               );
             }
 
-            _initControllerIfNeeded(goal);
-
             final remainingPiastres =
                 monthRemainingAsync.asData?.value.remaining ?? 0;
             final remainingEgp = (remainingPiastres / 100).round();
-
-            final int? monthsResult = goal.monthsToGoal;
 
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
@@ -510,7 +341,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                                     ),
                                     child: const Center(
                                       child: Icon(
-                                        Icons.celebration_rounded,
+                                        Icons.check_circle_rounded,
                                         color: Color(0xFF2E7D32),
                                         size: 28.0,
                                       ),
@@ -518,7 +349,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                                   ),
                                   const SizedBox(height: 12.0),
                                   Text(
-                                    'تم تحقيق الهدف بنجاح! 🎉',
+                                    'تم تحقيق الهدف بنجاح',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontFamily: AppTheme.fontFamily,
@@ -595,112 +426,6 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                               ),
                             ),
                             const SizedBox(height: 18.0),
-
-                            // Field 3: هتوفر كام في الشهر؟
-                            Text(
-                              'هتوفر كام في الشهر؟',
-                              style: TextStyle(
-                                fontFamily: AppTheme.fontFamily,
-                                fontSize: 13.5,
-                                color: AppColors.secondaryText,
-                              ),
-                            ),
-                            const SizedBox(height: 8.0),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: AppColors.inputFill,
-                                borderRadius: BorderRadius.circular(14.0),
-                                border: Border.all(
-                                  color: _savingError != null
-                                      ? Colors.redAccent
-                                      : AppColors.inputBorder,
-                                  width: 1.0,
-                                ),
-                              ),
-                              child: TextField(
-                                controller: _savingController,
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.allow(
-                                    RegExp(r'[0-9٠-٩,،]'),
-                                  ),
-                                  ThousandsSeparatorInputFormatter(),
-                                ],
-                                onChanged: (val) => _onSavingChanged(val, goal),
-                                decoration: const InputDecoration(
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 16.0,
-                                    vertical: 14.0,
-                                  ),
-                                ),
-                                style: TextStyle(
-                                  fontFamily: AppTheme.fontFamily,
-                                  fontSize: 16.0,
-                                  color: AppColors.text,
-                                ),
-                              ),
-                            ),
-                            if (_savingError != null) ...[
-                              const SizedBox(height: 4.0),
-                              Text(
-                                _savingError!,
-                                style: const TextStyle(
-                                  fontFamily: AppTheme.fontFamily,
-                                  fontSize: 12.0,
-                                  color: Colors.redAccent,
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 16.0),
-
-                            // Card 4: Result ("هتوصل لهدفك في N شهر")
-                            // If saving is empty/invalid, show nothing for the result
-                            if (monthsResult != null && _savingError == null)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 22.0,
-                                  horizontal: 16.0,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.lightGreen,
-                                  borderRadius: BorderRadius.circular(16.0),
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Text(
-                                      'هتوصل لهدفك في',
-                                      style: TextStyle(
-                                        fontFamily: AppTheme.fontFamily,
-                                        fontSize: 14.0,
-                                        color: AppColors.mainGreen,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6.0),
-                                    Text(
-                                      '${_thousands.format(monthsResult)} شهر',
-                                      style: const TextStyle(
-                                        fontFamily: AppTheme.fontFamily,
-                                        fontSize: 32.0,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.mainGreen,
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: 0,
-                                      height: 0,
-                                      child: Opacity(
-                                        opacity: 0,
-                                        child: Text(
-                                          '${NumberFormatter.formatCurrency(monthsResult)} شهر',
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            const SizedBox(height: 16.0),
                           ],
                         ],
                       ),
@@ -750,7 +475,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                                   height: 52.0,
                                   child: ElevatedButton(
                                     onPressed: () =>
-                                        _handleHawasht(context, goal, remainingEgp),
+                                        _openSaveBottomSheet(context, goal, remainingEgp, isWithdrawal: false),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: AppColors.mainGreen,
                                       foregroundColor: Colors.white,

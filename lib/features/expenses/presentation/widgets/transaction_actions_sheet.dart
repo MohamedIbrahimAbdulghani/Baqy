@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/category_icon_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
+import '../../../../core/widgets/action_feedback_dialog.dart';
 import '../../../shell/presentation/providers/tab_provider.dart';
 import '../../domain/models/transaction_item.dart';
 import '../providers/expense_providers.dart';
@@ -316,35 +318,27 @@ abstract final class TransactionActionsHelper {
       ref.invalidate(recentTransactionsProvider);
 
       if (context.mounted) {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.clearSnackBars();
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              'تم حذف "${transaction.description}"',
-              style: const TextStyle(fontFamily: AppTheme.fontFamily),
-            ),
-            duration: const Duration(seconds: 5),
-            persist: false,
-            behavior: SnackBarBehavior.floating,
-            action: SnackBarAction(
-              label: 'تراجع',
-              textColor: AppColors.lightGreen,
-              onPressed: () async {
-                messenger.hideCurrentSnackBar();
-                await ref.read(restoreTransactionUseCaseProvider)(transaction);
-                ref.invalidate(categoryTransactionsForDayProvider);
-                ref.invalidate(categoryTotalForDayProvider);
-                ref.invalidate(categoryTransactionsForMonthProvider);
-                ref.invalidate(categoryTotalForMonthProvider);
-                ref.invalidate(dayCategoryTotalsProvider);
-                ref.invalidate(monthCategoryTotalsProvider);
-                ref.invalidate(currentMonthRemainingProvider);
-                ref.invalidate(recentTransactionsProvider);
-              },
-            ),
-          ),
-        );
+        final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+        if (targetContext != null && targetContext.mounted) {
+          final formattedAmount = '${NumberFormatter.formatCurrency(transaction.amount ~/ 100)} جنيه';
+          await ActionFeedbackDialog.show(
+            context: targetContext,
+            type: ActionFeedbackType.deleted,
+            title: 'تم حذف المعاملة',
+            subtitle: 'تم حذف "${transaction.description}" بمبلغ $formattedAmount.',
+            onUndo: () async {
+              await ref.read(restoreTransactionUseCaseProvider)(transaction);
+              ref.invalidate(categoryTransactionsForDayProvider);
+              ref.invalidate(categoryTotalForDayProvider);
+              ref.invalidate(categoryTransactionsForMonthProvider);
+              ref.invalidate(categoryTotalForMonthProvider);
+              ref.invalidate(dayCategoryTotalsProvider);
+              ref.invalidate(monthCategoryTotalsProvider);
+              ref.invalidate(currentMonthRemainingProvider);
+              ref.invalidate(recentTransactionsProvider);
+            },
+          );
+        }
       }
     }
   }
@@ -434,15 +428,16 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
 
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'تم تعديل العملية بنجاح',
-              style: TextStyle(fontFamily: AppTheme.fontFamily),
-            ),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+        if (targetContext != null && targetContext.mounted) {
+          final formattedAmount = '${NumberFormatter.formatCurrency(parsed * 100 ~/ 100)} جنيه';
+          await ActionFeedbackDialog.show(
+            context: targetContext,
+            type: ActionFeedbackType.updated,
+            title: 'تم تعديل العملية بنجاح',
+            subtitle: 'تم تعديل تفاصيل "$desc" بمبلغ $formattedAmount.',
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
+import '../../../../core/utils/number_formatter.dart';
+import '../../../../core/widgets/action_feedback_dialog.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../expenses/domain/models/month_remaining.dart';
 import '../../../expenses/presentation/providers/expense_providers.dart';
@@ -88,6 +91,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     if (!mounted || ref.read(activeUserIdProvider) == null) return;
 
+    int? savedBudgetPiastres;
     await BudgetBottomSheet.show(
       context: context,
       monthNumber: monthNumber,
@@ -97,13 +101,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           yearMonth: yearMonth,
           amount: budgetPiastres,
         );
-        await BudgetMonitorController.resetAlertFlag(yearMonth);
+        savedBudgetPiastres = budgetPiastres;
+        final userId = ref.read(activeUserIdProvider);
+        await BudgetMonitorController.resetAlertFlag(yearMonth, userId: userId);
         ref.invalidate(currentMonthRemainingProvider);
         ref.invalidate(yearsWithDataProvider);
         final (year, _) = ArabicDateHelper.parseYearMonthKey(yearMonth);
         ref.invalidate(monthsWithDataProvider(year));
       },
     );
+
+    if (savedBudgetPiastres != null && mounted) {
+      final monthName = ArabicDateHelper.getMonthName(monthNumber);
+      final formatted = '${NumberFormatter.formatCurrency(savedBudgetPiastres! ~/ 100)} جنيه';
+      final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+      if (targetContext != null && targetContext.mounted) {
+        await ActionFeedbackDialog.show(
+          context: targetContext,
+          type: ActionFeedbackType.updated,
+          title: 'تم تعديل الميزانية بنجاح',
+          subtitle: 'تم ضبط ميزانية شهر $monthName بمبلغ $formatted وتحديث الحسابات.',
+        );
+      }
+    }
   }
 
   @override
@@ -121,13 +141,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Auto-open budget bottom sheet if current month has no budget
     monthRemainingAsync.whenData((remaining) {
       _checkAutoOpenBudget(selectedYm, month, remaining);
-      final double totalBudget = remaining.monthMoney / 100.0;
-      final double remainingEgp = remaining.remaining / 100.0;
-      BudgetMonitorController.evaluateAndNotify(
-        totalBudget: totalBudget,
-        remainingAmount: remainingEgp,
-        currentMonthKey: remaining.yearMonth,
-      );
     });
 
     final topInset = MediaQuery.of(context).padding.top;

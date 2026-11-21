@@ -716,7 +716,7 @@ void main() {
                       ActionFeedbackDialog.show(
                         context: context,
                         type: ActionFeedbackType.paymentRecorded,
-                        title: 'تم تسجيل الدفعة بنجاح! 👏',
+                        title: 'تم تسجيل الدفعة بنجاح',
                         subtitle: 'اتخصمت الدفعة من ميزانية الشهر.',
                         onUndo: () {
                           undoCalled = true;
@@ -735,7 +735,7 @@ void main() {
       await tester.tap(find.text('Show Payment Dialog'));
       await tester.pumpAndSettle();
 
-      expect(find.text('تم تسجيل الدفعة بنجاح! 👏'), findsOneWidget);
+      expect(find.text('تم تسجيل الدفعة بنجاح'), findsOneWidget);
       // Both "تم" and "تراجع" exist
       expect(find.text('تم'), findsOneWidget);
       expect(find.text('تراجع'), findsOneWidget);
@@ -832,6 +832,79 @@ void main() {
       await tester.tap(find.text('سفرية دهب'));
       await tester.pumpAndSettle();
       expect(tappedGoal?.id, equals(1));
+    });
+
+    testWidgets('20. Paying the final payment in DebtDetailsScreen pops back and shows settled celebration dialog', (tester) async {
+      final debtId = await debtRepo.addDebt(
+        personName: 'عمر',
+        direction: 'owe',
+        totalAmount: 10000, // 100 EGP
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          debtRepositoryProvider.overrideWithValue(debtRepo),
+          expenseRepositoryProvider.overrideWithValue(expenseRepo),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Navigator(
+              onGenerateRoute: (settings) {
+                return MaterialPageRoute(
+                  builder: (context) => Scaffold(
+                    body: Center(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => DebtDetailsScreen(debtId: debtId),
+                            ),
+                          );
+                        },
+                        child: const Text('Open Debt Details'),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Open DebtDetailsScreen
+      await tester.tap(find.text('Open Debt Details'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('عمر'), findsOneWidget);
+      expect(find.text('تسجيل دفعة'), findsOneWidget);
+
+      // Tap "تسجيل دفعة"
+      await tester.tap(find.text('تسجيل دفعة'));
+      await tester.pumpAndSettle();
+
+      // Enter 100 EGP (full remaining)
+      final textField = find.byType(TextField);
+      await tester.enterText(textField, '100');
+      await tester.pumpAndSettle();
+
+      // Tap "حفظ"
+      await tester.tap(find.text('حفظ'));
+      await tester.pumpAndSettle();
+
+      // DebtDetailsScreen should be popped, returning to 'Open Debt Details' page
+      expect(find.text('Open Debt Details'), findsOneWidget);
+
+      // Celebration dialog should be displayed
+      expect(find.text('مبروك! تم سداد الدين بالكامل'), findsOneWidget);
+      expect(find.text('سددت كل اللي عليك لـ عمر، واتنقل لقائمة تم سدادها.'), findsOneWidget);
     });
   });
 }
