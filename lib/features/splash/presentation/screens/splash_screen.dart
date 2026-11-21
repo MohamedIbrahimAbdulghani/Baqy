@@ -89,7 +89,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             ),
             const SizedBox(height: 28),
             Text(
-              'Baqy',
+              'باقي',
               style: TextStyle(
                 fontFamily: AppTheme.fontFamily,
                 fontWeight: FontWeight.w700,
