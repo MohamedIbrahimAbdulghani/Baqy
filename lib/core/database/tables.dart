@@ -88,6 +88,7 @@ class Debts extends Table {
   BoolColumn get reminderEnabled => boolean().withDefault(const Constant(false))();
   BoolColumn get archived => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime()(); // UTC
+  DateTimeColumn get updatedAt => dateTime().nullable()(); // UTC
 }
 
 @DataClassName('DebtPaymentData')

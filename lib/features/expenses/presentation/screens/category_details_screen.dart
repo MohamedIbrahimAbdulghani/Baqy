@@ -77,6 +77,10 @@ class CategoryDetailsScreen extends ConsumerWidget {
             ? ArabicDateHelper.formatWeekdayDayMonth(normalizedDay)
             : '');
 
+    final now = DateTime.now();
+    final actualCurrentYm = ArabicDateHelper.formatYearMonthKey(now.year, now.month);
+    final isPastMonth = args.yearMonth.compareTo(actualCurrentYm) < 0;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -107,14 +111,43 @@ class CategoryDetailsScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          args.category.name,
-                          style: TextStyle(
-                            fontFamily: AppTheme.fontFamily,
-                            fontSize: 22.0,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.text,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              args.category.name,
+                              style: TextStyle(
+                                fontFamily: AppTheme.fontFamily,
+                                fontSize: 22.0,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.text,
+                              ),
+                            ),
+                            if (isPastMonth) ...[
+                              const SizedBox(width: 8.0),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8.0,
+                                  vertical: 3.0,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6.0),
+                                  border: Border.all(
+                                    color: Colors.amber.shade700.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: Text(
+                                  'مؤرشف للاطلاع فقط',
+                                  style: TextStyle(
+                                    fontFamily: AppTheme.fontFamily,
+                                    fontSize: 11.0,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.amber.shade900,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         if (dateSubtitle.isNotEmpty) ...[
                           const SizedBox(height: 2.0),
@@ -314,15 +347,68 @@ class CategoryDetailsScreen extends ConsumerWidget {
 
                                   const SizedBox(width: 12.0),
 
-                                  // Left: Amount
-                                  Text(
-                                    txAmountText,
-                                    style: TextStyle(
-                                      fontFamily: AppTheme.fontFamily,
-                                      fontSize: 16.0,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.text,
-                                    ),
+                                  // Left: Amount & Deposit/Withdrawal badge
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        txAmountText,
+                                        style: TextStyle(
+                                          fontFamily: AppTheme.fontFamily,
+                                          fontSize: 16.0,
+                                          fontWeight: FontWeight.w700,
+                                          color: tx.isAddition
+                                              ? AppColors.mainGreen
+                                              : AppColors.text,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4.0),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6.0,
+                                          vertical: 2.0,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: tx.isAddition
+                                              ? AppColors.mainGreen
+                                                  .withValues(alpha: 0.12)
+                                              : AppColors.errorRed
+                                                  .withValues(alpha: 0.10),
+                                          borderRadius:
+                                              BorderRadius.circular(6.0),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              tx.isAddition
+                                                  ? Icons.add_rounded
+                                                  : Icons.remove_rounded,
+                                              size: 12.0,
+                                              color: tx.isAddition
+                                                  ? AppColors.mainGreen
+                                                  : AppColors.errorRed,
+                                            ),
+                                            const SizedBox(width: 2.0),
+                                            Text(
+                                              tx.isAddition
+                                                  ? 'إيداع (مضافة)'
+                                                  : 'سحب (مخصومة)',
+                                              style: TextStyle(
+                                                fontFamily: AppTheme.fontFamily,
+                                                fontSize: 10.0,
+                                                fontWeight: FontWeight.w600,
+                                                color: tx.isAddition
+                                                    ? AppColors.mainGreen
+                                                    : AppColors.errorRed,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),

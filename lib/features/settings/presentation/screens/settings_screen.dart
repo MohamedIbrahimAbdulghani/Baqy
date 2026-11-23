@@ -14,6 +14,8 @@ import '../../../../core/widgets/action_feedback_dialog.dart';
 import '../../../../core/widgets/whatsapp_icon.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../backup/presentation/providers/backup_providers.dart';
+import '../../../backup/presentation/widgets/backup_settings_card.dart';
 import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../../../home/presentation/controllers/budget_monitor_controller.dart';
 import '../../../home/presentation/widgets/budget_bottom_sheet.dart';
@@ -47,6 +49,10 @@ class SettingsScreen extends ConsumerWidget {
     int monthNumber,
     int currentBudgetPiastres,
   ) async {
+    final now = DateTime.now();
+    final currentYm = ArabicDateHelper.formatYearMonthKey(now.year, now.month);
+    if (yearMonth.compareTo(currentYm) < 0) return;
+
     int? initialBudgetEgp;
     if (currentBudgetPiastres > 0) {
       initialBudgetEgp = currentBudgetPiastres ~/ 100;
@@ -232,28 +238,56 @@ class SettingsScreen extends ConsumerWidget {
                 child: monthRemainingAsync.when(
                   data: (remaining) {
                     final budgetEgp = remaining.budget ~/ 100;
+                    final now = DateTime.now();
+                    final currentYm = ArabicDateHelper.formatYearMonthKey(now.year, now.month);
+                    final isPastMonth = selectedYm.compareTo(currentYm) < 0;
+
                     return Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        TextButton(
-                          onPressed: () => _openBudgetSheet(
-                            context,
-                            ref,
-                            selectedYm,
-                            month,
-                            remaining.budget,
-                          ),
-                          child: Text(
-                            l10n?.edit ?? 'تعديل',
-                            style: const TextStyle(
-                              fontFamily: AppTheme.fontFamily,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.mainGreen,
+                        if (isPastMonth)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10.0,
+                              vertical: 4.0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8.0),
+                              border: Border.all(
+                                color: Colors.amber.shade700.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Text(
+                              'مؤرشف للاطلاع فقط',
+                              style: TextStyle(
+                                fontFamily: AppTheme.fontFamily,
+                                fontSize: 12.0,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.amber.shade900,
+                              ),
+                            ),
+                          )
+                        else
+                          TextButton(
+                            onPressed: () => _openBudgetSheet(
+                              context,
+                              ref,
+                              selectedYm,
+                              month,
+                              remaining.budget,
+                            ),
+                            child: Text(
+                              l10n?.edit ?? 'تعديل',
+                              style: const TextStyle(
+                                fontFamily: AppTheme.fontFamily,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.mainGreen,
+                              ),
                             ),
                           ),
-                        ),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
@@ -290,6 +324,11 @@ class SettingsScreen extends ConsumerWidget {
                   error: (_, _) => const SizedBox.shrink(),
                 ),
               ),
+
+              const SizedBox(height: 16),
+
+              // Backup Card
+              const BackupSettingsCard(),
 
               const SizedBox(height: 16),
 
@@ -885,7 +924,14 @@ class SettingsScreen extends ConsumerWidget {
               Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: () {
+                  onTap: () async {
+                    // Flush any pending backup before signing out
+                    try {
+                      final syncController = ref.read(backupSyncControllerProvider);
+                      if (syncController != null) {
+                        await syncController.flush();
+                      }
+                    } catch (_) {}
                     // Navigate immediately with smooth fade animation
                     appRouter.go('/sign-in');
                     ref.read(authControllerProvider.notifier).signOut();

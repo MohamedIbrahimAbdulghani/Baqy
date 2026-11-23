@@ -10,7 +10,7 @@
   "signInSubtitle": "Sign in and track your expenses with your voice",
   "signInWithGoogle": "Sign in with Google",
   "signInError": "Couldn't sign you in, try again",
-  "privacyLine": "Your data is saved on your phone only, and no one on the team can see it.",
+  "privacyLine": "Your expenses are saved on your phone and backed up to Google servers, and no one saves your voice or speech.",
   "settingsTitle": "Settings",
   "languageLabel": "Language",
   "langArabic": "عربي",
@@ -18,7 +18,41 @@
   "budgetForMonth": "Budget for",
   "edit": "Edit",
   "privacyTitle": "Your Privacy",
-  "privacyDescription": "Your data is saved on your phone only, and no one on the team can see it.",
+  "privacyDescription": "Your expenses are saved on your phone, and a backup is saved on Google servers (Firebase) linked to your account so you can restore them if you change phones. The app owner has technical access to the database. The audio you record is sent to Google's service to convert it into expenses, and the app itself does not save your voice or speech.",
+  "backupCardTitle": "Cloud Backup",
+  "backupLastBackup": "Last backup: {dateTime}",
+  "@backupLastBackup": {
+    "placeholders": {
+      "dateTime": {
+        "type": "String"
+      }
+    }
+  },
+  "backupNoBackupYet": "No backup yet",
+  "backupSaveNow": "Back up now",
+  "backupRestore": "Restore",
+  "backupSavedSuccess": "Backup saved successfully",
+  "backupSaveFailed": "Couldn't save backup, try again",
+  "backupRestoreSuccess": "Data restored successfully",
+  "backupRestoreFailed": "Couldn't restore data, try again",
+  "backupNotFound": "No saved backup found",
+  "backupNewerVersionError": "This backup is from a newer version, update the app",
+  "backupFoundDialogTitle": "Backup Found",
+  "backupFoundDialogBody": "We found saved data on your account (last updated {dateTime}). Would you like to restore it?",
+  "@backupFoundDialogBody": {
+    "placeholders": {
+      "dateTime": {
+        "type": "String"
+      }
+    }
+  },
+  "backupStartFresh": "Start Fresh",
+  "backupConfirmStartFreshTitle": "Are you sure?",
+  "backupConfirmStartFreshBody": "The old backup will be replaced when the app saves a new backup.",
+  "backupBack": "Back",
+  "backupRestoringProgress": "Restoring your data...",
+  "backupManualRestoreTitle": "Restore Backup?",
+  "backupManualRestoreBody": "The data on this phone will be replaced with the latest backup saved on your account.",
   "feedbackTitle": "Send Us Feedback",
   "feedbackDescription": "Have an idea or an issue? Send it to help us improve the app.",
   "gmail": "Gmail",

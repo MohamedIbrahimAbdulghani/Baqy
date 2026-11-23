@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -18,8 +19,14 @@ import 'package:baqy/features/security/domain/usecases/reset_passcode_usecase.da
 import 'package:baqy/features/security/presentation/providers/security_providers.dart';
 import 'package:baqy/features/security/presentation/screens/app_lock_screen.dart';
 import 'package:baqy/features/security/presentation/widgets/pin_keypad.dart';
+import 'package:baqy/features/security/presentation/widgets/app_lock_gate.dart';
 import 'package:baqy/features/settings/presentation/screens/settings_screen.dart';
 import 'package:baqy/l10n/app_localizations.dart';
+
+class FakeActiveUserIdNotifier extends ActiveUserIdNotifier {
+  @override
+  String? build() => 'test-user';
+}
 
 class FakeSecureStorage extends Fake implements FlutterSecureStorage {
   final Map<String, String> _data = {};
@@ -78,6 +85,15 @@ class FakeSecurityRepository implements SecurityRepository {
   final SecuritySettings initialSettings;
   SecuritySettings settings;
   String? savedPin = '1234';
+  int biometricAuthCallCount = 0;
+  bool isBiometricPromptActiveValue = false;
+  Future<bool> Function()? customAuthenticate;
+
+  @override
+  bool get isAppLockEnabledSync => settings.isAppLockEnabled;
+
+  @override
+  bool get isBiometricPromptActive => isBiometricPromptActiveValue;
 
   @override
   Future<SecuritySettings> getSettings() async => settings;
@@ -86,8 +102,18 @@ class FakeSecurityRepository implements SecurityRepository {
   Future<bool> isBiometricsAvailable() async => settings.isBiometricsSupported;
 
   @override
-  Future<bool> authenticateWithBiometrics({required String localizedReason}) async =>
-      true;
+  Future<bool> authenticateWithBiometrics({required String localizedReason}) async {
+    if (customAuthenticate != null) {
+      return await customAuthenticate!();
+    }
+    biometricAuthCallCount++;
+    isBiometricPromptActiveValue = true;
+    try {
+      return true;
+    } finally {
+      isBiometricPromptActiveValue = false;
+    }
+  }
 
   @override
   Future<bool> hasPin() async => savedPin != null;
@@ -580,6 +606,144 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(AppColors.isDark, isFalse);
+    });
+
+    test('isAppLockedProvider defaults to true on cold start', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(container.read(isAppLockedProvider), isTrue);
+    });
+
+    testWidgets('AppLockGate locks when app transitions to inactive (e.g. phone call or app switch)', (tester) async {
+      final fakeRepo = FakeSecurityRepository();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            securityRepositoryProvider.overrideWithValue(fakeRepo),
+            activeUserIdProvider.overrideWith(FakeActiveUserIdNotifier.new),
+          ],
+          child: const MaterialApp(
+            locale: Locale('ar'),
+            localizationsDelegates: [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: AppLockGate(
+              child: Scaffold(
+                body: Text('Main Screen Content'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // App is initially locked on cold start
+      expect(find.text('أهلاً بك مجدداً'), findsOneWidget);
+
+      // Unlock with correct PIN
+      await tester.tap(find.text('1'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('2'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('3'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('4'));
+      await tester.pumpAndSettle();
+
+      // AppLockScreen is now dismissed, main screen is visible
+      expect(find.text('Main Screen Content'), findsOneWidget);
+      expect(find.text('أهلاً بك مجدداً'), findsNothing);
+
+      // Simulate incoming phone call or app switch (inactive)
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pumpAndSettle();
+
+      // Must be immediately locked! AppLockScreen is back on screen
+      expect(find.text('أهلاً بك مجدداً'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Biometric authentication prompts exactly once and does not trigger twice on system dialog lifecycle transitions',
+        (tester) async {
+      final biometricCompleter = Completer<bool>();
+
+      final fakeRepo = FakeSecurityRepository(
+        initialSettings: const SecuritySettings(
+          isAppLockEnabled: true,
+          hasPinSet: true,
+          isBiometricsEnabled: true,
+          isBiometricsSupported: true,
+        ),
+      );
+
+      // Override authenticate to be pending while the native dialog is showing
+      fakeRepo.customAuthenticate = () async {
+        fakeRepo.biometricAuthCallCount++;
+        fakeRepo.isBiometricPromptActiveValue = true;
+        try {
+          return await biometricCompleter.future;
+        } finally {
+          fakeRepo.isBiometricPromptActiveValue = false;
+        }
+      };
+
+      final container = ProviderContainer(
+        overrides: [
+          securityRepositoryProvider.overrideWithValue(fakeRepo),
+          activeUserIdProvider.overrideWith(FakeActiveUserIdNotifier.new),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            localizationsDelegates: [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: AppLockGate(
+              child: Scaffold(
+                body: Text('Main Screen Content'),
+              ),
+            ),
+          ),
+        ),
+      );
+      // Pump initial frame so AppLockScreen mounts and triggers biometrics
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // Biometric auth has been initiated
+      expect(fakeRepo.biometricAuthCallCount, equals(1));
+      expect(fakeRepo.isBiometricPromptActive, isTrue);
+
+      // While prompt is visible, OS transitions lifecycle to inactive
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+
+      // User scans finger -> biometric succeeds
+      biometricCompleter.complete(true);
+      await tester.pump();
+
+      // OS transitions lifecycle back to resumed as the dialog dismisses
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      // Biometric auth must have been called exactly ONCE, never twice!
+      expect(fakeRepo.biometricAuthCallCount, equals(1));
+      // And the app is successfully unlocked
+      expect(find.text('Main Screen Content'), findsOneWidget);
     });
   });
 }

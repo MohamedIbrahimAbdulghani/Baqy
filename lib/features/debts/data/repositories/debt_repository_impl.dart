@@ -63,6 +63,7 @@ class DebtRepositoryImpl implements DebtRepository {
         d.reminder_enabled,
         d.archived,
         d.created_at,
+        d.updated_at,
         COALESCE(SUM(p.amount), 0) AS paid_amount,
         COUNT(p.id) AS payments_count
       FROM debts d
@@ -70,7 +71,7 @@ class DebtRepositoryImpl implements DebtRepository {
       WHERE d.direction = ?1
         ${archived != null ? 'AND d.archived = ?2' : ''}
       GROUP BY d.id
-      ORDER BY d.created_at DESC, d.id DESC;
+      ORDER BY COALESCE(d.updated_at, d.created_at) DESC, d.id DESC;
     ''';
 
     final variables = <Variable>[
@@ -89,6 +90,7 @@ class DebtRepositoryImpl implements DebtRepository {
           return rows.map((row) {
             final dueDateSec = row.read<int?>('due_date');
             final createdAtSec = row.read<int>('created_at');
+            final updatedAtSec = row.read<int?>('updated_at');
             return DebtItem(
               id: row.read<int>('id'),
               personName: row.read<String>('person_name'),
@@ -101,6 +103,9 @@ class DebtRepositoryImpl implements DebtRepository {
               reminderEnabled: row.read<bool>('reminder_enabled'),
               archived: row.read<bool>('archived'),
               createdAt: DateTime.fromMillisecondsSinceEpoch(createdAtSec * 1000, isUtc: true),
+              updatedAt: updatedAtSec != null
+                  ? DateTime.fromMillisecondsSinceEpoch(updatedAtSec * 1000, isUtc: true)
+                  : null,
               paidAmount: row.read<int>('paid_amount'),
               paymentsCount: row.read<int>('payments_count'),
             );
@@ -121,6 +126,7 @@ class DebtRepositoryImpl implements DebtRepository {
         d.reminder_enabled,
         d.archived,
         d.created_at,
+        d.updated_at,
         COALESCE(SUM(p.amount), 0) AS paid_amount,
         COUNT(p.id) AS payments_count
       FROM debts d
@@ -141,6 +147,7 @@ class DebtRepositoryImpl implements DebtRepository {
           if (row == null) return null;
           final dueDateSec = row.read<int?>('due_date');
           final createdAtSec = row.read<int>('created_at');
+          final updatedAtSec = row.read<int?>('updated_at');
           return DebtItem(
             id: row.read<int>('id'),
             personName: row.read<String>('person_name'),
@@ -153,6 +160,9 @@ class DebtRepositoryImpl implements DebtRepository {
             reminderEnabled: row.read<bool>('reminder_enabled'),
             archived: row.read<bool>('archived'),
             createdAt: DateTime.fromMillisecondsSinceEpoch(createdAtSec * 1000, isUtc: true),
+            updatedAt: updatedAtSec != null
+                ? DateTime.fromMillisecondsSinceEpoch(updatedAtSec * 1000, isUtc: true)
+                : null,
             paidAmount: row.read<int>('paid_amount'),
             paymentsCount: row.read<int>('payments_count'),
           );
@@ -194,18 +204,20 @@ class DebtRepositoryImpl implements DebtRepository {
         d.reminder_enabled,
         d.archived,
         d.created_at,
+        d.updated_at,
         COALESCE(SUM(p.amount), 0) AS paid_amount,
         COUNT(p.id) AS payments_count
       FROM debts d
       LEFT JOIN debt_payments p ON p.debt_id = d.id
       GROUP BY d.id
-      ORDER BY d.created_at DESC, d.id DESC;
+      ORDER BY COALESCE(d.updated_at, d.created_at) DESC, d.id DESC;
     ''';
 
     final rows = await _db.customSelect(query).get();
     return rows.map((row) {
       final dueDateSec = row.read<int?>('due_date');
       final createdAtSec = row.read<int>('created_at');
+      final updatedAtSec = row.read<int?>('updated_at');
       return DebtItem(
         id: row.read<int>('id'),
         personName: row.read<String>('person_name'),
@@ -218,6 +230,9 @@ class DebtRepositoryImpl implements DebtRepository {
         reminderEnabled: row.read<bool>('reminder_enabled'),
         archived: row.read<bool>('archived'),
         createdAt: DateTime.fromMillisecondsSinceEpoch(createdAtSec * 1000, isUtc: true),
+        updatedAt: updatedAtSec != null
+            ? DateTime.fromMillisecondsSinceEpoch(updatedAtSec * 1000, isUtc: true)
+            : null,
         paidAmount: row.read<int>('paid_amount'),
         paymentsCount: row.read<int>('payments_count'),
       );
@@ -237,6 +252,7 @@ class DebtRepositoryImpl implements DebtRepository {
         d.reminder_enabled,
         d.archived,
         d.created_at,
+        d.updated_at,
         COALESCE(SUM(p.amount), 0) AS paid_amount,
         COUNT(p.id) AS payments_count
       FROM debts d
@@ -253,6 +269,7 @@ class DebtRepositoryImpl implements DebtRepository {
     if (row == null) return null;
     final dueDateSec = row.read<int?>('due_date');
     final createdAtSec = row.read<int>('created_at');
+    final updatedAtSec = row.read<int?>('updated_at');
     return DebtItem(
       id: row.read<int>('id'),
       personName: row.read<String>('person_name'),
@@ -265,6 +282,9 @@ class DebtRepositoryImpl implements DebtRepository {
       reminderEnabled: row.read<bool>('reminder_enabled'),
       archived: row.read<bool>('archived'),
       createdAt: DateTime.fromMillisecondsSinceEpoch(createdAtSec * 1000, isUtc: true),
+      updatedAt: updatedAtSec != null
+          ? DateTime.fromMillisecondsSinceEpoch(updatedAtSec * 1000, isUtc: true)
+          : null,
       paidAmount: row.read<int>('paid_amount'),
       paymentsCount: row.read<int>('payments_count'),
     );
@@ -284,6 +304,7 @@ class DebtRepositoryImpl implements DebtRepository {
       throw ArgumentError('Direction must be "owe" or "owed"');
     }
 
+    final now = DateTime.now().toUtc();
     final id = await _db.into(_db.debts).insert(
           DebtsCompanion.insert(
             personName: sanitizedName,
@@ -293,7 +314,8 @@ class DebtRepositoryImpl implements DebtRepository {
             leadDays: Value(leadDays),
             reminderEnabled: Value(dueDate != null),
             archived: const Value(false),
-            createdAt: DateTime.now().toUtc(),
+            createdAt: now,
+            updatedAt: Value(now),
           ),
         );
 
@@ -331,6 +353,7 @@ class DebtRepositoryImpl implements DebtRepository {
     }
 
     final isSettled = (totalAmount - existing.paidAmount) <= 0;
+    final now = DateTime.now().toUtc();
 
     await _db.transaction(() async {
       await (_db.update(_db.debts)..where((d) => d.id.equals(id))).write(
@@ -342,6 +365,7 @@ class DebtRepositoryImpl implements DebtRepository {
           leadDays: Value(leadDays),
           reminderEnabled: Value(dueDate != null),
           archived: Value(isSettled),
+          updatedAt: Value(now),
         ),
       );
 
@@ -430,11 +454,13 @@ class DebtRepositoryImpl implements DebtRepository {
 
       // 3. Check remaining: if <= 0, automatically archive debt
       final newRemaining = debt.remaining - amount;
-      if (newRemaining <= 0) {
-        await (_db.update(_db.debts)..where((d) => d.id.equals(debtId))).write(
-          const DebtsCompanion(archived: Value(true)),
-        );
-      }
+      final now = DateTime.now().toUtc();
+      await (_db.update(_db.debts)..where((d) => d.id.equals(debtId))).write(
+        DebtsCompanion(
+          archived: Value(newRemaining <= 0),
+          updatedAt: Value(now),
+        ),
+      );
 
       return pId;
     });
@@ -486,8 +512,12 @@ class DebtRepositoryImpl implements DebtRepository {
 
       // Recalculate remaining
       final newRemaining = maxAllowed - newAmount;
+      final now = DateTime.now().toUtc();
       await (_db.update(_db.debts)..where((d) => d.id.equals(debtId!))).write(
-        DebtsCompanion(archived: Value(newRemaining <= 0)),
+        DebtsCompanion(
+          archived: Value(newRemaining <= 0),
+          updatedAt: Value(now),
+        ),
       );
     });
 
@@ -518,9 +548,14 @@ class DebtRepositoryImpl implements DebtRepository {
 
       // Check debt's updated remaining: if > 0, unarchive it
       final currentDebt = await getDebtById(debtId!);
-      if (currentDebt != null && currentDebt.remaining > 0 && currentDebt.archived) {
+      if (currentDebt != null) {
+        final now = DateTime.now().toUtc();
+        final shouldUnarchive = currentDebt.remaining > 0 && currentDebt.archived;
         await (_db.update(_db.debts)..where((d) => d.id.equals(debtId!))).write(
-          const DebtsCompanion(archived: Value(false)),
+          DebtsCompanion(
+            archived: Value(shouldUnarchive ? false : currentDebt.archived),
+            updatedAt: Value(now),
+          ),
         );
       }
     });

@@ -32,6 +32,8 @@ import '../../../goals/presentation/providers/goal_providers.dart';
 import '../../domain/usecases/add_category_usecase.dart';
 import '../../domain/usecases/add_expense_usecase.dart';
 import '../../domain/usecases/archive_category_usecase.dart';
+import '../../domain/usecases/check_month_rollover_usecase.dart';
+import '../../domain/usecases/execute_rollover_usecase.dart';
 import '../../domain/usecases/delete_transaction_usecase.dart';
 import '../../domain/usecases/get_category_totals_for_day_usecase.dart';
 import '../../domain/usecases/get_category_totals_usecase.dart';
@@ -179,20 +181,23 @@ final addExpenseUseCaseProvider = Provider<AddExpenseUseCase>((ref) {
   return AddExpenseUseCase(repo);
 });
 
-final updateTransactionUseCaseProvider =
-    Provider<UpdateTransactionUseCase>((ref) {
+final updateTransactionUseCaseProvider = Provider<UpdateTransactionUseCase>((
+  ref,
+) {
   final repo = ref.watch(expenseRepositoryProvider);
   return UpdateTransactionUseCase(repo);
 });
 
-final deleteTransactionUseCaseProvider =
-    Provider<DeleteTransactionUseCase>((ref) {
+final deleteTransactionUseCaseProvider = Provider<DeleteTransactionUseCase>((
+  ref,
+) {
   final repo = ref.watch(expenseRepositoryProvider);
   return DeleteTransactionUseCase(repo);
 });
 
-final restoreTransactionUseCaseProvider =
-    Provider<RestoreTransactionUseCase>((ref) {
+final restoreTransactionUseCaseProvider = Provider<RestoreTransactionUseCase>((
+  ref,
+) {
   final repo = ref.watch(expenseRepositoryProvider);
   return RestoreTransactionUseCase(repo);
 });
@@ -205,6 +210,22 @@ final archiveCategoryUseCaseProvider = Provider<ArchiveCategoryUseCase>((ref) {
 final saveUserRuleUseCaseProvider = Provider<SaveUserRuleUseCase>((ref) {
   final repo = ref.watch(expenseRepositoryProvider);
   return SaveUserRuleUseCase(repo);
+});
+
+final checkMonthRolloverUseCaseProvider = Provider<CheckMonthRolloverUseCase>((
+  ref,
+) {
+  final repo = ref.watch(expenseRepositoryProvider);
+  return CheckMonthRolloverUseCase(repo);
+});
+
+final executeRolloverUseCaseProvider = Provider<ExecuteRolloverUseCase>((ref) {
+  final expenseRepo = ref.watch(expenseRepositoryProvider);
+  final goalRepo = ref.watch(goalRepositoryProvider);
+  return ExecuteRolloverUseCase(
+    expenseRepository: expenseRepo,
+    goalRepository: goalRepo,
+  );
 });
 
 /// Emits whenever any database table is modified (reactive trigger)
@@ -227,7 +248,9 @@ final categoriesProvider = FutureProvider.autoDispose<List<CategoryItem>>((
     onTimeout: () => throw TimeoutException('انتهت مهلة تحميل التصنيفات'),
   );
   if (kDebugMode) {
-    debugPrint('[PROVIDER_DEBUG] categoriesProvider: resolved ${result.length} categories in ${sw.elapsedMilliseconds}ms');
+    debugPrint(
+      '[PROVIDER_DEBUG] categoriesProvider: resolved ${result.length} categories in ${sw.elapsedMilliseconds}ms',
+    );
   }
   return result;
 });
@@ -241,14 +264,18 @@ class SelectedYearMonthNotifier extends Notifier<String> {
     final now = DateTime.now();
     final ym = ArabicDateHelper.formatYearMonthKey(now.year, now.month);
     if (kDebugMode) {
-      debugPrint('[PROVIDER_DEBUG] SelectedYearMonthNotifier: initial state $ym');
+      debugPrint(
+        '[PROVIDER_DEBUG] SelectedYearMonthNotifier: initial state $ym',
+      );
     }
     return ym;
   }
 
   void selectYearMonth(String yearMonth) {
     if (kDebugMode) {
-      debugPrint('[PROVIDER_DEBUG] SelectedYearMonthNotifier: switched to $yearMonth');
+      debugPrint(
+        '[PROVIDER_DEBUG] SelectedYearMonthNotifier: switched to $yearMonth',
+      );
     }
     state = yearMonth;
   }
@@ -259,45 +286,65 @@ final selectedYearMonthProvider =
       SelectedYearMonthNotifier.new,
     );
 
+/// Indicates whether the currently selected month is before the current calendar month (i.e. past/archived month)
+final isViewingPastMonthProvider = Provider<bool>((ref) {
+  final selectedYm = ref.watch(selectedYearMonthProvider);
+  final now = DateTime.now();
+  final currentYm = ArabicDateHelper.formatYearMonthKey(now.year, now.month);
+  return selectedYm.compareTo(currentYm) < 0;
+});
+
 /// Month remaining calculation (budget, expenses, income, remaining) for the selected month
-final currentMonthRemainingProvider =
-    FutureProvider.autoDispose<MonthRemaining>((ref) async {
-      ref.watch(databaseChangesProvider);
-      final yearMonth = ref.watch(selectedYearMonthProvider);
-      final sw = Stopwatch()..start();
-      if (kDebugMode) {
-        debugPrint('[PROVIDER_DEBUG] currentMonthRemainingProvider: starting fetch for $yearMonth');
-      }
-      final useCase = ref.watch(getMonthRemainingUseCaseProvider);
-      final result = await useCase(yearMonth).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw TimeoutException('انتهت مهلة تحميل بيانات ميزانية الشهر ($yearMonth)'),
-      );
-      if (kDebugMode) {
-        debugPrint('[PROVIDER_DEBUG] currentMonthRemainingProvider: resolved in ${sw.elapsedMilliseconds}ms: remaining=${result.remaining}, budget=${result.budget}, expenses=${result.expenses}');
-      }
-      return result;
-    });
+final currentMonthRemainingProvider = FutureProvider.autoDispose<MonthRemaining>((
+  ref,
+) async {
+  ref.watch(databaseChangesProvider);
+  final yearMonth = ref.watch(selectedYearMonthProvider);
+  final sw = Stopwatch()..start();
+  if (kDebugMode) {
+    debugPrint(
+      '[PROVIDER_DEBUG] currentMonthRemainingProvider: starting fetch for $yearMonth',
+    );
+  }
+  final useCase = ref.watch(getMonthRemainingUseCaseProvider);
+  final result = await useCase(yearMonth).timeout(
+    const Duration(seconds: 10),
+    onTimeout: () => throw TimeoutException(
+      'انتهت مهلة تحميل بيانات ميزانية الشهر ($yearMonth)',
+    ),
+  );
+  if (kDebugMode) {
+    debugPrint(
+      '[PROVIDER_DEBUG] currentMonthRemainingProvider: resolved in ${sw.elapsedMilliseconds}ms: remaining=${result.remaining}, budget=${result.budget}, expenses=${result.expenses}',
+    );
+  }
+  return result;
+});
 
 /// Last 3 transactions for the currently selected month
-final recentTransactionsProvider =
-    FutureProvider.autoDispose<List<TransactionItem>>((ref) async {
-      ref.watch(databaseChangesProvider);
-      final yearMonth = ref.watch(selectedYearMonthProvider);
-      final sw = Stopwatch()..start();
-      if (kDebugMode) {
-        debugPrint('[PROVIDER_DEBUG] recentTransactionsProvider: starting fetch for $yearMonth');
-      }
-      final useCase = ref.watch(getLastTransactionsForMonthUseCaseProvider);
-      final result = await useCase(yearMonth, limit: 3).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw TimeoutException('انتهت مهلة تحميل آخر المعاملات'),
-      );
-      if (kDebugMode) {
-        debugPrint('[PROVIDER_DEBUG] recentTransactionsProvider: resolved ${result.length} transactions in ${sw.elapsedMilliseconds}ms');
-      }
-      return result;
-    });
+final recentTransactionsProvider = FutureProvider.autoDispose<List<TransactionItem>>((
+  ref,
+) async {
+  ref.watch(databaseChangesProvider);
+  final yearMonth = ref.watch(selectedYearMonthProvider);
+  final sw = Stopwatch()..start();
+  if (kDebugMode) {
+    debugPrint(
+      '[PROVIDER_DEBUG] recentTransactionsProvider: starting fetch for $yearMonth',
+    );
+  }
+  final useCase = ref.watch(getLastTransactionsForMonthUseCaseProvider);
+  final result = await useCase(yearMonth, limit: 3).timeout(
+    const Duration(seconds: 10),
+    onTimeout: () => throw TimeoutException('انتهت مهلة تحميل آخر المعاملات'),
+  );
+  if (kDebugMode) {
+    debugPrint(
+      '[PROVIDER_DEBUG] recentTransactionsProvider: resolved ${result.length} transactions in ${sw.elapsedMilliseconds}ms',
+    );
+  }
+  return result;
+});
 
 /// Ascending list of years that have data plus the current year
 final yearsWithDataProvider = FutureProvider.autoDispose<List<int>>((
@@ -311,27 +358,32 @@ final yearsWithDataProvider = FutureProvider.autoDispose<List<int>>((
     onTimeout: () => [DateTime.now().year],
   );
   if (kDebugMode) {
-    debugPrint('[PROVIDER_DEBUG] yearsWithDataProvider: resolved years $result in ${sw.elapsedMilliseconds}ms');
+    debugPrint(
+      '[PROVIDER_DEBUG] yearsWithDataProvider: resolved years $result in ${sw.elapsedMilliseconds}ms',
+    );
   }
   return result;
 });
 
 /// Set of month numbers (1..12) that have transactions or budgets in the specified year
-final monthsWithDataProvider = FutureProvider.autoDispose.family<Set<int>, int>(
-  (ref, year) async {
-    ref.watch(databaseChangesProvider);
-    final sw = Stopwatch()..start();
-    final useCase = ref.watch(getMonthsWithDataUseCaseProvider);
-    final result = await useCase(year).timeout(
-      const Duration(seconds: 10),
-      onTimeout: () => {DateTime.now().month},
+final monthsWithDataProvider = FutureProvider.autoDispose.family<Set<int>, int>((
+  ref,
+  year,
+) async {
+  ref.watch(databaseChangesProvider);
+  final sw = Stopwatch()..start();
+  final useCase = ref.watch(getMonthsWithDataUseCaseProvider);
+  final result = await useCase(year).timeout(
+    const Duration(seconds: 10),
+    onTimeout: () => {DateTime.now().month},
+  );
+  if (kDebugMode) {
+    debugPrint(
+      '[PROVIDER_DEBUG] monthsWithDataProvider: resolved months $result for year $year in ${sw.elapsedMilliseconds}ms',
     );
-    if (kDebugMode) {
-      debugPrint('[PROVIDER_DEBUG] monthsWithDataProvider: resolved months $result for year $year in ${sw.elapsedMilliseconds}ms');
-    }
-    return result;
-  },
-);
+  }
+  return result;
+});
 
 /// Category totals for a specific month (for Month Details bar chart)
 final monthCategoryTotalsProvider = FutureProvider.autoDispose
@@ -492,25 +544,24 @@ class PendingVoiceAudioPathNotifier extends Notifier<String?> {
   void setVal(String? v) => state = v;
 }
 
-final voiceAmplitudeProvider =
-    NotifierProvider<VoiceAmplitudeNotifier, double>(
+final voiceAmplitudeProvider = NotifierProvider<VoiceAmplitudeNotifier, double>(
   VoiceAmplitudeNotifier.new,
 );
 
 final voiceRecordingDurationProvider =
     NotifierProvider<VoiceRecordingDurationNotifier, int>(
-  VoiceRecordingDurationNotifier.new,
-);
+      VoiceRecordingDurationNotifier.new,
+    );
 
 final voiceIsAnalyzingProvider =
     NotifierProvider<VoiceIsAnalyzingNotifier, bool>(
-  VoiceIsAnalyzingNotifier.new,
-);
+      VoiceIsAnalyzingNotifier.new,
+    );
 
 final pendingVoiceAudioPathProvider =
     NotifierProvider<PendingVoiceAudioPathNotifier, String?>(
-  PendingVoiceAudioPathNotifier.new,
-);
+      PendingVoiceAudioPathNotifier.new,
+    );
 
 /// Handles local persistence of pending unsaved voice recording path
 class PendingRecordingStorage {
@@ -740,9 +791,10 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     _amplitudeSubscription?.cancel();
     if (_speechService != null && _speechService is! SpeechToTextServiceImpl) {
       try {
-        await _speechService!
-            .stop()
-            .timeout(const Duration(milliseconds: 300), onTimeout: () {});
+        await _speechService!.stop().timeout(
+          const Duration(milliseconds: 300),
+          onTimeout: () {},
+        );
       } catch (_) {}
     }
     ref.read(voiceAmplitudeProvider.notifier).setVal(0.0);
@@ -831,7 +883,8 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     int stopToRecognizeMs = 0,
   }) async {
     final activeContext = context ?? _currentContext;
-    final activeMessenger = messenger ??
+    final activeMessenger =
+        messenger ??
         (activeContext != null && activeContext.mounted
             ? ScaffoldMessenger.maybeOf(activeContext)
             : null);
@@ -901,14 +954,17 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     // Save goal with target in piastres (never log or save spoken sentence)
     final saveSw = Stopwatch()..start();
     try {
-      await ref.read(goalRepositoryProvider).addGoal(
+      await ref
+          .read(goalRepositoryProvider)
+          .addGoal(
             name: goalResult.name,
             targetAmount: goalResult.targetAmount * 100,
             icon: goalResult.icon,
           );
     } catch (_) {}
     final parseAndSaveMs = saveSw.elapsedMilliseconds;
-    final totalMs = totalSw?.elapsedMilliseconds ??
+    final totalMs =
+        totalSw?.elapsedMilliseconds ??
         (stopToRecognizeMs + geminiRequestMs + parseAndSaveMs);
 
     if (kDebugMode) {
@@ -948,8 +1004,9 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     }
 
     final categories = await ref.read(getCategoriesUseCaseProvider)();
-    final userRules =
-        await ref.read(saveUserRuleUseCaseProvider).getRecentRules(limit: 50);
+    final userRules = await ref
+        .read(saveUserRuleUseCaseProvider)
+        .getRecentRules(limit: 50);
 
     AudioParseResult? result;
     int geminiRequestMs = 0;
@@ -969,7 +1026,9 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     }
 
     // Fallback to local parser if Gemini failed or timed out (never calls network)
-    if (result == null && fallbackSpeechText != null && fallbackSpeechText.isNotEmpty) {
+    if (result == null &&
+        fallbackSpeechText != null &&
+        fallbackSpeechText.isNotEmpty) {
       final localOps = EgyptianExpenseParser.parse(
         fallbackSpeechText,
         customCategories: categories.map((c) => c.name).toList(),
@@ -988,7 +1047,8 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     if (result == null) {
       // Failed (network / timeout / server error): Do NOT delete audio file!
       final errorReason = parser.lastErrorMessage;
-      final isRateLimited = parser.lastAudioError == GeminiAudioErrorType.rateLimited;
+      final isRateLimited =
+          parser.lastAudioError == GeminiAudioErrorType.rateLimited;
       if (activeContext != null && activeContext.mounted) {
         _showErrorRetryDialog(
           context: activeContext,
@@ -1030,13 +1090,17 @@ class VoiceRecordingNotifier extends Notifier<bool> {
         categories: categories,
         transcript: result.transcript,
         onSave: (reviewedExpenses) async {
-          await _saveExpenses(expenses: reviewedExpenses, categories: categories);
+          await _saveExpenses(
+            expenses: reviewedExpenses,
+            categories: categories,
+          );
           await _deleteAudioAfterSuccess(audioPath);
         },
       );
     }
     final parseAndSaveMs = saveSw.elapsedMilliseconds;
-    final totalMs = totalSw?.elapsedMilliseconds ??
+    final totalMs =
+        totalSw?.elapsedMilliseconds ??
         (stopToRecognizeMs + geminiRequestMs + parseAndSaveMs);
 
     if (kDebugMode) {
@@ -1084,12 +1148,16 @@ class VoiceRecordingNotifier extends Notifier<bool> {
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           backgroundColor: AppColors.card,
           title: Row(
             children: [
               Icon(
-                isRateLimited ? Icons.hourglass_top_rounded : Icons.wifi_off_rounded,
+                isRateLimited
+                    ? Icons.hourglass_top_rounded
+                    : Icons.wifi_off_rounded,
                 color: isRateLimited ? Colors.amber : Colors.orangeAccent,
               ),
               const SizedBox(width: 8),
@@ -1183,7 +1251,9 @@ class VoiceRecordingNotifier extends Notifier<bool> {
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           backgroundColor: AppColors.card,
           title: const Row(
             children: [
@@ -1257,7 +1327,9 @@ class VoiceRecordingNotifier extends Notifier<bool> {
 
     final cWords = cTrim.split(RegExp(r'\s+'));
     final nWords = nTrim.split(RegExp(r'\s+'));
-    final maxOverlap = cWords.length < nWords.length ? cWords.length : nWords.length;
+    final maxOverlap = cWords.length < nWords.length
+        ? cWords.length
+        : nWords.length;
 
     int overlapCount = 0;
     for (int k = maxOverlap; k >= 1; k--) {
@@ -1308,11 +1380,13 @@ class VoiceRecordingNotifier extends Notifier<bool> {
         final propIcon = exp.newCategoryProposal?.icon ?? 'label';
         final propColor = exp.newCategoryProposal?.color ?? '#2ECC71';
 
-        final existingCat = currentCategories.where(
-          (c) =>
-              CategoryMatcher.normalize(c.name) ==
-              CategoryMatcher.normalize(propName),
-        ).firstOrNull;
+        final existingCat = currentCategories
+            .where(
+              (c) =>
+                  CategoryMatcher.normalize(c.name) ==
+                  CategoryMatcher.normalize(propName),
+            )
+            .firstOrNull;
 
         if (existingCat != null) {
           matchedCategory = existingCat;
@@ -1363,7 +1437,8 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     ScaffoldMessengerState? messenger,
     required String message,
   }) {
-    final target = messenger ??
+    final target =
+        messenger ??
         (context != null && context.mounted
             ? ScaffoldMessenger.maybeOf(context)
             : null);

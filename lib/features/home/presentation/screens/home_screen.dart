@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/routing/app_router.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../../core/widgets/action_feedback_dialog.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../expenses/domain/models/month_remaining.dart';
 import '../../../expenses/presentation/providers/expense_providers.dart';
+import '../../../expenses/presentation/widgets/month_rollover_dialog.dart';
 import '../controllers/budget_monitor_controller.dart';
 import '../widgets/budget_bottom_sheet.dart';
 import '../widgets/budget_ring.dart';
@@ -39,6 +41,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
+  bool _isCheckingMonthTransition = false;
+
+  void _checkMonthTransition(
+    String yearMonth,
+    int monthNumber,
+    MonthRemaining remaining,
+  ) {
+    if (_isCheckingMonthTransition) return;
+    if (ref.read(activeUserIdProvider) == null) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || ref.read(activeUserIdProvider) == null) return;
+      _isCheckingMonthTransition = true;
+      try {
+        // 1. Check and prompt rollover if previous month had remaining money
+        await MonthRolloverHelper.checkAndPromptRollover(
+          context: context,
+          ref: ref,
+          currentYearMonth: yearMonth,
+        );
+
+        // 2. Check if current active month needs budget set AFTER rollover completes
+        if (mounted && ref.read(activeUserIdProvider) != null) {
+          final updatedRemaining = await ref
+              .read(getMonthRemainingUseCaseProvider)(yearMonth);
+          _checkAutoOpenBudget(yearMonth, monthNumber, updatedRemaining);
+        }
+      } finally {
+        _isCheckingMonthTransition = false;
+      }
+    });
+  }
+
   void _checkAutoOpenBudget(
     String yearMonth,
     int monthNumber,
@@ -47,22 +82,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Never auto-open budget if user is not signed in / logging out
     if (ref.read(activeUserIdProvider) == null) return;
 
+    final now = DateTime.now();
+    final currentYm = ArabicDateHelper.formatYearMonthKey(now.year, now.month);
+    // Only auto-open for the current ongoing month, never past months
+    if (yearMonth != currentYm) return;
+
     if (remaining.budget <= 0) {
       final promptedMonths = ref.read(hasAutoOpenedBudgetForMonthProvider);
       if (!promptedMonths.contains(yearMonth)) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && ref.read(activeUserIdProvider) != null) {
-            final currentPrompted = ref.read(
-              hasAutoOpenedBudgetForMonthProvider,
-            );
-            if (!currentPrompted.contains(yearMonth)) {
-              ref
-                  .read(hasAutoOpenedBudgetForMonthProvider.notifier)
-                  .markOpened(yearMonth);
-              _openBudgetSheet(yearMonth, monthNumber, 0);
-            }
+        if (mounted && ref.read(activeUserIdProvider) != null) {
+          final currentPrompted = ref.read(
+            hasAutoOpenedBudgetForMonthProvider,
+          );
+          if (!currentPrompted.contains(yearMonth)) {
+            ref
+                .read(hasAutoOpenedBudgetForMonthProvider.notifier)
+                .markOpened(yearMonth);
+            _openBudgetSheet(yearMonth, monthNumber, 0);
           }
-        });
+        }
       }
     }
   }
@@ -72,6 +110,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     int monthNumber,
     int currentBudgetPiastres,
   ) async {
+    if (!mounted || ref.read(activeUserIdProvider) == null) return;
+
+    final now = DateTime.now();
+    final currentYm = ArabicDateHelper.formatYearMonthKey(now.year, now.month);
+    if (yearMonth.compareTo(currentYm) < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'هذا الشهر مؤرشف للاطلاع فقط ولا يمكن تعديل ميزانيته.',
+            textDirection: TextDirection.rtl,
+            style: TextStyle(fontFamily: AppTheme.fontFamily),
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // Prompt rollover if pending for this month before setting budget
+    await MonthRolloverHelper.checkAndPromptRollover(
+      context: context,
+      ref: ref,
+      currentYearMonth: yearMonth,
+    );
     if (!mounted || ref.read(activeUserIdProvider) == null) return;
 
     int? initialBudgetEgp;
@@ -138,9 +200,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final yearsAsync = ref.watch(yearsWithDataProvider);
     final monthsWithDataAsync = ref.watch(monthsWithDataProvider(year));
 
-    // Auto-open budget bottom sheet if current month has no budget
+    final isViewingPastMonth = ref.watch(isViewingPastMonthProvider);
+
+    // Month transition: check rollover first, then auto-open budget if needed
     monthRemainingAsync.whenData((remaining) {
-      _checkAutoOpenBudget(selectedYm, month, remaining);
+      _checkMonthTransition(selectedYm, month, remaining);
     });
 
     final topInset = MediaQuery.of(context).padding.top;
@@ -168,6 +232,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     },
                   ),
 
+                  // Archived / View-only banner when browsing past months
+                  if (isViewingPastMonth)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(14.0),
+                        border: Border.all(
+                          color: Colors.amber.shade700.withValues(alpha: 0.35),
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.archive_outlined,
+                            color: Colors.amber.shade800,
+                            size: 20.0,
+                          ),
+                          const SizedBox(width: 10.0),
+                          Expanded(
+                            child: Text(
+                              'هذا الشهر مؤرشف للاطلاع فقط. تم إغلاقه ولا يمكن إضافة أو تعديل مصاريفه.',
+                              style: TextStyle(
+                                fontFamily: AppTheme.fontFamily,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.amber.shade900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
                   const SizedBox(height: 20.0),
 
                   // Center: Big Ring
@@ -177,6 +277,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       spentPiastres: remaining.expenses,
                       monthMoneyPiastres: remaining.monthMoney,
                       savedPiastres: remaining.goalSavings,
+                      isReadOnly: isViewingPastMonth,
                       onTap: () =>
                           _openBudgetSheet(selectedYm, month, remaining.budget),
                     ),

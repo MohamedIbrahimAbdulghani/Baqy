@@ -13,6 +13,7 @@ class BudgetRing extends StatelessWidget {
     required this.monthMoneyPiastres,
     this.savedPiastres = 0,
     required this.onTap,
+    this.isReadOnly = false,
   });
 
   final int remainingPiastres;
@@ -20,6 +21,7 @@ class BudgetRing extends StatelessWidget {
   final int monthMoneyPiastres;
   final int savedPiastres;
   final VoidCallback onTap;
+  final bool isReadOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -112,10 +114,10 @@ class BudgetRing extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 4.0),
-                          const Icon(
-                            Icons.edit_outlined,
+                          Icon(
+                            isReadOnly ? Icons.archive_outlined : Icons.edit_outlined,
                             size: 14.0,
-                            color: AppColors.mainGreen,
+                            color: isReadOnly ? Colors.amber.shade700 : AppColors.mainGreen,
                           ),
                         ],
                       ),

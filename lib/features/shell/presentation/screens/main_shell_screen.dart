@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../auth/domain/models/account_status.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../auth/presentation/widgets/account_status_dialog.dart';
+import '../../../backup/presentation/providers/backup_providers.dart';
 import '../../../expenses/domain/models/month_remaining.dart';
 import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../../../goals/presentation/widgets/goals_speed_dial_fab.dart';
@@ -74,6 +76,9 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
         ref.read(tabIndexProvider.notifier).selectTab(pending);
       }
 
+      // Request notification permissions so budget threshold warnings and reminders work on Android 13+
+      NotificationService.instance.requestPermissions();
+
       // Reschedule reminders and debts when app opens
       if (mounted) {
         ref.read(reminderRepositoryProvider).getReminders().then((reminders) {
@@ -87,7 +92,41 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
       // Check security status on launch and start periodic monitor
       _checkSecurityStatus();
       _startSecurityMonitor();
+
+      // Check if this is a new phone with empty local DB and an existing cloud backup
+      _checkCloudBackupOnLaunch();
     });
+  }
+
+  Future<void> _checkCloudBackupOnLaunch() async {
+    final user = ref.read(currentUserProvider);
+    if (user == null || !mounted) return;
+    final uid = user.uid;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final decisionMade = prefs.getBool('backup_start_fresh_$uid') ?? false;
+      if (decisionMade) return;
+
+      final db = ref.read(appDatabaseProvider);
+      final repo = ref.read(backupRepositoryProvider);
+      final hasData = await repo.hasUserData(db);
+      if (hasData) return;
+
+      // Local database has no user data rows. Check cloud backup with 8-second timeout
+      final meta = await repo.getCloudBackupMeta(uid);
+      if (meta == null || meta.chunkCount == 0 || !mounted) return;
+
+      debugPrint('[BACKUP_AUTO_RESTORE] Empty local DB found for $uid. Auto-restoring cloud backup...');
+      await repo.restoreBackup(uid: uid, db: db);
+      ref.read(lastBackupTimeProvider.notifier).update(meta.updatedAt);
+      await prefs.setInt('backup_last_upload_time_$uid', meta.updatedAt.millisecondsSinceEpoch);
+      await prefs.setString('backup_last_content_hash_$uid', meta.contentHash);
+      debugPrint('[BACKUP_AUTO_RESTORE] Cloud backup restored silently and successfully.');
+    } catch (e, st) {
+      debugPrint('[BACKUP_AUTO_RESTORE_ERROR] Failed to auto-restore cloud backup on launch: $e\n$st');
+      // Offline or timed out: continue normally and check again at the next app opening
+    }
   }
 
   void _startSecurityMonitor() {
@@ -161,19 +200,53 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Keep background backup sync controller active while user is on the main shell
+    ref.watch(backupSyncControllerProvider);
 
     ref.listen<AsyncValue<MonthRemaining>>(currentMonthRemainingProvider, (prev, next) {
-      next.whenData((remaining) {
-        final userId = ref.read(activeUserIdProvider);
-        final double totalBudget = remaining.monthMoney / 100.0;
-        final double remainingEgp = remaining.remaining / 100.0;
+      // Ignore initial load or when account is switching / mounting:
+      // A threshold notification must ONLY trigger when an active transaction drops balance from > 25% to <= 25%,
+      // NEVER when opening the app or switching to another Gmail account!
+      final prevRemaining = prev?.asData?.value;
+      final nextRemaining = next.asData?.value;
+      if (prevRemaining == null || nextRemaining == null) return;
+
+      final userId = ref.read(activeUserIdProvider);
+      if (userId == null || userId.isEmpty) return;
+
+      final double prevBudget = prevRemaining.monthMoney / 100.0;
+      final double prevRemainingEgp = prevRemaining.remaining / 100.0;
+      final double newBudget = nextRemaining.monthMoney / 100.0;
+      final double newRemainingEgp = nextRemaining.remaining / 100.0;
+
+      if (prevBudget <= 0 && newBudget <= 0) return;
+
+      final bool wasAbove = !BudgetMonitorController.isThresholdReached(
+        totalBudget: prevBudget,
+        remainingAmount: prevRemainingEgp,
+      );
+      final bool isNowBelow = BudgetMonitorController.isThresholdReached(
+        totalBudget: newBudget,
+        remainingAmount: newRemainingEgp,
+      );
+
+      // Trigger alert ONLY if user explicitly transitioned from above 25% to <= 25%
+      if (wasAbove && isNowBelow) {
         BudgetMonitorController.evaluateAndNotify(
-          totalBudget: totalBudget,
-          remainingAmount: remainingEgp,
-          currentMonthKey: remaining.yearMonth,
+          totalBudget: newBudget,
+          remainingAmount: newRemainingEgp,
+          currentMonthKey: nextRemaining.yearMonth,
           userId: userId,
         );
-      });
+      } else if (!isNowBelow) {
+        // Balance rose back above 25% (income added or budget increased): re-arm
+        BudgetMonitorController.evaluateAndNotify(
+          totalBudget: newBudget,
+          remainingAmount: newRemainingEgp,
+          currentMonthKey: nextRemaining.yearMonth,
+          userId: userId,
+        );
+      }
     });
 
     final themeMode = ref.watch(themeModeProvider);

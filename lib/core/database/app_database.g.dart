@@ -2899,6 +2899,17 @@ class $DebtsTable extends Debts with TableInfo<$DebtsTable, DebtData> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2910,6 +2921,7 @@ class $DebtsTable extends Debts with TableInfo<$DebtsTable, DebtData> {
     reminderEnabled,
     archived,
     createdAt,
+    updatedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2988,6 +3000,12 @@ class $DebtsTable extends Debts with TableInfo<$DebtsTable, DebtData> {
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -3033,6 +3051,10 @@ class $DebtsTable extends Debts with TableInfo<$DebtsTable, DebtData> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
     );
   }
 
@@ -3052,6 +3074,7 @@ class DebtData extends DataClass implements Insertable<DebtData> {
   final bool reminderEnabled;
   final bool archived;
   final DateTime createdAt;
+  final DateTime? updatedAt;
   const DebtData({
     required this.id,
     required this.personName,
@@ -3062,6 +3085,7 @@ class DebtData extends DataClass implements Insertable<DebtData> {
     required this.reminderEnabled,
     required this.archived,
     required this.createdAt,
+    this.updatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3077,6 +3101,9 @@ class DebtData extends DataClass implements Insertable<DebtData> {
     map['reminder_enabled'] = Variable<bool>(reminderEnabled);
     map['archived'] = Variable<bool>(archived);
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
     return map;
   }
 
@@ -3093,6 +3120,9 @@ class DebtData extends DataClass implements Insertable<DebtData> {
       reminderEnabled: Value(reminderEnabled),
       archived: Value(archived),
       createdAt: Value(createdAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
     );
   }
 
@@ -3111,6 +3141,7 @@ class DebtData extends DataClass implements Insertable<DebtData> {
       reminderEnabled: serializer.fromJson<bool>(json['reminderEnabled']),
       archived: serializer.fromJson<bool>(json['archived']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
     );
   }
   @override
@@ -3126,6 +3157,7 @@ class DebtData extends DataClass implements Insertable<DebtData> {
       'reminderEnabled': serializer.toJson<bool>(reminderEnabled),
       'archived': serializer.toJson<bool>(archived),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
     };
   }
 
@@ -3139,6 +3171,7 @@ class DebtData extends DataClass implements Insertable<DebtData> {
     bool? reminderEnabled,
     bool? archived,
     DateTime? createdAt,
+    Value<DateTime?> updatedAt = const Value.absent(),
   }) => DebtData(
     id: id ?? this.id,
     personName: personName ?? this.personName,
@@ -3149,6 +3182,7 @@ class DebtData extends DataClass implements Insertable<DebtData> {
     reminderEnabled: reminderEnabled ?? this.reminderEnabled,
     archived: archived ?? this.archived,
     createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
   );
   DebtData copyWithCompanion(DebtsCompanion data) {
     return DebtData(
@@ -3167,6 +3201,7 @@ class DebtData extends DataClass implements Insertable<DebtData> {
           : this.reminderEnabled,
       archived: data.archived.present ? data.archived.value : this.archived,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -3181,7 +3216,8 @@ class DebtData extends DataClass implements Insertable<DebtData> {
           ..write('leadDays: $leadDays, ')
           ..write('reminderEnabled: $reminderEnabled, ')
           ..write('archived: $archived, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
@@ -3197,6 +3233,7 @@ class DebtData extends DataClass implements Insertable<DebtData> {
     reminderEnabled,
     archived,
     createdAt,
+    updatedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -3210,7 +3247,8 @@ class DebtData extends DataClass implements Insertable<DebtData> {
           other.leadDays == this.leadDays &&
           other.reminderEnabled == this.reminderEnabled &&
           other.archived == this.archived &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
 }
 
 class DebtsCompanion extends UpdateCompanion<DebtData> {
@@ -3223,6 +3261,7 @@ class DebtsCompanion extends UpdateCompanion<DebtData> {
   final Value<bool> reminderEnabled;
   final Value<bool> archived;
   final Value<DateTime> createdAt;
+  final Value<DateTime?> updatedAt;
   const DebtsCompanion({
     this.id = const Value.absent(),
     this.personName = const Value.absent(),
@@ -3233,6 +3272,7 @@ class DebtsCompanion extends UpdateCompanion<DebtData> {
     this.reminderEnabled = const Value.absent(),
     this.archived = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
   });
   DebtsCompanion.insert({
     this.id = const Value.absent(),
@@ -3244,6 +3284,7 @@ class DebtsCompanion extends UpdateCompanion<DebtData> {
     this.reminderEnabled = const Value.absent(),
     this.archived = const Value.absent(),
     required DateTime createdAt,
+    this.updatedAt = const Value.absent(),
   }) : personName = Value(personName),
        direction = Value(direction),
        totalAmount = Value(totalAmount),
@@ -3258,6 +3299,7 @@ class DebtsCompanion extends UpdateCompanion<DebtData> {
     Expression<bool>? reminderEnabled,
     Expression<bool>? archived,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -3269,6 +3311,7 @@ class DebtsCompanion extends UpdateCompanion<DebtData> {
       if (reminderEnabled != null) 'reminder_enabled': reminderEnabled,
       if (archived != null) 'archived': archived,
       if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
     });
   }
 
@@ -3282,6 +3325,7 @@ class DebtsCompanion extends UpdateCompanion<DebtData> {
     Value<bool>? reminderEnabled,
     Value<bool>? archived,
     Value<DateTime>? createdAt,
+    Value<DateTime?>? updatedAt,
   }) {
     return DebtsCompanion(
       id: id ?? this.id,
@@ -3293,6 +3337,7 @@ class DebtsCompanion extends UpdateCompanion<DebtData> {
       reminderEnabled: reminderEnabled ?? this.reminderEnabled,
       archived: archived ?? this.archived,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -3326,6 +3371,9 @@ class DebtsCompanion extends UpdateCompanion<DebtData> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     return map;
   }
 
@@ -3340,7 +3388,8 @@ class DebtsCompanion extends UpdateCompanion<DebtData> {
           ..write('leadDays: $leadDays, ')
           ..write('reminderEnabled: $reminderEnabled, ')
           ..write('archived: $archived, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
@@ -6017,6 +6066,7 @@ typedef $$DebtsTableCreateCompanionBuilder =
       Value<bool> reminderEnabled,
       Value<bool> archived,
       required DateTime createdAt,
+      Value<DateTime?> updatedAt,
     });
 typedef $$DebtsTableUpdateCompanionBuilder =
     DebtsCompanion Function({
@@ -6029,6 +6079,7 @@ typedef $$DebtsTableUpdateCompanionBuilder =
       Value<bool> reminderEnabled,
       Value<bool> archived,
       Value<DateTime> createdAt,
+      Value<DateTime?> updatedAt,
     });
 
 final class $$DebtsTableReferences
@@ -6104,6 +6155,11 @@ class $$DebtsTableFilterComposer extends Composer<_$AppDatabase, $DebtsTable> {
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6186,6 +6242,11 @@ class $$DebtsTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$DebtsTableAnnotationComposer
@@ -6229,6 +6290,9 @@ class $$DebtsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   Expression<T> debtPaymentsRefs<T extends Object>(
     Expression<T> Function($$DebtPaymentsTableAnnotationComposer a) f,
@@ -6293,6 +6357,7 @@ class $$DebtsTableTableManager
                 Value<bool> reminderEnabled = const Value.absent(),
                 Value<bool> archived = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
               }) => DebtsCompanion(
                 id: id,
                 personName: personName,
@@ -6303,6 +6368,7 @@ class $$DebtsTableTableManager
                 reminderEnabled: reminderEnabled,
                 archived: archived,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
               ),
           createCompanionCallback:
               ({
@@ -6315,6 +6381,7 @@ class $$DebtsTableTableManager
                 Value<bool> reminderEnabled = const Value.absent(),
                 Value<bool> archived = const Value.absent(),
                 required DateTime createdAt,
+                Value<DateTime?> updatedAt = const Value.absent(),
               }) => DebtsCompanion.insert(
                 id: id,
                 personName: personName,
@@ -6325,6 +6392,7 @@ class $$DebtsTableTableManager
                 reminderEnabled: reminderEnabled,
                 archived: archived,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
               ),
           withReferenceMapper: (p0) => p0
               .map(

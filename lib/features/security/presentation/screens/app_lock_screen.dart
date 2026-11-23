@@ -6,6 +6,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/baqy_logo.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../domain/models/security_settings.dart';
 import '../providers/security_providers.dart';
 import '../widgets/pin_keypad.dart';
 
@@ -18,13 +19,15 @@ class AppLockScreen extends ConsumerStatefulWidget {
   ConsumerState<AppLockScreen> createState() => _AppLockScreenState();
 }
 
-class _AppLockScreenState extends ConsumerState<AppLockScreen> {
+class _AppLockScreenState extends ConsumerState<AppLockScreen>
+    with WidgetsBindingObserver {
   String _enteredDigits = '';
   bool _hasError = false;
   String _errorMessage = '';
   Timer? _countdownTimer;
   int _secondsRemaining = 0;
   bool _hasAttemptedAutoBiometric = false;
+  bool _isBiometricRunning = false;
   bool _isResetting = false;
   _ForgotPasscodeDialog _activeDialog = _ForgotPasscodeDialog.none;
   String? _dialogEmail;
@@ -33,6 +36,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkLockoutAndInit();
     });
@@ -40,20 +44,57 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _countdownTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final repo = ref.read(securityRepositoryProvider);
+    // Crucial: Ignore temporary lifecycle transitions (e.g. inactive -> resumed)
+    // caused by the native OS biometric prompt dialog itself!
+    if (repo.isBiometricPromptActive || _isBiometricRunning) {
+      return;
+    }
+
+    if (state == AppLifecycleState.resumed) {
+      // Re-trigger auto-biometric check only when returning into active foreground from background
+      _checkLockoutAndInit();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      // Reset only when app actually goes to background
+      _hasAttemptedAutoBiometric = false;
+    }
   }
 
   void _checkLockoutAndInit() {
     final settingsAsync = ref.read(securitySettingsProvider);
     settingsAsync.whenData((settings) {
-      if (settings.isLockedOut) {
-        _startCountdown(settings.lockoutSecondsRemaining);
-      } else if (settings.isBiometricsEnabled && !_hasAttemptedAutoBiometric) {
-        _hasAttemptedAutoBiometric = true;
-        _tryBiometrics();
-      }
+      _evaluateAutoBiometric(settings);
     });
+  }
+
+  void _evaluateAutoBiometric(SecuritySettings settings) {
+    // Crucial: NEVER prompt biometrics if the app is currently in background or exiting!
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle == AppLifecycleState.inactive ||
+        lifecycle == AppLifecycleState.paused ||
+        lifecycle == AppLifecycleState.hidden ||
+        lifecycle == AppLifecycleState.detached) {
+      return;
+    }
+
+    // Do not prompt if already unlocked
+    if (!ref.read(isAppLockedProvider)) return;
+
+    if (settings.isLockedOut) {
+      _startCountdown(settings.lockoutSecondsRemaining);
+    } else if (settings.isBiometricsEnabled && !_hasAttemptedAutoBiometric) {
+      _hasAttemptedAutoBiometric = true;
+      _tryBiometrics();
+    }
   }
 
   void _startCountdown(int seconds) {
@@ -88,13 +129,30 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
   }
 
   Future<void> _tryBiometrics() async {
-    if (_secondsRemaining > 0) return;
-    final success = await ref
-        .read(securitySettingsProvider.notifier)
-        .authenticateBiometrics();
-    if (!mounted) return;
-    if (success) {
-      ref.read(isAppLockedProvider.notifier).unlock();
+    if (_isBiometricRunning || _secondsRemaining > 0) return;
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle == AppLifecycleState.inactive ||
+        lifecycle == AppLifecycleState.paused ||
+        lifecycle == AppLifecycleState.hidden ||
+        lifecycle == AppLifecycleState.detached) {
+      return;
+    }
+
+    if (!ref.read(isAppLockedProvider)) return;
+
+    _isBiometricRunning = true;
+    try {
+      final success = await ref
+          .read(securitySettingsProvider.notifier)
+          .authenticateBiometrics();
+      if (!mounted) return;
+      if (success) {
+        ref.read(isAppLockedProvider.notifier).unlock();
+      }
+    } finally {
+      if (mounted) {
+        _isBiometricRunning = false;
+      }
     }
   }
 
@@ -246,6 +304,15 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<SecuritySettings>>(
+      securitySettingsProvider,
+      (previous, next) {
+        next.whenData((settings) {
+          _evaluateAutoBiometric(settings);
+        });
+      },
+    );
+
     final settingsAsync = ref.watch(securitySettingsProvider);
     final isBiometricsEnabled =
         settingsAsync.value?.isBiometricsEnabled ?? false;

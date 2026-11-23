@@ -906,5 +906,144 @@ void main() {
       expect(find.text('مبروك! تم سداد الدين بالكامل'), findsOneWidget);
       expect(find.text('سددت كل اللي عليك لـ عمر، واتنقل لقائمة تم سدادها.'), findsOneWidget);
     });
+
+    testWidgets('20b. Paying a partial payment in DebtDetailsScreen stays in details screen and shows payment recorded dialog', (tester) async {
+      final debtId = await debtRepo.addDebt(
+        personName: 'خالد',
+        direction: 'owe',
+        totalAmount: 100000, // 1000 EGP
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          debtRepositoryProvider.overrideWithValue(debtRepo),
+          expenseRepositoryProvider.overrideWithValue(expenseRepo),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Navigator(
+              onGenerateRoute: (settings) {
+                return MaterialPageRoute(
+                  builder: (context) => Scaffold(
+                    body: Center(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => DebtDetailsScreen(debtId: debtId),
+                            ),
+                          );
+                        },
+                        child: const Text('Open Debt Details'),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Open DebtDetailsScreen
+      await tester.tap(find.text('Open Debt Details'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('خالد'), findsOneWidget);
+      expect(find.text('تسجيل دفعة'), findsOneWidget);
+
+      // Tap "تسجيل دفعة"
+      await tester.tap(find.text('تسجيل دفعة'));
+      await tester.pumpAndSettle();
+
+      // Enter 400 EGP (partial payment)
+      final textField = find.byType(TextField);
+      await tester.enterText(textField, '400');
+      await tester.pumpAndSettle();
+
+      // Tap "حفظ"
+      await tester.tap(find.text('حفظ'));
+      await tester.pumpAndSettle();
+
+      // DebtDetailsScreen stays visible
+      expect(find.text('خالد'), findsOneWidget);
+
+      // Payment recorded confirmation dialog should be displayed
+      expect(find.text('تم تسجيل الدفعة بنجاح'), findsOneWidget);
+      expect(find.textContaining('اتخصمت الدفعة'), findsOneWidget);
+    });
+
+    test(
+      '21. modifying an older debt moves it to the top of the debts list by last modified date',
+      () async {
+        // 1. Add older debt: أحمد
+        final debtId1 = await debtRepo.addDebt(
+          personName: 'أحمد',
+          direction: 'owe',
+          totalAmount: 100000,
+        );
+
+        // Delay 1.1s to ensure distinct integer second timestamps in SQLite
+        await Future.delayed(const Duration(milliseconds: 1100));
+
+        // 2. Add newer debt: محمد
+        final debtId2 = await debtRepo.addDebt(
+          personName: 'محمد',
+          direction: 'owe',
+          totalAmount: 200000,
+        );
+
+        // Initial watch: محمد is top, أحمد is second
+        var debts = await debtRepo.watchDebts(direction: 'owe', archived: false).first;
+        expect(debts.length, equals(2));
+        expect(debts[0].id, equals(debtId2));
+        expect(debts[0].personName, equals('محمد'));
+        expect(debts[1].id, equals(debtId1));
+        expect(debts[1].personName, equals('أحمد'));
+
+        // Delay 1.1s
+        await Future.delayed(const Duration(milliseconds: 1100));
+
+        // 3. Edit older debt: أحمد (change amount or name)
+        await debtRepo.updateDebt(
+          id: debtId1,
+          personName: 'أحمد المعدل',
+          direction: 'owe',
+          totalAmount: 150000,
+        );
+
+        // Now: أحمد المعدل MUST be at the top because it was modified last!
+        debts = await debtRepo.watchDebts(direction: 'owe', archived: false).first;
+        expect(debts.length, equals(2));
+        expect(debts[0].id, equals(debtId1));
+        expect(debts[0].personName, equals('أحمد المعدل'));
+        expect(debts[1].id, equals(debtId2));
+        expect(debts[1].personName, equals('محمد'));
+
+        // Delay 1.1s
+        await Future.delayed(const Duration(milliseconds: 1100));
+
+        // 4. Record payment on debt 2 (محمد)
+        await debtRepo.recordPayment(
+          debtId: debtId2,
+          amount: 50000,
+          paidAt: DateTime.now(),
+        );
+
+        // Now: محمد was modified last, so it jumps back to the top!
+        debts = await debtRepo.watchDebts(direction: 'owe', archived: false).first;
+        expect(debts[0].id, equals(debtId2));
+        expect(debts[0].personName, equals('محمد'));
+        expect(debts[1].id, equals(debtId1));
+        expect(debts[1].personName, equals('أحمد المعدل'));
+      },
+    );
   });
 }

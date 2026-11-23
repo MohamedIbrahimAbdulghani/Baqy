@@ -10,6 +10,8 @@ import 'core/routing/app_router.dart';
 import 'core/services/notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
+import 'features/security/data/repositories/security_repository_impl.dart';
+import 'features/security/presentation/providers/security_providers.dart';
 import 'features/security/presentation/widgets/app_lock_gate.dart';
 import 'l10n/app_localizations.dart';
 
@@ -42,9 +44,10 @@ Future<void> main() async {
   }
 
   // Pre-load saved theme and locale synchronously so initial build has zero delay/flicker
+  SharedPreferences? sharedPrefs;
   try {
-    final prefs = await SharedPreferences.getInstance();
-    final savedTheme = prefs.getString('app_theme_mode');
+    sharedPrefs = await SharedPreferences.getInstance();
+    final savedTheme = sharedPrefs.getString('app_theme_mode');
     AppColors.isDark = (savedTheme == 'dark');
   } catch (_) {}
 
@@ -54,6 +57,10 @@ Future<void> main() async {
     ProviderScope(
       overrides: [
         localeProvider.overrideWith(() => LocaleNotifier(initialLocale: initialLocale)),
+        if (sharedPrefs != null)
+          securityRepositoryProvider.overrideWithValue(
+            SecurityRepositoryImpl(prefs: sharedPrefs),
+          ),
       ],
       child: const BaqyApp(),
     ),

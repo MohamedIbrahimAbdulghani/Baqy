@@ -161,7 +161,7 @@ abstract class AppLocalizations {
   /// No description provided for @privacyLine.
   ///
   /// In ar, this message translates to:
-  /// **'بياناتك بتتحفظ على موبايلك إنت بس، ومفيش حد في الفريق يقدر يشوفها.'**
+  /// **'مصاريفك بتتحفظ على موبايلك ونسخة احتياطية منها على خوادم جوجل، ومحدش بيحفظ صوتك أو كلامك.'**
   String get privacyLine;
 
   /// No description provided for @settingsTitle.
@@ -209,8 +209,128 @@ abstract class AppLocalizations {
   /// No description provided for @privacyDescription.
   ///
   /// In ar, this message translates to:
-  /// **'بياناتك بتتحفظ على موبايلك إنت بس، ومفيش حد في الفريق يقدر يشوفها.'**
+  /// **'مصاريفك بتتحفظ على موبايلك، ونسخة احتياطية منها بتتحفظ على خوادم جوجل (Firebase) مرتبطة بحسابك علشان تقدر تسترجعها لو غيّرت التليفون. صاحب التطبيق عنده صلاحية تقنية على قاعدة البيانات. والصوت اللي بتسجّله بيتبعت لخدمة جوجل لتحويله لمصاريف، والتطبيق نفسه ما بيحفظش الصوت ولا الكلام.'**
   String get privacyDescription;
+
+  /// No description provided for @backupCardTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'النسخة الاحتياطية'**
+  String get backupCardTitle;
+
+  /// No description provided for @backupLastBackup.
+  ///
+  /// In ar, this message translates to:
+  /// **'آخر نسخة: {dateTime}'**
+  String backupLastBackup(String dateTime);
+
+  /// No description provided for @backupNoBackupYet.
+  ///
+  /// In ar, this message translates to:
+  /// **'لسه مفيش نسخة'**
+  String get backupNoBackupYet;
+
+  /// No description provided for @backupSaveNow.
+  ///
+  /// In ar, this message translates to:
+  /// **'احفظ دلوقتي'**
+  String get backupSaveNow;
+
+  /// No description provided for @backupRestore.
+  ///
+  /// In ar, this message translates to:
+  /// **'استرجاع'**
+  String get backupRestore;
+
+  /// No description provided for @backupSavedSuccess.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم حفظ النسخة'**
+  String get backupSavedSuccess;
+
+  /// No description provided for @backupSaveFailed.
+  ///
+  /// In ar, this message translates to:
+  /// **'مقدرتش أحفظ النسخة، جرّب تاني'**
+  String get backupSaveFailed;
+
+  /// No description provided for @backupRestoreSuccess.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم استرجاع بياناتك'**
+  String get backupRestoreSuccess;
+
+  /// No description provided for @backupRestoreFailed.
+  ///
+  /// In ar, this message translates to:
+  /// **'مقدرتش أسترجع بياناتك، جرّب تاني'**
+  String get backupRestoreFailed;
+
+  /// No description provided for @backupNotFound.
+  ///
+  /// In ar, this message translates to:
+  /// **'مفيش نسخة محفوظة'**
+  String get backupNotFound;
+
+  /// No description provided for @backupNewerVersionError.
+  ///
+  /// In ar, this message translates to:
+  /// **'النسخة دي من إصدار أحدث، حدّث التطبيق'**
+  String get backupNewerVersionError;
+
+  /// No description provided for @backupFoundDialogTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'لقينا نسخة احتياطية'**
+  String get backupFoundDialogTitle;
+
+  /// No description provided for @backupFoundDialogBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'لقينا بيانات محفوظة على حسابك (آخر تحديث {dateTime}). تحب نسترجعها؟'**
+  String backupFoundDialogBody(String dateTime);
+
+  /// No description provided for @backupStartFresh.
+  ///
+  /// In ar, this message translates to:
+  /// **'ابدأ من جديد'**
+  String get backupStartFresh;
+
+  /// No description provided for @backupConfirmStartFreshTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'متأكد؟'**
+  String get backupConfirmStartFreshTitle;
+
+  /// No description provided for @backupConfirmStartFreshBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'النسخة القديمة هتتبدّل لما التطبيق يحفظ نسخة جديدة.'**
+  String get backupConfirmStartFreshBody;
+
+  /// No description provided for @backupBack.
+  ///
+  /// In ar, this message translates to:
+  /// **'رجوع'**
+  String get backupBack;
+
+  /// No description provided for @backupRestoringProgress.
+  ///
+  /// In ar, this message translates to:
+  /// **'بنسترجع بياناتك...'**
+  String get backupRestoringProgress;
+
+  /// No description provided for @backupManualRestoreTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'استرجاع النسخة؟'**
+  String get backupManualRestoreTitle;
+
+  /// No description provided for @backupManualRestoreBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'اللي على الموبايل ده هيتبدّل بآخر نسخة محفوظة على حسابك.'**
+  String get backupManualRestoreBody;
 
   /// No description provided for @feedbackTitle.
   ///

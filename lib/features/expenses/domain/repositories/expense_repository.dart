@@ -176,4 +176,16 @@ abstract class ExpenseRepository {
   /// Retrieve the most recent user rules (up to limit)
   Future<List<({int id, String keyword, String categoryName, int categoryId})>>
       getRecentUserRules({int limit = 50});
+
+  /// Check whether month leftover rollover has already been handled for a previous month
+  Future<bool> isMonthRolloverHandled({
+    required String previousYearMonth,
+    String? userId,
+  });
+
+  /// Mark month leftover rollover as handled for a previous month
+  Future<void> markMonthRolloverHandled({
+    required String previousYearMonth,
+    String? userId,
+  });
 }

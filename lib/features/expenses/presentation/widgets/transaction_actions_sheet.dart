@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/category_icon_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../../core/widgets/action_feedback_dialog.dart';
@@ -12,6 +13,15 @@ import '../../domain/models/transaction_item.dart';
 import '../providers/expense_providers.dart';
 
 abstract final class TransactionActionsHelper {
+  /// Helper to check if a transaction belongs to an expired / past month
+  static bool isTransactionFromPastMonth(TransactionItem transaction) {
+    final localDate = transaction.createdAt.toLocal();
+    final txYm = ArabicDateHelper.formatYearMonthKey(localDate.year, localDate.month);
+    final now = DateTime.now();
+    final currentYm = ArabicDateHelper.formatYearMonthKey(now.year, now.month);
+    return txYm.compareTo(currentYm) < 0;
+  }
+
   /// Shows options bottom sheet on Tap or Long Press.
   /// If the transaction belongs to debts or goals, it displays an explanatory card
   /// preventing edit/delete and directing the user to the dedicated screen.
@@ -26,6 +36,7 @@ abstract final class TransactionActionsHelper {
       builder: (sheetContext) {
         final isDebt = transaction.source == 'debt';
         final isLocked = transaction.isLockedFromExpenses;
+        final isPastMonth = isTransactionFromPastMonth(transaction);
 
         return Directionality(
           textDirection: TextDirection.rtl,
@@ -170,6 +181,82 @@ abstract final class TransactionActionsHelper {
                           ),
                         ),
                       ),
+                    ] else if (isPastMonth) ...[
+                      // Past Month Read-Only Info Card: strictly no edit or delete from past months
+                      Container(
+                        padding: const EdgeInsets.all(14.0),
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          borderRadius: BorderRadius.circular(14.0),
+                          border: Border.all(
+                            color: Colors.amber.shade600.withValues(alpha: 0.4),
+                            width: 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 36.0,
+                              height: 36.0,
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.archive_outlined,
+                                size: 20.0,
+                                color: Colors.amber.shade800,
+                              ),
+                            ),
+                            const SizedBox(width: 12.0),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'شهر مؤرشف (للاطلاع فقط)',
+                                    style: TextStyle(
+                                      fontFamily: AppTheme.fontFamily,
+                                      fontSize: 14.0,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.amber.shade900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4.0),
+                                  Text(
+                                    'هذه المعاملة تنتمي لشهر سابق تم قفله وأرشفته. لا يمكن تعديل أو حذف المعاملات السابقة للحفاظ على دقة الحسابات والميزانية.',
+                                    style: TextStyle(
+                                      fontFamily: AppTheme.fontFamily,
+                                      fontSize: 13.0,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.secondaryText,
+                                      height: 1.45,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16.0),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 46.0,
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(sheetContext).pop(),
+                          style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                          ),
+                          child: const Text(
+                            'إغلاق',
+                            style: TextStyle(fontFamily: AppTheme.fontFamily),
+                          ),
+                        ),
+                      ),
                     ] else ...[
                       // Regular Expense: Edit & Delete available
                       ListTile(
@@ -234,7 +321,7 @@ abstract final class TransactionActionsHelper {
     required WidgetRef ref,
     required TransactionItem transaction,
   }) {
-    if (transaction.isLockedFromExpenses) {
+    if (transaction.isLockedFromExpenses || isTransactionFromPastMonth(transaction)) {
       return showActionsBottomSheet(
         context: context,
         ref: ref,
@@ -258,7 +345,7 @@ abstract final class TransactionActionsHelper {
     required WidgetRef ref,
     required TransactionItem transaction,
   }) async {
-    if (transaction.isLockedFromExpenses) {
+    if (transaction.isLockedFromExpenses || isTransactionFromPastMonth(transaction)) {
       return;
     }
     final confirmed = await showDialog<bool>(

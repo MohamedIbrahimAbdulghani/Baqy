@@ -107,7 +107,7 @@ class _TransactionCard extends ConsumerWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Left: Amount & foreign reference
+            // Left: Amount, Deposit/Withdrawal badge & foreign reference
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -118,12 +118,55 @@ class _TransactionCard extends ConsumerWidget {
                     fontFamily: AppTheme.fontFamily,
                     fontSize: 16.0,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.text,
+                    color: transaction.isAddition
+                        ? AppColors.mainGreen
+                        : AppColors.text,
+                  ),
+                ),
+                const SizedBox(height: 4.0),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7.0,
+                    vertical: 2.5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: transaction.isAddition
+                        ? AppColors.mainGreen.withValues(alpha: 0.12)
+                        : AppColors.errorRed.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(6.0),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        transaction.isAddition
+                            ? Icons.add_rounded
+                            : Icons.remove_rounded,
+                        size: 13.0,
+                        color: transaction.isAddition
+                            ? AppColors.mainGreen
+                            : AppColors.errorRed,
+                      ),
+                      const SizedBox(width: 2.0),
+                      Text(
+                        transaction.isAddition
+                            ? 'إيداع (مضافة)'
+                            : 'سحب (مخصومة)',
+                        style: TextStyle(
+                          fontFamily: AppTheme.fontFamily,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: transaction.isAddition
+                              ? AppColors.mainGreen
+                              : AppColors.errorRed,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 if (transaction.foreignAmount != null &&
                     transaction.foreignCurrency != null) ...[
-                  const SizedBox(height: 2.0),
+                  const SizedBox(height: 3.0),
                   Text(
                     '≈ ${transaction.foreignAmount} ${transaction.foreignCurrency}',
                     style: const TextStyle(

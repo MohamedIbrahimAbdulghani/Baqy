@@ -17,12 +17,19 @@ class AuthRepositoryImpl implements AuthRepository {
   final GoogleSignIn _googleSignIn;
   bool _isGoogleSignInInitialized = false;
 
+  static const String _serverClientId =
+      '340670824976-hqsu4qg4lgv0m5n6kn5nu1vu8vqtuo8p.apps.googleusercontent.com';
+
   Future<void> _ensureInitialized() async {
     if (!_isGoogleSignInInitialized) {
       try {
-        await _googleSignIn.initialize();
-      } catch (_) {}
-      _isGoogleSignInInitialized = true;
+        await _googleSignIn.initialize(
+          serverClientId: _serverClientId,
+        );
+        _isGoogleSignInInitialized = true;
+      } catch (_) {
+        _isGoogleSignInInitialized = true;
+      }
     }
   }
 
@@ -105,7 +112,6 @@ class AuthRepositoryImpl implements AuthRepository {
       rethrow;
     } on GoogleSignInException catch (e) {
       if (e.code == GoogleSignInExceptionCode.canceled) {
-        // User closed the account picker silently
         return null;
       }
       rethrow;

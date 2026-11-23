@@ -38,6 +38,19 @@ class TransactionItem {
       category?.name == 'تحويش' ||
       (category?.id != null && category!.id < 0);
 
+  /// Whether this transaction represents an addition/deposit to the user's money
+  /// (e.g. income, collecting a debt owed to the user).
+  bool get isAddition {
+    if (kind == 'income') return amount >= 0;
+    if (kind == 'saving') return amount < 0; // withdrawal from goal back to cash
+    if (kind == 'expense') return amount < 0; // refund back to cash
+    return false;
+  }
+
+  /// Whether this transaction represents a deduction/withdrawal from the user's money
+  /// (e.g. regular expense, paying a debt owed by the user, or saving into a goal).
+  bool get isDeduction => !isAddition;
+
   TransactionItem copyWith({
     int? id,
     int? amount,

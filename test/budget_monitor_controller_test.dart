@@ -6,10 +6,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 class _FakeNotificationService extends NotificationService {
   _FakeNotificationService() : super.test();
   int showCount = 0;
+  double? lastTotalBudget;
+  double? lastRemainingAmount;
 
   @override
-  Future<void> showBudgetWarningNotification() async {
+  Future<void> showBudgetWarningNotification({
+    double? totalBudget,
+    double? remainingAmount,
+  }) async {
     showCount++;
+    lastTotalBudget = totalBudget;
+    lastRemainingAmount = remainingAmount;
   }
 }
 
@@ -234,6 +241,45 @@ void main() {
         userId: userId,
       );
       expect(fakeNotif.showCount, equals(2));
+    });
+
+    test('User exact scenario: 10,000 budget, 7,500 spent -> alerts; 5,000 income -> remaining 7,500, re-alerts when reaching 25% of 15,000', () async {
+      final now = DateTime.now();
+      final currentMonthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+      const userId = 'user_exact_scenario';
+
+      // 1. Initial 10,000 budget, 7,500 spent -> remaining 2,500 (25% remaining)
+      await BudgetMonitorController.evaluateAndNotify(
+        totalBudget: 10000,
+        remainingAmount: 2500,
+        currentMonthKey: currentMonthKey,
+        userId: userId,
+      );
+      expect(fakeNotif.showCount, equals(1));
+      expect(fakeNotif.lastRemainingAmount, equals(2500));
+      expect(fakeNotif.lastTotalBudget, equals(10000));
+
+      // 2. Extra 5,000 income arrives -> total 15,000, remaining 7,500 (50% remaining)
+      await BudgetMonitorController.evaluateAndNotify(
+        totalBudget: 15000,
+        remainingAmount: 7500,
+        currentMonthKey: currentMonthKey,
+        userId: userId,
+      );
+      // Re-armed, but not alerted
+      expect(fakeNotif.showCount, equals(1));
+
+      // 3. User spends until remaining drops to 3,750 (25% of 15,000)
+      await BudgetMonitorController.evaluateAndNotify(
+        totalBudget: 15000,
+        remainingAmount: 3750,
+        currentMonthKey: currentMonthKey,
+        userId: userId,
+      );
+      // Re-alerted!
+      expect(fakeNotif.showCount, equals(2));
+      expect(fakeNotif.lastRemainingAmount, equals(3750));
+      expect(fakeNotif.lastTotalBudget, equals(15000));
     });
   });
 }

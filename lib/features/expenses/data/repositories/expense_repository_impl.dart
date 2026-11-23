@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/utils/goal_icon_helper.dart';
 import '../../domain/models/category_item.dart';
@@ -1389,6 +1390,26 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
         categoryId: cat.id,
       );
     }).toList();
+  }
+
+  @override
+  Future<bool> isMonthRolloverHandled({
+    required String previousYearMonth,
+    String? userId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userPrefix = (userId != null && userId.isNotEmpty) ? '${userId}_' : '';
+    return prefs.getBool('month_rollover_handled_$userPrefix$previousYearMonth') ?? false;
+  }
+
+  @override
+  Future<void> markMonthRolloverHandled({
+    required String previousYearMonth,
+    String? userId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userPrefix = (userId != null && userId.isNotEmpty) ? '${userId}_' : '';
+    await prefs.setBool('month_rollover_handled_$userPrefix$previousYearMonth', true);
   }
 }
 

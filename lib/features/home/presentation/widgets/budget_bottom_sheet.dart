@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/notification_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
@@ -76,6 +77,7 @@ class _BudgetBottomSheetState extends State<BudgetBottomSheet> {
 
     final budgetPiastres = parsed * 100;
     await widget.onSave(budgetPiastres);
+    NotificationService.instance.requestPermissions();
 
     if (mounted) {
       Navigator.of(context).pop();

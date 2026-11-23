@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -69,13 +70,26 @@ abstract final class BudgetMonitorController {
 
     if (reached) {
       if (!hasAlerted) {
+        if (kDebugMode) {
+          debugPrint(
+            '[BUDGET_ALERT] Threshold reached: remaining $remainingAmount <= 25% of total $totalBudget. Sending alert!',
+          );
+        }
         await prefs.setBool(prefKey, true);
-        await NotificationService.instance.showBudgetWarningNotification();
+        await NotificationService.instance.showBudgetWarningNotification(
+          totalBudget: totalBudget,
+          remainingAmount: remainingAmount,
+        );
       }
     } else {
       // If the remaining balance rises back above 25% (extra money/income received or budget increased):
       // re-arm the alert flag so that when remaining drops to 25% again, a new alert is sent!
       if (hasAlerted) {
+        if (kDebugMode) {
+          debugPrint(
+            '[BUDGET_ALERT] Balance rose above 25%: remaining $remainingAmount > 25% of total $totalBudget. Re-arming alert!',
+          );
+        }
         await prefs.setBool(prefKey, false);
       }
     }

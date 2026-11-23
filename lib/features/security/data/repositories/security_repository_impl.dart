@@ -33,6 +33,18 @@ class SecurityRepositoryImpl implements SecurityRepository {
   static const int maxFailedAttempts = 5;
   static const int lockoutSeconds = 60;
 
+  static bool _biometricPromptActive = false;
+
+  @override
+  bool get isBiometricPromptActive => _biometricPromptActive;
+
+  @override
+  bool get isAppLockEnabledSync {
+    final prefs = _prefsInstance;
+    if (prefs == null) return false;
+    return prefs.getBool(_appLockEnabledKey) ?? false;
+  }
+
   Future<SharedPreferences> _getPrefs() async {
     return _prefsInstance ??= await SharedPreferences.getInstance();
   }
@@ -91,6 +103,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
   Future<bool> authenticateWithBiometrics({
     required String localizedReason,
   }) async {
+    _biometricPromptActive = true;
     try {
       final isAvailable = await isBiometricsAvailable();
       if (!isAvailable) return false;
@@ -108,6 +121,10 @@ class SecurityRepositoryImpl implements SecurityRepository {
       return false;
     } catch (_) {
       return false;
+    } finally {
+      // Small buffer to allow Android window focus to transition back to resumed
+      await Future.delayed(const Duration(milliseconds: 300));
+      _biometricPromptActive = false;
     }
   }
 
@@ -144,6 +161,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
     await _secureStorage.write(key: _pinKey, value: hash);
     final prefs = await _getPrefs();
     await prefs.setBool(_appLockEnabledKey, true);
+    await prefs.setBool(_lockOnExitEnabledKey, true);
     await resetFailedAttempts();
   }
 

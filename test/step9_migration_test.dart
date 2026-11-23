@@ -1,6 +1,6 @@
 // ignore_for_file: depend_on_referenced_packages
 import 'dart:io';
-import 'package:drift/drift.dart' hide isNull;
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
 import 'package:sqlite3/sqlite3.dart' as raw_sqlite;
@@ -114,6 +114,7 @@ void main() {
     expect(debt1.totalAmount, equals(1000000));
     expect(debt1.archived, isFalse);
     expect(debt1.leadDays, equals(2));
+    expect(debt1.updatedAt, isNotNull);
 
     final debt2 = debtsList.firstWhere((d) => d.id == 2);
     expect(debt2.personName, equals('سارة'));

@@ -96,7 +96,7 @@ final securitySettingsProvider =
 
 class AppLockStateNotifier extends Notifier<bool> {
   @override
-  bool build() => false;
+  bool build() => true;
 
   void lock() => state = true;
   void unlock() => state = false;

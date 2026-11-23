@@ -1,6 +1,8 @@
 import '../models/security_settings.dart';
 
 abstract class SecurityRepository {
+  bool get isAppLockEnabledSync;
+  bool get isBiometricPromptActive;
   Future<SecuritySettings> getSettings();
   Future<bool> isBiometricsAvailable();
   Future<bool> authenticateWithBiometrics({required String localizedReason});

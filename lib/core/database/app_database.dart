@@ -20,7 +20,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? openEncryptedConnection());
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   static const List<({String name, String icon, String color, int sortOrder})>
       defaultCategoryDefinitions = [
@@ -297,6 +297,19 @@ class AppDatabase extends _$AppDatabase {
             final debtCols = await getColumns('debts');
             if (!debtCols.contains('lead_days')) {
               await m.addColumn(debts, debts.leadDays);
+            }
+          }
+        }
+
+        if (from < 9) {
+          if (kDebugMode) {
+            debugPrint('[DB_DEBUG] onUpgrade (v8->v9): adding updated_at column to debts');
+          }
+          if (await tableExists('debts')) {
+            final debtCols = await getColumns('debts');
+            if (!debtCols.contains('updated_at')) {
+              await m.addColumn(debts, debts.updatedAt);
+              await customStatement('UPDATE debts SET updated_at = created_at WHERE updated_at IS NULL;');
             }
           }
         }

@@ -41,7 +41,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyLine =>
-      'Your data is saved on your phone only, and no one on the team can see it.';
+      'Your expenses are saved on your phone and backed up to Google servers, and no one saves your voice or speech.';
 
   @override
   String get settingsTitle => 'Settings';
@@ -66,7 +66,74 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyDescription =>
-      'Your data is saved on your phone only, and no one on the team can see it.';
+      'Your expenses are saved on your phone, and a backup is saved on Google servers (Firebase) linked to your account so you can restore them if you change phones. The app owner has technical access to the database. The audio you record is sent to Google\'s service to convert it into expenses, and the app itself does not save your voice or speech.';
+
+  @override
+  String get backupCardTitle => 'Cloud Backup';
+
+  @override
+  String backupLastBackup(String dateTime) {
+    return 'Last backup: $dateTime';
+  }
+
+  @override
+  String get backupNoBackupYet => 'No backup yet';
+
+  @override
+  String get backupSaveNow => 'Back up now';
+
+  @override
+  String get backupRestore => 'Restore';
+
+  @override
+  String get backupSavedSuccess => 'Backup saved successfully';
+
+  @override
+  String get backupSaveFailed => 'Couldn\'t save backup, try again';
+
+  @override
+  String get backupRestoreSuccess => 'Data restored successfully';
+
+  @override
+  String get backupRestoreFailed => 'Couldn\'t restore data, try again';
+
+  @override
+  String get backupNotFound => 'No saved backup found';
+
+  @override
+  String get backupNewerVersionError =>
+      'This backup is from a newer version, update the app';
+
+  @override
+  String get backupFoundDialogTitle => 'Backup Found';
+
+  @override
+  String backupFoundDialogBody(String dateTime) {
+    return 'We found saved data on your account (last updated $dateTime). Would you like to restore it?';
+  }
+
+  @override
+  String get backupStartFresh => 'Start Fresh';
+
+  @override
+  String get backupConfirmStartFreshTitle => 'Are you sure?';
+
+  @override
+  String get backupConfirmStartFreshBody =>
+      'The old backup will be replaced when the app saves a new backup.';
+
+  @override
+  String get backupBack => 'Back';
+
+  @override
+  String get backupRestoringProgress => 'Restoring your data...';
+
+  @override
+  String get backupManualRestoreTitle => 'Restore Backup?';
+
+  @override
+  String get backupManualRestoreBody =>
+      'The data on this phone will be replaced with the latest backup saved on your account.';
 
   @override
   String get feedbackTitle => 'Send Us Feedback';

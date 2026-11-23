@@ -10,7 +10,7 @@
   "signInSubtitle": "سجّل دخولك وابدأ تتابع مصاريفك بصوتك",
   "signInWithGoogle": "الدخول بحساب جوجل",
   "signInError": "مقدرتش أسجّلك، جرّب تاني",
-  "privacyLine": "بياناتك بتتحفظ على موبايلك إنت بس، ومفيش حد في الفريق يقدر يشوفها.",
+  "privacyLine": "مصاريفك بتتحفظ على موبايلك ونسخة احتياطية منها على خوادم جوجل، ومحدش بيحفظ صوتك أو كلامك.",
   "settingsTitle": "الإعدادات",
   "languageLabel": "اللغة",
   "langArabic": "عربي",
@@ -18,7 +18,41 @@
   "budgetForMonth": "ميزانية شهر",
   "edit": "تعديل",
   "privacyTitle": "خصوصيتك",
-  "privacyDescription": "بياناتك بتتحفظ على موبايلك إنت بس، ومفيش حد في الفريق يقدر يشوفها.",
+  "privacyDescription": "مصاريفك بتتحفظ على موبايلك، ونسخة احتياطية منها بتتحفظ على خوادم جوجل (Firebase) مرتبطة بحسابك علشان تقدر تسترجعها لو غيّرت التليفون. صاحب التطبيق عنده صلاحية تقنية على قاعدة البيانات. والصوت اللي بتسجّله بيتبعت لخدمة جوجل لتحويله لمصاريف، والتطبيق نفسه ما بيحفظش الصوت ولا الكلام.",
+  "backupCardTitle": "النسخة الاحتياطية",
+  "backupLastBackup": "آخر نسخة: {dateTime}",
+  "@backupLastBackup": {
+    "placeholders": {
+      "dateTime": {
+        "type": "String"
+      }
+    }
+  },
+  "backupNoBackupYet": "لسه مفيش نسخة",
+  "backupSaveNow": "احفظ دلوقتي",
+  "backupRestore": "استرجاع",
+  "backupSavedSuccess": "تم حفظ النسخة",
+  "backupSaveFailed": "مقدرتش أحفظ النسخة، جرّب تاني",
+  "backupRestoreSuccess": "تم استرجاع بياناتك",
+  "backupRestoreFailed": "مقدرتش أسترجع بياناتك، جرّب تاني",
+  "backupNotFound": "مفيش نسخة محفوظة",
+  "backupNewerVersionError": "النسخة دي من إصدار أحدث، حدّث التطبيق",
+  "backupFoundDialogTitle": "لقينا نسخة احتياطية",
+  "backupFoundDialogBody": "لقينا بيانات محفوظة على حسابك (آخر تحديث {dateTime}). تحب نسترجعها؟",
+  "@backupFoundDialogBody": {
+    "placeholders": {
+      "dateTime": {
+        "type": "String"
+      }
+    }
+  },
+  "backupStartFresh": "ابدأ من جديد",
+  "backupConfirmStartFreshTitle": "متأكد؟",
+  "backupConfirmStartFreshBody": "النسخة القديمة هتتبدّل لما التطبيق يحفظ نسخة جديدة.",
+  "backupBack": "رجوع",
+  "backupRestoringProgress": "بنسترجع بياناتك...",
+  "backupManualRestoreTitle": "استرجاع النسخة؟",
+  "backupManualRestoreBody": "اللي على الموبايل ده هيتبدّل بآخر نسخة محفوظة على حسابك.",
   "feedbackTitle": "ابعتلنا رأيك",
   "feedbackDescription": "عندك فكرة أو مشكلة؟ ابعتهالنا عشان نحسّن التطبيق.",
   "gmail": "جيميل",

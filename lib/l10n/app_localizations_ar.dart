@@ -40,7 +40,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get privacyLine =>
-      'بياناتك بتتحفظ على موبايلك إنت بس، ومفيش حد في الفريق يقدر يشوفها.';
+      'مصاريفك بتتحفظ على موبايلك ونسخة احتياطية منها على خوادم جوجل، ومحدش بيحفظ صوتك أو كلامك.';
 
   @override
   String get settingsTitle => 'الإعدادات';
@@ -65,7 +65,73 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get privacyDescription =>
-      'بياناتك بتتحفظ على موبايلك إنت بس، ومفيش حد في الفريق يقدر يشوفها.';
+      'مصاريفك بتتحفظ على موبايلك، ونسخة احتياطية منها بتتحفظ على خوادم جوجل (Firebase) مرتبطة بحسابك علشان تقدر تسترجعها لو غيّرت التليفون. صاحب التطبيق عنده صلاحية تقنية على قاعدة البيانات. والصوت اللي بتسجّله بيتبعت لخدمة جوجل لتحويله لمصاريف، والتطبيق نفسه ما بيحفظش الصوت ولا الكلام.';
+
+  @override
+  String get backupCardTitle => 'النسخة الاحتياطية';
+
+  @override
+  String backupLastBackup(String dateTime) {
+    return 'آخر نسخة: $dateTime';
+  }
+
+  @override
+  String get backupNoBackupYet => 'لسه مفيش نسخة';
+
+  @override
+  String get backupSaveNow => 'احفظ دلوقتي';
+
+  @override
+  String get backupRestore => 'استرجاع';
+
+  @override
+  String get backupSavedSuccess => 'تم حفظ النسخة';
+
+  @override
+  String get backupSaveFailed => 'مقدرتش أحفظ النسخة، جرّب تاني';
+
+  @override
+  String get backupRestoreSuccess => 'تم استرجاع بياناتك';
+
+  @override
+  String get backupRestoreFailed => 'مقدرتش أسترجع بياناتك، جرّب تاني';
+
+  @override
+  String get backupNotFound => 'مفيش نسخة محفوظة';
+
+  @override
+  String get backupNewerVersionError => 'النسخة دي من إصدار أحدث، حدّث التطبيق';
+
+  @override
+  String get backupFoundDialogTitle => 'لقينا نسخة احتياطية';
+
+  @override
+  String backupFoundDialogBody(String dateTime) {
+    return 'لقينا بيانات محفوظة على حسابك (آخر تحديث $dateTime). تحب نسترجعها؟';
+  }
+
+  @override
+  String get backupStartFresh => 'ابدأ من جديد';
+
+  @override
+  String get backupConfirmStartFreshTitle => 'متأكد؟';
+
+  @override
+  String get backupConfirmStartFreshBody =>
+      'النسخة القديمة هتتبدّل لما التطبيق يحفظ نسخة جديدة.';
+
+  @override
+  String get backupBack => 'رجوع';
+
+  @override
+  String get backupRestoringProgress => 'بنسترجع بياناتك...';
+
+  @override
+  String get backupManualRestoreTitle => 'استرجاع النسخة؟';
+
+  @override
+  String get backupManualRestoreBody =>
+      'اللي على الموبايل ده هيتبدّل بآخر نسخة محفوظة على حسابك.';
 
   @override
   String get feedbackTitle => 'ابعتلنا رأيك';

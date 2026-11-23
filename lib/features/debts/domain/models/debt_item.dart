@@ -9,6 +9,7 @@ class DebtItem {
     required this.reminderEnabled,
     required this.archived,
     required this.createdAt,
+    this.updatedAt,
     this.paidAmount = 0,
     this.paymentsCount = 0,
   });
@@ -22,6 +23,7 @@ class DebtItem {
   final bool reminderEnabled;
   final bool archived;
   final DateTime createdAt;
+  final DateTime? updatedAt;
   final int paidAmount; // piastres
   final int paymentsCount;
 
@@ -50,6 +52,7 @@ class DebtItem {
     bool? reminderEnabled,
     bool? archived,
     DateTime? createdAt,
+    DateTime? updatedAt,
     int? paidAmount,
     int? paymentsCount,
   }) {
@@ -63,6 +66,7 @@ class DebtItem {
       reminderEnabled: reminderEnabled ?? this.reminderEnabled,
       archived: archived ?? this.archived,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       paidAmount: paidAmount ?? this.paidAmount,
       paymentsCount: paymentsCount ?? this.paymentsCount,
     );

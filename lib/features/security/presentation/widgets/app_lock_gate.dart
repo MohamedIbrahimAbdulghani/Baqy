@@ -18,14 +18,12 @@ class AppLockGate extends ConsumerStatefulWidget {
 
 class _AppLockGateState extends ConsumerState<AppLockGate>
     with WidgetsBindingObserver {
-  DateTime? _pausedAt;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // Initial check: if app lock is enabled and user is signed in, lock on cold start
+    // Initial check: ensure locked if user is already signed in and app lock enabled
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkInitialLock();
     });
@@ -47,27 +45,25 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    final repo = ref.read(securityRepositoryProvider);
+    // If the system biometric prompt is actively showing, ignore the temporary inactive transition
+    if (repo.isBiometricPromptActive) {
+      return;
+    }
+
     final user = ref.read(activeUserIdProvider);
     final settings = ref.read(securitySettingsProvider).value;
+    final isLockEnabled = settings?.isAppLockEnabled ?? repo.isAppLockEnabledSync;
 
-    if (user == null || settings == null || !settings.isAppLockEnabled) {
+    if (user == null || !isLockEnabled) {
       return;
     }
 
-    // Check user preference for locking upon leaving the app
-    if (!settings.lockOnExit) {
-      return;
-    }
-
-    if (state == AppLifecycleState.paused) {
-      _pausedAt = DateTime.now();
+    // Whenever the app leaves the active foreground (answering a phone call,
+    // switching apps, pulling down notifications, going home, or locking the screen):
+    // Lock immediately so opening the app again strictly requires authentication!
+    if (state != AppLifecycleState.resumed) {
       ref.read(isAppLockedProvider.notifier).lock();
-    } else if (state == AppLifecycleState.resumed) {
-      // Lock if paused
-      if (_pausedAt != null) {
-        ref.read(isAppLockedProvider.notifier).lock();
-        _pausedAt = null;
-      }
     }
   }
 
@@ -76,9 +72,12 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
     final isLocked = ref.watch(isAppLockedProvider);
     final settings = ref.watch(securitySettingsProvider).value;
     final user = ref.watch(activeUserIdProvider);
+    final repo = ref.watch(securityRepositoryProvider);
 
-    final shouldShowLock =
-        isLocked && user != null && (settings?.isAppLockEnabled ?? false);
+    // Synchronously check lock enabled to guarantee zero-millisecond lag/flicker
+    final isLockEnabled = settings?.isAppLockEnabled ?? repo.isAppLockEnabledSync;
+
+    final shouldShowLock = isLocked && user != null && isLockEnabled;
 
     return Stack(
       children: [

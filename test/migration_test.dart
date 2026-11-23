@@ -70,7 +70,7 @@ void main() {
 
       // Check categories: 'قهوة وكافيهات' -> 'مشروبات وكافيهات' with same id=2
       final cats = await v3Db.select(v3Db.categories).get();
-      expect(cats.length, equals(24), reason: 'All 24 default categories should exist');
+      expect(cats.length, equals(25), reason: 'All default categories should exist');
 
       final coffeeCat = cats.firstWhere((c) => c.id == 2);
       expect(coffeeCat.name, equals('مشروبات وكافيهات'));
@@ -105,7 +105,7 @@ void main() {
       // 3. Test Idempotency: Open the same database again
       final v3DbAgain = AppDatabase(NativeDatabase(dbFile));
       final catsAgain = await v3DbAgain.select(v3DbAgain.categories).get();
-      expect(catsAgain.length, equals(24), reason: 'Re-opening must not duplicate categories');
+      expect(catsAgain.length, equals(25), reason: 'Re-opening must not duplicate categories');
 
       final txsAgain = await v3DbAgain.select(v3DbAgain.transactions).get();
       expect(txsAgain.length, equals(3), reason: 'Re-opening must not duplicate or lose transactions');
@@ -171,8 +171,8 @@ void main() {
       // 2. Open with AppDatabase (v6) - triggers onUpgrade from 5 to 6
       final v6Db = AppDatabase(NativeDatabase(dbFile));
 
-      // Verify schemaVersion is 6
-      expect(v6Db.schemaVersion, equals(6));
+      // Verify schemaVersion is current version
+      expect(v6Db.schemaVersion, equals(9));
 
       // Verify goals: both preserved, icon is nullable/null for old rows
       final goals = await v6Db.select(v6Db.goals).get();

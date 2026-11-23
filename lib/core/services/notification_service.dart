@@ -8,6 +8,7 @@ import 'package:timezone/timezone.dart' as tz;
 import '../../features/debts/domain/models/debt_item.dart';
 import '../../features/reminders/domain/models/reminder_item.dart';
 import '../../features/reminders/domain/utils/reminder_date_calculator.dart';
+import '../utils/number_formatter.dart';
 
 /// Service responsible for managing local push notifications, reminder scheduling, and permissions.
 class NotificationService {
@@ -122,8 +123,9 @@ class NotificationService {
             budgetChannelId,
             budgetChannelName,
             description: budgetChannelDescription,
-            importance: Importance.high,
+            importance: Importance.max,
             playSound: true,
+            enableVibration: true,
           );
 
       const AndroidNotificationChannel remindersChannel =
@@ -510,20 +512,37 @@ class NotificationService {
   }
 
   /// Dispatches an immediate local push notification warning that remaining budget is low.
-  Future<void> showBudgetWarningNotification() async {
-    const AndroidNotificationDetails androidDetails =
+  Future<void> showBudgetWarningNotification({
+    double? totalBudget,
+    double? remainingAmount,
+  }) async {
+    try {
+      if (Platform.isAndroid || Platform.isIOS) {
+        await requestPermissions();
+      }
+    } catch (_) {}
+
+    final String bodyText = (remainingAmount != null && totalBudget != null)
+        ? 'باقي لك ${NumberFormatter.formatCurrency(remainingAmount.toInt())} جنيه من ${NumberFormatter.formatCurrency(totalBudget.toInt())} جنيه (ربع الميزانية). قربت تخلص مصاريف الشهر ده!'
+        : 'خد بالك انت قربت تخلص مصاريف الشهر ده (وصلت لربع الميزانية)';
+
+    final AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
           budgetChannelId,
           budgetChannelName,
           channelDescription: budgetChannelDescription,
-          importance: Importance.high,
-          priority: Priority.high,
+          importance: Importance.max,
+          priority: Priority.max,
           icon: '@mipmap/ic_launcher',
-          largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
-          color: Color(0xFF2F6B5A),
+          largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+          color: const Color(0xFF2F6B5A),
           showWhen: true,
           enableVibration: true,
           playSound: true,
+          styleInformation: BigTextStyleInformation(
+            bodyText,
+            contentTitle: 'تنبيه الميزانية - BAQY',
+          ),
         );
 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
@@ -532,7 +551,7 @@ class NotificationService {
       presentSound: true,
     );
 
-    const NotificationDetails notificationDetails = NotificationDetails(
+    final NotificationDetails notificationDetails = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );
@@ -544,8 +563,9 @@ class NotificationService {
     await _notificationsPlugin.show(
       101, // Constant ID for budget threshold warnings
       'تنبيه الميزانية - BAQY',
-      'خد بالك انت قربت تخلص مصاريف الشهر ده',
+      bodyText,
       notificationDetails,
+      payload: 'home',
     );
   }
 }

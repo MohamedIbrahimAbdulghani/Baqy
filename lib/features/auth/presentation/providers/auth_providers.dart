@@ -40,8 +40,8 @@ final activeDatabaseProvider =
 class ActiveUserIdNotifier extends Notifier<String?> {
   @override
   String? build() {
-    final repo = ref.watch(authRepositoryProvider);
-    return repo.currentUser?.uid;
+    final user = ref.watch(currentUserProvider);
+    return user?.uid;
   }
 
   void setUserId(String? id) => state = id;

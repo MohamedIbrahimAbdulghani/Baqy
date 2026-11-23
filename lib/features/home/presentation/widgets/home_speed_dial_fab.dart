@@ -64,6 +64,7 @@ class _HomeSpeedDialFabState extends ConsumerState<HomeSpeedDialFab>
     final isRecording = ref.watch(voiceRecordingProvider);
     final isAnalyzing = ref.watch(voiceIsAnalyzingProvider);
     final pendingAudio = ref.watch(pendingVoiceAudioPathProvider);
+    final isViewingPastMonth = ref.watch(isViewingPastMonthProvider);
 
     if (isRecording || isAnalyzing) {
       return VoiceRecordingStopButton(
@@ -74,6 +75,11 @@ class _HomeSpeedDialFabState extends ConsumerState<HomeSpeedDialFab>
           }
         },
       );
+    }
+
+    // When viewing an archived/past month, hide the FAB to prevent adding past expenses
+    if (isViewingPastMonth && pendingAudio == null) {
+      return const SizedBox.shrink();
     }
 
     return Column(
@@ -158,80 +164,82 @@ class _HomeSpeedDialFabState extends ConsumerState<HomeSpeedDialFab>
             ),
           ),
         // Upper two buttons: expand smoothly upwards without taking space when closed
-        SizeTransition(
-          sizeFactor: _expandAnimation,
-          alignment: Alignment.bottomCenter, // Expands from bottom upwards
-          child: ScaleTransition(
-            scale: _expandAnimation,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Button 2 (Pencil - top)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12.0),
-                  child: _ActionCircleButton(
-                    icon: Icons.edit_outlined,
-                    onTap: () {
-                      _close();
-                      context.push('/add-expense');
-                    },
+        if (!isViewingPastMonth) ...[
+          SizeTransition(
+            sizeFactor: _expandAnimation,
+            alignment: Alignment.bottomCenter, // Expands from bottom upwards
+            child: ScaleTransition(
+              scale: _expandAnimation,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Button 2 (Pencil - top)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: _ActionCircleButton(
+                      icon: Icons.edit_outlined,
+                      onTap: () {
+                        _close();
+                        context.push('/add-expense');
+                      },
+                    ),
                   ),
-                ),
 
-                // Button 1 (Mic - middle)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12.0),
-                  child: _ActionCircleButton(
-                    icon: Icons.mic_none_rounded,
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      _close();
-                      ref
-                          .read(voiceRecordingProvider.notifier)
-                          .startRecording(context: context);
-                    },
+                  // Button 1 (Mic - middle)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: _ActionCircleButton(
+                      icon: Icons.mic_none_rounded,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _close();
+                        ref
+                            .read(voiceRecordingProvider.notifier)
+                            .startRecording(context: context);
+                      },
+                    ),
                   ),
+                ],
+              ),
+            ),
+          ),
+
+          // Main "+" / "x" Button
+          Container(
+            width: 58.0,
+            height: 58.0,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.mainGreen,
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x33000000),
+                  blurRadius: 10.0,
+                  offset: Offset(0, 4),
                 ),
               ],
             ),
-          ),
-        ),
-
-        // Main "+" / "x" Button
-        Container(
-          width: 58.0,
-          height: 58.0,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.mainGreen,
-            boxShadow: [
-              BoxShadow(
-                color: Color(0x33000000),
-                blurRadius: 10.0,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            shape: const CircleBorder(),
-            child: InkWell(
-              onTap: _toggle,
-              customBorder: const CircleBorder(),
-              child: Center(
-                child: AnimatedRotation(
-                  turns: _isOpen ? 0.125 : 0.0, // 45 degrees rotation turns + to x
-                  duration: const Duration(milliseconds: 200),
-                  child: const Icon(
-                    Icons.add,
-                    color: Colors.white,
-                    size: 30.0,
+            child: Material(
+              color: Colors.transparent,
+              shape: const CircleBorder(),
+              child: InkWell(
+                onTap: _toggle,
+                customBorder: const CircleBorder(),
+                child: Center(
+                  child: AnimatedRotation(
+                    turns: _isOpen ? 0.125 : 0.0, // 45 degrees rotation turns + to x
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(
+                      Icons.add,
+                      color: Colors.white,
+                      size: 30.0,
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }
