@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../domain/exceptions/auth_exceptions.dart';
@@ -17,19 +18,12 @@ class AuthRepositoryImpl implements AuthRepository {
   final GoogleSignIn _googleSignIn;
   bool _isGoogleSignInInitialized = false;
 
-  static const String _serverClientId =
-      '340670824976-hqsu4qg4lgv0m5n6kn5nu1vu8vqtuo8p.apps.googleusercontent.com';
-
   Future<void> _ensureInitialized() async {
     if (!_isGoogleSignInInitialized) {
       try {
-        await _googleSignIn.initialize(
-          serverClientId: _serverClientId,
-        );
-        _isGoogleSignInInitialized = true;
-      } catch (_) {
-        _isGoogleSignInInitialized = true;
-      }
+        await _googleSignIn.initialize();
+      } catch (_) {}
+      _isGoogleSignInInitialized = true;
     }
   }
 
@@ -63,7 +57,26 @@ class AuthRepositoryImpl implements AuthRepository {
     String? userEmail;
     try {
       await _ensureInitialized();
-      final account = await _googleSignIn.authenticate();
+      GoogleSignInAccount? account;
+      try {
+        account = await _googleSignIn.attemptLightweightAuthentication();
+        debugPrint('[AUTH_DEBUG] attemptLightweightAuthentication result: ${account?.email}');
+      } catch (e) {
+        debugPrint('[AUTH_DEBUG] attemptLightweightAuthentication caught: $e');
+      }
+
+      if (account == null) {
+        try {
+          account = await _googleSignIn.authenticate();
+        } on GoogleSignInException catch (e, st) {
+          debugPrint('[AUTH_DEBUG] authenticate caught: ${e.code} - ${e.description}\n$st');
+          if (e.code == GoogleSignInExceptionCode.canceled) {
+            return null;
+          }
+          rethrow;
+        }
+      }
+
       userEmail = account.email;
       final idToken = account.authentication.idToken;
 
@@ -97,7 +110,8 @@ class AuthRepositoryImpl implements AuthRepository {
         email: user.email,
         photoUrl: user.photoURL,
       );
-    } on FirebaseAuthException catch (e) {
+    } on FirebaseAuthException catch (e, st) {
+      debugPrint('[AUTH_DEBUG] FirebaseAuthException: ${e.code} - ${e.message}\n$st');
       if (e.code == 'user-disabled') {
         throw AccountDisabledException(
           'لا يمكنك تسجيل الدخول بهذا الحساب، لأن هذا البريد الإلكتروني معطّل حالياً من قِبل إدارة التطبيق.\n\nإذا كنت تعتقد أن هذا الإجراء تم بالخطأ، يُرجى التواصل مع إدارة التطبيق عبر واتساب أو جيميل لإعادة تفعيله.',
@@ -110,10 +124,14 @@ class AuthRepositoryImpl implements AuthRepository {
         );
       }
       rethrow;
-    } on GoogleSignInException catch (e) {
+    } on GoogleSignInException catch (e, st) {
+      debugPrint('[AUTH_DEBUG] GoogleSignInException: ${e.code} - ${e.description}\n$st');
       if (e.code == GoogleSignInExceptionCode.canceled) {
         return null;
       }
+      rethrow;
+    } catch (e, st) {
+      debugPrint('[AUTH_DEBUG] Unexpected signIn error: $e\n$st');
       rethrow;
     }
   }

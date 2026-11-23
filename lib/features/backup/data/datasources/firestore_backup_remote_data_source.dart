@@ -136,20 +136,25 @@ class FirestoreBackupRemoteDataSource implements BackupRemoteDataSource {
     required String uid,
     required BackupMeta meta,
     required List<Uint8List> chunks,
+    Map<String, dynamic>? readableSummary,
   }) async {
     final batch = _firestore.batch();
     final backupCol =
         _firestore.collection('users').doc(uid).collection('backup');
 
-    // 1. Set meta document with server timestamp
+    // 1. Set meta document with server timestamp and readable summary
     final metaRef = backupCol.doc('meta');
-    batch.set(metaRef, {
+    final metaData = <String, dynamic>{
       'schemaVersion': meta.schemaVersion,
       'chunkCount': chunks.length,
       'updatedAt': FieldValue.serverTimestamp(),
       'tableCounts': meta.tableCounts,
       'contentHash': meta.contentHash,
-    });
+    };
+    if (readableSummary != null) {
+      metaData.addAll(readableSummary);
+    }
+    batch.set(metaRef, metaData);
 
     // 2. Set chunk documents
     for (int i = 0; i < chunks.length; i++) {

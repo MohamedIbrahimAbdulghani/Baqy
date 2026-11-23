@@ -17,6 +17,9 @@ class BackupSyncController with WidgetsBindingObserver {
   bool _hasPendingChanges = false;
   bool _isUploading = false;
   bool _isRestoring = false;
+
+  bool get isRestoring => _isRestoring;
+  bool get isUploading => _isUploading;
   BackupMeta? _pendingRemoteMeta;
   DateTime? _lastUploadTime;
   int _dailyUploadCount = 0;

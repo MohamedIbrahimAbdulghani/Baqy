@@ -8,6 +8,7 @@ import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../../core/widgets/action_feedback_dialog.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../backup/presentation/providers/backup_providers.dart';
 import '../../../expenses/domain/models/month_remaining.dart';
 import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../../../expenses/presentation/widgets/month_rollover_dialog.dart';
@@ -55,6 +56,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (!mounted || ref.read(activeUserIdProvider) == null) return;
       _isCheckingMonthTransition = true;
       try {
+        // If cloud backup is currently auto-restoring in background, wait
+        final syncController = ref.read(backupSyncControllerProvider);
+        if (syncController != null && syncController.isRestoring) return;
+
         // 1. Check and prompt rollover if previous month had remaining money
         await MonthRolloverHelper.checkAndPromptRollover(
           context: context,
@@ -87,7 +92,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Only auto-open for the current ongoing month, never past months
     if (yearMonth != currentYm) return;
 
-    if (remaining.budget <= 0) {
+    // Never auto-open if cloud restore is currently running
+    final syncController = ref.read(backupSyncControllerProvider);
+    if (syncController != null && syncController.isRestoring) return;
+
+    // Only auto-open for a completely fresh month with no budget and no activity at all
+    if (remaining.budget <= 0 &&
+        remaining.monthMoney <= 0 &&
+        remaining.expenses <= 0 &&
+        remaining.income <= 0) {
       final promptedMonths = ref.read(hasAutoOpenedBudgetForMonthProvider);
       if (!promptedMonths.contains(yearMonth)) {
         if (mounted && ref.read(activeUserIdProvider) != null) {

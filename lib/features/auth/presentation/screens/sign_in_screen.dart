@@ -26,6 +26,7 @@ class SignInScreen extends ConsumerWidget {
       final authState = ref.read(authControllerProvider);
       if (authState.hasError) {
         final error = authState.error;
+        debugPrint('[SIGN_IN_SCREEN] error: $error\n${authState.stackTrace}');
         if (error is AccountDisabledException) {
           await AccountStatusDialog.show(
             context,

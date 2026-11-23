@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart' show TableUpdate;
 import '../../../../core/database/app_database.dart';
@@ -203,13 +204,130 @@ class BackupRepositoryImpl implements BackupRepository {
       return meta;
     }
 
+    final readableSummary = _buildReadableSummary(snapshot: snapshot, uid: uid);
+
     await _remoteDataSource.uploadBackup(
       uid: uid,
       meta: meta,
       chunks: processed.chunks,
+      readableSummary: readableSummary,
     );
 
     return meta;
+  }
+
+  Map<String, dynamic> _buildReadableSummary({
+    required BackupSnapshot snapshot,
+    required String uid,
+  }) {
+    // 1. Categories lookup
+    final catList = snapshot.tables['categories'] ?? [];
+    final catMap = <int, String>{};
+    for (final c in catList) {
+      final id = c['id'] as int?;
+      final name = c['name'] as String?;
+      if (id != null && name != null) {
+        catMap[id] = name;
+      }
+    }
+
+    // 2. Transactions
+    final txList = snapshot.tables['transactions'] ?? [];
+    final now = DateTime.now();
+    final currentMonthPrefix =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    double totalExpensesMonth = 0;
+    double totalIncomeMonth = 0;
+
+    final formattedTransactions = <Map<String, dynamic>>[];
+
+    for (final t in txList) {
+      final rawAmount = (t['amount'] as num? ?? 0);
+      final amountEgp = rawAmount / 100.0;
+      final kind = t['kind'] as String? ?? 'expense';
+      final isExpense = kind == 'expense';
+      final desc = t['description'] as String? ?? '';
+      final catId = t['category_id'] as int?;
+      final catName = catMap[catId] ?? 'أخرى';
+
+      final rawDate = t['created_at'];
+      DateTime dt;
+      if (rawDate is int) {
+        final ms = rawDate > 100000000000 ? rawDate : rawDate * 1000;
+        dt = DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true).toLocal();
+      } else if (rawDate is DateTime) {
+        dt = rawDate.toLocal();
+      } else if (rawDate is String) {
+        dt = DateTime.tryParse(rawDate)?.toLocal() ?? DateTime.now();
+      } else {
+        dt = DateTime.now();
+      }
+
+      final dateStr =
+          '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      final txMonth = '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+
+      if (txMonth == currentMonthPrefix) {
+        if (isExpense) {
+          totalExpensesMonth += amountEgp;
+        } else {
+          totalIncomeMonth += amountEgp;
+        }
+      }
+
+      formattedTransactions.add({
+        'description': desc,
+        'amountEgp': amountEgp,
+        'category': catName,
+        'type': isExpense ? 'مصروف (-)' : 'دخل (+)',
+        'date': dateStr,
+      });
+    }
+
+    // Sort by date descending (newest first)
+    formattedTransactions.sort(
+        (a, b) => (b['date'] as String).compareTo(a['date'] as String));
+
+    // 3. Month budget
+    final budgetList = snapshot.tables['month_budgets'] ?? [];
+    double budgetEgp = 0;
+    for (final b in budgetList) {
+      if (b['year_month'] == currentMonthPrefix) {
+        budgetEgp = ((b['amount'] as num? ?? 0) / 100.0);
+        break;
+      }
+    }
+    if (budgetEgp == 0 && budgetList.isNotEmpty) {
+      budgetEgp = ((budgetList.last['amount'] as num? ?? 0) / 100.0);
+    }
+
+    final remainingEgp = (budgetEgp + totalIncomeMonth) - totalExpensesMonth;
+
+    // 4. User info from FirebaseAuth if matches uid
+    String displayName = 'غير محدد';
+    String email = 'غير محدد';
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && user.uid == uid) {
+        displayName = user.displayName ?? displayName;
+        email = user.email ?? email;
+      }
+    } catch (_) {}
+
+    return {
+      'userInfo': {
+        'displayName': displayName,
+        'email': email,
+      },
+      'financialSummary': {
+        'currentMonth': currentMonthPrefix,
+        'monthlyBudgetEgp': budgetEgp,
+        'totalExpensesThisMonthEgp': totalExpensesMonth,
+        'totalIncomeThisMonthEgp': totalIncomeMonth,
+        'remainingBalanceEgp': remainingEgp,
+      },
+      'transactions': formattedTransactions.take(100).toList(),
+    };
   }
 
   @override

@@ -161,7 +161,7 @@ abstract class AppLocalizations {
   /// No description provided for @privacyLine.
   ///
   /// In ar, this message translates to:
-  /// **'مصاريفك بتتحفظ على موبايلك ونسخة احتياطية منها على خوادم جوجل، ومحدش بيحفظ صوتك أو كلامك.'**
+  /// **'بياناتك ومصاريفك بتتحفظ بأمان ومرتبطة بحساب الجيميل بتاعك لحمايتها، ومحدش بيحفظ صوتك أو كلامك.'**
   String get privacyLine;
 
   /// No description provided for @settingsTitle.
@@ -209,7 +209,7 @@ abstract class AppLocalizations {
   /// No description provided for @privacyDescription.
   ///
   /// In ar, this message translates to:
-  /// **'مصاريفك بتتحفظ على موبايلك، ونسخة احتياطية منها بتتحفظ على خوادم جوجل (Firebase) مرتبطة بحسابك علشان تقدر تسترجعها لو غيّرت التليفون. صاحب التطبيق عنده صلاحية تقنية على قاعدة البيانات. والصوت اللي بتسجّله بيتبعت لخدمة جوجل لتحويله لمصاريف، والتطبيق نفسه ما بيحفظش الصوت ولا الكلام.'**
+  /// **'بياناتك ومصاريفك بتتحفظ بأمان ومرتبطة بحساب الجيميل بتاعك لحمايتها وتقدر تسترجعها في أي وقت لو غيرت تليفونك، ومفيش أي حد يقدر يطّلع على بياناتك ومصاريفك.'**
   String get privacyDescription;
 
   /// No description provided for @backupCardTitle.

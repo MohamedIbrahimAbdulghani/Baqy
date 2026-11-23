@@ -41,7 +41,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyLine =>
-      'Your expenses are saved on your phone and backed up to Google servers, and no one saves your voice or speech.';
+      'Your data is securely saved and linked to your Gmail account for protection, and no one saves your voice or speech.';
 
   @override
   String get settingsTitle => 'Settings';
@@ -66,7 +66,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyDescription =>
-      'Your expenses are saved on your phone, and a backup is saved on Google servers (Firebase) linked to your account so you can restore them if you change phones. The app owner has technical access to the database. The audio you record is sent to Google\'s service to convert it into expenses, and the app itself does not save your voice or speech.';
+      'Your data and expenses are securely saved and linked to your Gmail account for protection so you can restore them anytime if you change devices, and no one else can access your data.';
 
   @override
   String get backupCardTitle => 'Cloud Backup';

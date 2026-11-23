@@ -48,6 +48,7 @@ class FakeBackupRemoteDataSource implements BackupRemoteDataSource {
     required String uid,
     required BackupMeta meta,
     required List<Uint8List> chunks,
+    Map<String, dynamic>? readableSummary,
   }) async {
     uploadCalls++;
     storedMeta = meta;

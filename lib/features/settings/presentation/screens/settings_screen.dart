@@ -509,7 +509,7 @@ class SettingsScreen extends ConsumerWidget {
                     const SizedBox(height: 8),
                     Text(
                       l10n?.privacyDescription ??
-                          'بياناتك بتتحفظ على موبايلك إنت بس، ومفيش حد في الفريق يقدر يشوفها.',
+                          'بياناتك ومصاريفك بتتحفظ بأمان ومرتبطة بحساب الجيميل بتاعك لحمايتها وتقدر تسترجعها في أي وقت، ومفيش حد يقدر يوصلها.',
                       style: TextStyle(
                         fontFamily: AppTheme.fontFamily,
                         fontSize: 13,
