@@ -179,4 +179,21 @@ class FirestoreBackupRemoteDataSource implements BackupRemoteDataSource {
       rethrow;
     }
   }
+
+  @override
+  Future<void> deleteBackup(String uid) async {
+    try {
+      final backupCol =
+          _firestore.collection('users').doc(uid).collection('backup');
+      final batch = _firestore.batch();
+      batch.delete(backupCol.doc('meta'));
+      for (int i = 0; i < 20; i++) {
+        batch.delete(backupCol.doc('chunk_$i'));
+      }
+      await batch.commit();
+      debugPrint('[FIRESTORE_REMOTE] Backup documents deleted for uid: $uid');
+    } catch (e, st) {
+      debugPrint('[FIRESTORE_REMOTE_ERROR] deleteBackup failed: $e\n$st');
+    }
+  }
 }

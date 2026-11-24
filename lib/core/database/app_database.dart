@@ -57,28 +57,61 @@ class AppDatabase extends _$AppDatabase {
         if (kDebugMode) {
           debugPrint('[DB_DEBUG] onCreate: creating all tables...');
         }
-        await m.createAll();
+        try {
+          await m.createAll();
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('[DB_DEBUG] m.createAll failed: $e. Falling back to idempotent creation.');
+          }
+          for (final table in allTables) {
+            try {
+              final exists = (await customSelect(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='${table.actualTableName}';",
+              ).get()).isNotEmpty;
+              if (!exists) {
+                await m.createTable(table);
+              }
+            } catch (_) {}
+          }
+          final indices = [
+            'CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions (created_at);',
+            'CREATE INDEX IF NOT EXISTS idx_transactions_category_created ON transactions (category_id, created_at);',
+            'CREATE INDEX IF NOT EXISTS idx_transactions_kind_created ON transactions (kind, created_at);',
+            'CREATE INDEX IF NOT EXISTS idx_goal_savings_goal_id ON goal_savings (goal_id);',
+            'CREATE INDEX IF NOT EXISTS idx_goal_savings_saved_at ON goal_savings (saved_at);',
+          ];
+          for (final sql in indices) {
+            try {
+              await customStatement(sql);
+            } catch (_) {}
+          }
+        }
+        await customStatement('PRAGMA user_version = $schemaVersion;');
         if (kDebugMode) {
-          debugPrint('[DB_DEBUG] onCreate: tables created in ${sw.elapsedMilliseconds}ms. Seeding 22 default categories...');
+          debugPrint('[DB_DEBUG] onCreate: tables verified/created in ${sw.elapsedMilliseconds}ms. Seeding 22 default categories if needed...');
         }
 
         // Seed 22 default categories once (idempotent)
-        final now = DateTime.now();
-        await batch((b) {
-          b.insertAll(
-            categories,
-            defaultCategoryDefinitions.map((def) {
-              return CategoriesCompanion.insert(
-                name: def.name,
-                icon: def.icon,
-                colorHex: def.color,
-                isDefault: const Value(true),
-                sortOrder: Value(def.sortOrder),
-                createdAt: Value(now),
-              );
-            }).toList(),
-          );
-        });
+        final catRows = await customSelect('SELECT count(*) as c FROM categories;').get();
+        final catCount = catRows.isNotEmpty ? (catRows.first.data['c'] as num? ?? 0) : 0;
+        if (catCount == 0) {
+          final now = DateTime.now();
+          await batch((b) {
+            b.insertAll(
+              categories,
+              defaultCategoryDefinitions.map((def) {
+                return CategoriesCompanion.insert(
+                  name: def.name,
+                  icon: def.icon,
+                  colorHex: def.color,
+                  isDefault: const Value(true),
+                  sortOrder: Value(def.sortOrder),
+                  createdAt: Value(now),
+                );
+              }).toList(),
+            );
+          });
+        }
         if (kDebugMode) {
           debugPrint('[DB_DEBUG] onCreate: seeded 22 default categories in ${sw.elapsedMilliseconds}ms total');
         }
@@ -324,6 +357,7 @@ class AppDatabase extends _$AppDatabase {
           debugPrint('[DB_DEBUG] beforeOpen: wasCreated=${details.wasCreated}, hadUpgrade=${details.hadUpgrade}, versionBefore=${details.versionBefore}, versionNow=${details.versionNow}');
         }
         await customStatement('PRAGMA foreign_keys = ON;');
+        await customStatement('PRAGMA user_version = $schemaVersion;');
         // Ensure standard names and missing default categories (e.g. سوبر ماركت) are seeded idempotently
         try {
           await customStatement(
@@ -364,16 +398,17 @@ class AppDatabase extends _$AppDatabase {
 
   /// Clears all user transactions, budgets, debts, goals and custom categories,
   /// preserving only the default seeded categories.
+  /// Child tables referencing parent tables via foreign keys are deleted first.
   Future<void> clearAllData() async {
     await transaction(() async {
-      await delete(transactions).go();
-      await delete(monthBudgets).go();
       await delete(debtPayments).go();
       await delete(debts).go();
       await delete(goalSavings).go();
       await delete(goals).go();
-      await delete(reminders).go();
+      await delete(transactions).go();
       await delete(userRules).go();
+      await delete(monthBudgets).go();
+      await delete(reminders).go();
       await (delete(categories)..where((c) => c.isDefault.equals(false))).go();
     });
   }

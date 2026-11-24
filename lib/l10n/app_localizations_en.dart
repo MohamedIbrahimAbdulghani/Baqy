@@ -234,4 +234,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get monthDec => 'December';
+
+  @override
+  String get backupDataUpdatedSnackbar => 'Your data has been updated';
+
+  @override
+  String get backupConflictDialogTitle => 'Data Conflict';
+
+  @override
+  String get backupConflictDialogBody =>
+      'There are unsaved edits on this device, and a newer version exists on your account. What would you like to keep?';
+
+  @override
+  String get backupConflictKeepLocal => 'Keep device version';
+
+  @override
+  String get backupConflictKeepCloud => 'Keep account version';
 }

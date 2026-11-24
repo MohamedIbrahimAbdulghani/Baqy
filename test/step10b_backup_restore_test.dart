@@ -63,6 +63,13 @@ class FakeBackupRemoteDataSource implements BackupRemoteDataSource {
 
   @override
   Stream<BackupMeta?> watchMeta(String uid) => _metaController.stream;
+
+  @override
+  Future<void> deleteBackup(String uid) async {
+    storedMeta = null;
+    storedChunks.clear();
+    _metaController.add(null);
+  }
 }
 
 class FakeNotificationService extends NotificationService {

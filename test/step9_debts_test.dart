@@ -7,6 +7,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import 'package:baqy/core/database/app_database.dart';
 import 'package:baqy/core/services/notification_service.dart';
+import 'package:baqy/core/utils/arabic_date_helper.dart';
 import 'package:baqy/core/widgets/action_feedback_dialog.dart';
 import 'package:baqy/features/debts/data/repositories/debt_repository_impl.dart';
 import 'package:baqy/features/debts/domain/models/debt_item.dart';
@@ -360,6 +361,57 @@ void main() {
         // Home numbers restored
         final remFinal = await expenseRepo.getRemainingOfMonth(yearMonth);
         expect(remFinal.remaining, equals(initialRem.remaining));
+      },
+    );
+
+    test(
+      '7b. deleting a settled/archived debt preserves linked transactions and does not affect monthly expenses',
+      () async {
+        final now = DateTime.now();
+        final yearMonth =
+            '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+        final initialRem = await expenseRepo.getRemainingOfMonth(yearMonth);
+
+        final debtId = await debtRepo.addDebt(
+          personName: 'أحمد',
+          direction: 'owe',
+          totalAmount: 400000,
+        );
+
+        // Pay full amount so debt is settled/archived
+        await debtRepo.recordPayment(
+          debtId: debtId,
+          amount: 400000,
+          paidAt: now,
+        );
+
+        final settledDebt = await debtRepo.getDebtById(debtId);
+        expect(settledDebt?.isSettled, isTrue);
+        expect(settledDebt?.archived, isTrue);
+
+        final remMid = await expenseRepo.getRemainingOfMonth(yearMonth);
+        expect(remMid.remaining, equals(initialRem.remaining - 400000));
+
+        // Delete the settled debt
+        await debtRepo.deleteDebt(debtId);
+
+        // Debt record and debt_payments are removed
+        final deletedDebt = await debtRepo.getDebtById(debtId);
+        expect(deletedDebt, isNull);
+
+        final payments = await debtRepo.watchPaymentsForDebt(debtId).first;
+        expect(payments, isEmpty);
+
+        // BUT linked transaction is PRESERVED in transactions
+        final txs = await expenseRepo
+            .watchLastTransactionsForMonth(yearMonth)
+            .first;
+        expect(txs.any((t) => t.description == 'أحمد'), isTrue);
+
+        // Monthly remaining/expenses remain untouched (still includes the 400000 expense)
+        final remFinal = await expenseRepo.getRemainingOfMonth(yearMonth);
+        expect(remFinal.remaining, equals(remMid.remaining));
       },
     );
 
@@ -1043,6 +1095,194 @@ void main() {
         expect(debts[0].personName, equals('محمد'));
         expect(debts[1].id, equals(debtId1));
         expect(debts[1].personName, equals('أحمد المعدل'));
+      },
+    );
+
+    testWidgets(
+      '22. Tapping سداد المبلغ بالكامل opens confirmation dialog, and confirming pays full remaining',
+      (tester) async {
+        final debtId = await debtRepo.addDebt(
+          personName: 'كريم',
+          direction: 'owe',
+          totalAmount: 15000, // 150 EGP
+        );
+
+        final container = ProviderContainer(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(db),
+            debtRepositoryProvider.overrideWithValue(debtRepo),
+            expenseRepositoryProvider.overrideWithValue(expenseRepo),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              home: Navigator(
+                onGenerateRoute: (settings) {
+                  return MaterialPageRoute(
+                    builder: (context) => Scaffold(
+                      body: Center(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => DebtDetailsScreen(debtId: debtId),
+                              ),
+                            );
+                          },
+                          child: const Text('Open Debt Details'),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Open DebtDetailsScreen
+        await tester.tap(find.text('Open Debt Details'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('كريم'), findsOneWidget);
+        expect(find.text('سداد المبلغ بالكامل'), findsOneWidget);
+        expect(find.text('تسجيل دفعة'), findsOneWidget);
+
+        // Tap "سداد المبلغ بالكامل"
+        await tester.tap(find.text('سداد المبلغ بالكامل'));
+        await tester.pumpAndSettle();
+
+        // Check dialog appears with title and buttons "نعم" and "لا"
+        expect(find.text('هل تريد سداد المبلغ بالكامل؟'), findsOneWidget);
+        expect(find.text('نعم'), findsOneWidget);
+        expect(find.text('لا'), findsOneWidget);
+
+        // Tap "لا" to cancel first
+        await tester.tap(find.text('لا'));
+        await tester.pumpAndSettle();
+
+        // Verify dialog dismissed and debt not settled yet
+        expect(find.text('هل تريد سداد المبلغ بالكامل؟'), findsNothing);
+        expect(find.text('سداد المبلغ بالكامل'), findsOneWidget);
+
+        // Tap "سداد المبلغ بالكامل" again
+        await tester.tap(find.text('سداد المبلغ بالكامل'));
+        await tester.pumpAndSettle();
+
+        // Tap "نعم" to confirm
+        await tester.tap(find.text('نعم'));
+        await tester.pumpAndSettle();
+
+        // Verify feedback dialog appears
+        expect(find.text('تم سداد المبلغ بنجاح'), findsOneWidget);
+
+        // Verify debt is now archived / settled in repo
+        final debt = await debtRepo.getDebtById(debtId);
+        expect(debt!.archived, isTrue);
+        expect(debt.remaining, equals(0));
+      },
+    );
+
+    testWidgets(
+      '23. When debt on me exceeds remaining budget, pay full shows warning dialog and record payment caps at available money',
+      (tester) async {
+        final now = DateTime.now();
+        final ym = ArabicDateHelper.formatYearMonthKey(now.year, now.month);
+        // Budget is 500 EGP (50,000 piastres)
+        await expenseRepo.setMonthBudget(yearMonth: ym, amount: 50000);
+
+        // Debt is 1,000 EGP (100,000 piastres) -> exceeds available budget!
+        final debtId = await debtRepo.addDebt(
+          personName: 'مصطفى',
+          direction: 'owe',
+          totalAmount: 100000,
+        );
+
+        final container = ProviderContainer(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(db),
+            debtRepositoryProvider.overrideWithValue(debtRepo),
+            expenseRepositoryProvider.overrideWithValue(expenseRepo),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              home: Navigator(
+                onGenerateRoute: (settings) {
+                  return MaterialPageRoute(
+                    builder: (context) => Scaffold(
+                      body: Center(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => DebtDetailsScreen(debtId: debtId),
+                              ),
+                            );
+                          },
+                          child: const Text('Open Debt Details'),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Open DebtDetailsScreen
+        await tester.tap(find.text('Open Debt Details'));
+        await tester.pumpAndSettle();
+
+        // Notice that note mentions available money
+        expect(find.textContaining('المتوفر معاك حالياً:'), findsOneWidget);
+
+        // 1. Tap "سداد المبلغ بالكامل"
+        await tester.tap(find.text('سداد المبلغ بالكامل'));
+        await tester.pumpAndSettle();
+
+        // Warning dialog appears because debt (1000) > available (500)
+        expect(find.text('المبلغ أكبر من المتوفر معاك'), findsOneWidget);
+        expect(find.text('تسجيل دفعة جزئية'), findsOneWidget);
+
+        // Tap "تسجيل دفعة جزئية" from the dialog
+        await tester.tap(find.text('تسجيل دفعة جزئية'));
+        await tester.pumpAndSettle();
+
+        // Record payment sheet opens and mentions available money
+        expect(find.textContaining('المتوفر معاك:'), findsOneWidget);
+
+        // Try to enter 600 EGP (more than available)
+        final textField = find.byType(TextField);
+        await tester.enterText(textField, '600');
+        await tester.pumpAndSettle();
+
+        // Tap "حفظ"
+        await tester.tap(find.text('حفظ'));
+        await tester.pumpAndSettle();
+
+        // Error message appears
+        expect(find.textContaining('المبلغ أكبر من المتوفر معاك في الميزانية'), findsOneWidget);
+
+        // Now enter 500 EGP (within available)
+        await tester.enterText(textField, '500');
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('حفظ'));
+        await tester.pumpAndSettle();
+
+        // Payment saved successfully
+        expect(find.text('تم تسجيل الدفعة بنجاح'), findsOneWidget);
       },
     );
   });

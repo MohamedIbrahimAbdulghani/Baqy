@@ -16,10 +16,18 @@ import 'package:baqy/features/auth/presentation/widgets/account_status_dialog.da
 import 'package:baqy/features/expenses/domain/models/month_remaining.dart';
 import 'package:baqy/features/expenses/presentation/providers/expense_providers.dart';
 import 'package:baqy/features/home/presentation/widgets/budget_bottom_sheet.dart';
+import 'package:baqy/features/backup/presentation/providers/backup_providers.dart';
 import 'package:baqy/features/settings/presentation/screens/settings_screen.dart';
 import 'package:baqy/l10n/app_localizations.dart';
 
 class FakeAppDatabase extends Fake implements AppDatabase {
+  bool clearAllDataCalled = false;
+
+  @override
+  Future<void> clearAllData() async {
+    clearAllDataCalled = true;
+  }
+
   @override
   Future<void> close() async {}
 }
@@ -367,6 +375,86 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AccountStatusDialog), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'SettingsScreen reset data card displays styled card, dialog with warnings, and cancels or confirms',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final fakeDb = FakeAppDatabase();
+      final fakeRepo = FakeAuthRepository(
+        userToReturn: const AuthUser(
+          uid: 'uid_1',
+          displayName: 'محمد',
+          email: 'mohamed@test.com',
+        ),
+      );
+
+      await tester.pumpWidget(
+        buildTestApp(
+          child: const SettingsScreen(),
+          overrides: [
+            authRepositoryProvider.overrideWithValue(fakeRepo),
+            appDatabaseProvider.overrideWithValue(fakeDb),
+            backupSyncControllerProvider.overrideWithValue(null),
+            currentMonthRemainingProvider.overrideWith(
+              (ref) async => const MonthRemaining(
+                budget: 1000000,
+                expenses: 200000,
+                income: 0,
+                goalSavings: 0,
+                monthMoney: 1000000,
+                remaining: 800000,
+                yearMonth: '2026-11',
+              ),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Scroll to Reset Data card so it comes into view
+      await tester.scrollUntilVisible(
+        find.text('تصفير جميع البيانات'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+
+      // Find the Reset Data card
+      expect(find.text('تصفير جميع البيانات'), findsOneWidget);
+      expect(find.text('حذف كافة المصاريف والديون والميزانيات للبدء من جديد'), findsOneWidget);
+      expect(find.byIcon(Icons.restart_alt_rounded), findsOneWidget);
+
+      // Tap it
+      await tester.tap(find.text('تصفير جميع البيانات'));
+      await tester.pumpAndSettle();
+
+      // Confirmation dialog appears with detailed warnings
+      expect(find.text('تصفير جميع البيانات؟'), findsOneWidget);
+      expect(find.textContaining('هل أنت متأكد من رغبتك في حذف كافة البيانات'), findsOneWidget);
+      expect(find.textContaining('سيتم مسح جميع المصاريف والمعاملات المسجلة'), findsOneWidget);
+      expect(find.text('إلغاء'), findsOneWidget);
+      expect(find.text('تصفير البيانات'), findsOneWidget);
+
+      // Tap "إلغاء" first
+      await tester.tap(find.text('إلغاء'));
+      await tester.pumpAndSettle();
+
+      // Dialog dismissed and DB was not cleared
+      expect(find.text('تصفير جميع البيانات؟'), findsNothing);
+      expect(fakeDb.clearAllDataCalled, isFalse);
+
+      // Tap again to confirm
+      await tester.tap(find.text('تصفير جميع البيانات'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('تصفير البيانات'));
+      await tester.pumpAndSettle();
+
+      // Verified clearAllData was executed
+      expect(fakeDb.clearAllDataCalled, isTrue);
     },
   );
 }

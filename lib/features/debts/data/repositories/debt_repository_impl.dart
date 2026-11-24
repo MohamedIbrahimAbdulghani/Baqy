@@ -389,14 +389,24 @@ class DebtRepositoryImpl implements DebtRepository {
 
   @override
   Future<void> deleteDebt(int id) async {
+    final existing = await getDebtById(id);
+    final isSettled = existing != null && (existing.isSettled || existing.archived || existing.remaining <= 0);
+
     await _db.transaction(() async {
       final payments = await (_db.select(_db.debtPayments)..where((p) => p.debtId.equals(id))).get();
       final txIds = payments.map((p) => p.transactionId).whereType<int>().toList();
 
       await (_db.delete(_db.debtPayments)..where((p) => p.debtId.equals(id))).go();
-      for (final txId in txIds) {
-        await (_db.delete(_db.transactions)..where((t) => t.id.equals(txId))).go();
+
+      // Only delete transactions if the debt was NOT settled.
+      // For settled/archived debts, payments have already been settled in reality,
+      // so deleting the archived record must preserve transactions and not alter monthly expenses.
+      if (!isSettled) {
+        for (final txId in txIds) {
+          await (_db.delete(_db.transactions)..where((t) => t.id.equals(txId))).go();
+        }
       }
+
       await (_db.delete(_db.debts)..where((d) => d.id.equals(id))).go();
     });
 

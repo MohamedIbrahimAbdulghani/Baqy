@@ -11,12 +11,16 @@ class RecordPaymentSheet extends StatefulWidget {
     required this.onSave,
     this.title = 'تسجيل دفعة',
     this.initialAmountPiastres,
+    this.customMaxError,
+    this.helperText,
   });
 
   final int maxRemainingPiastres;
   final Future<void> Function(int amountPiastres) onSave;
   final String title;
   final int? initialAmountPiastres;
+  final String? customMaxError;
+  final String? helperText;
 
   static Future<void> show({
     required BuildContext context,
@@ -24,6 +28,8 @@ class RecordPaymentSheet extends StatefulWidget {
     required Future<void> Function(int amountPiastres) onSave,
     String title = 'تسجيل دفعة',
     int? initialAmountPiastres,
+    String? customMaxError,
+    String? helperText,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -34,6 +40,8 @@ class RecordPaymentSheet extends StatefulWidget {
         onSave: onSave,
         title: title,
         initialAmountPiastres: initialAmountPiastres,
+        customMaxError: customMaxError,
+        helperText: helperText,
       ),
     );
   }
@@ -76,7 +84,7 @@ class _RecordPaymentSheetState extends State<RecordPaymentSheet> {
     final amountPiastres = parsed * 100;
     if (amountPiastres > widget.maxRemainingPiastres) {
       setState(() {
-        _errorMessage = 'المبلغ أكبر من المتبقي';
+        _errorMessage = widget.customMaxError ?? 'المبلغ أكبر من المتبقي';
       });
       return;
     }
@@ -135,16 +143,31 @@ class _RecordPaymentSheetState extends State<RecordPaymentSheet> {
             ),
             const SizedBox(height: 20.0),
 
-            // Field Label: "المبلغ بالجنيه"
-            Text(
-              'المبلغ بالجنيه',
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontFamily: AppTheme.fontFamily,
-                fontSize: 13.0,
-                fontWeight: FontWeight.w400,
-                color: AppColors.secondaryText,
-              ),
+            // Field Label: "المبلغ بالجنيه" & Optional helper text
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'المبلغ بالجنيه',
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 13.0,
+                    fontWeight: FontWeight.w400,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+                if (widget.helperText != null)
+                  Text(
+                    widget.helperText!,
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: 12.0,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.secondaryText,
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 8.0),
 

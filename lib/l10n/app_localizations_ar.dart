@@ -232,4 +232,20 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get monthDec => 'ديسمبر';
+
+  @override
+  String get backupDataUpdatedSnackbar => 'تم تحديث بياناتك';
+
+  @override
+  String get backupConflictDialogTitle => 'في تعارض في البيانات';
+
+  @override
+  String get backupConflictDialogBody =>
+      'في تعديلات على الموبايل ده ومش اتحفظت، وفي نسخة أحدث على حسابك. تحب تحتفظ بإيه؟';
+
+  @override
+  String get backupConflictKeepLocal => 'اللي على الموبايل ده';
+
+  @override
+  String get backupConflictKeepCloud => 'النسخة اللي على الحساب';
 }

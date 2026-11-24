@@ -85,5 +85,10 @@
   "monthSep": "September",
   "monthOct": "October",
   "monthNov": "November",
-  "monthDec": "December"
+  "monthDec": "December",
+  "backupDataUpdatedSnackbar": "Your data has been updated",
+  "backupConflictDialogTitle": "Data Conflict",
+  "backupConflictDialogBody": "There are unsaved edits on this device, and a newer version exists on your account. What would you like to keep?",
+  "backupConflictKeepLocal": "Keep device version",
+  "backupConflictKeepCloud": "Keep account version"
 }

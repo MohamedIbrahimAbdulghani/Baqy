@@ -6,6 +6,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
+import '../../../backup/presentation/controllers/backup_sync_controller.dart';
+import '../../../backup/presentation/providers/backup_providers.dart';
 import '../../domain/models/category_item.dart';
 import '../providers/expense_providers.dart';
 import '../widgets/category_chip.dart';
@@ -21,6 +23,7 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
 class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   late final TextEditingController _nameController;
   late final TextEditingController _amountController;
+  BackupSyncController? _syncController;
 
   int? _selectedCategoryId;
   bool _isEditMode = false;
@@ -30,12 +33,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   @override
   void initState() {
     super.initState();
+    _syncController = ref.read(backupSyncControllerProvider);
+    _syncController?.setExpenseScreenOpen(true);
     _nameController = TextEditingController();
     _amountController = TextEditingController();
   }
 
   @override
   void dispose() {
+    _syncController?.setExpenseScreenOpen(false);
     _nameController.dispose();
     _amountController.dispose();
     super.dispose();
@@ -93,6 +99,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       final currentYm = ref.read(selectedYearMonthProvider);
       final (year, _) = ArabicDateHelper.parseYearMonthKey(currentYm);
       ref.invalidate(monthsWithDataProvider(year));
+      ref.read(backupSyncControllerProvider)?.flush();
 
       if (mounted) {
         context.pop();

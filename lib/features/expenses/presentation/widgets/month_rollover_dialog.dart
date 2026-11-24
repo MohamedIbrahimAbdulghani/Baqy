@@ -12,8 +12,7 @@ import '../providers/expense_providers.dart';
 abstract final class MonthRolloverHelper {
   static bool _hasCheckedThisSession = false;
 
-  /// Visible for testing to reset session memory
-  @visibleForTesting
+  /// Resets session memory (e.g. after data reset or in tests)
   static void resetSession() {
     _hasCheckedThisSession = false;
   }

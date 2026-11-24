@@ -39,4 +39,7 @@ abstract class BackupRepository {
     required BackupSnapshot snapshot,
     required AppDatabase db,
   });
+
+  /// Deletes cloud backup documents from Firestore.
+  Future<void> deleteCloudBackup(String uid);
 }

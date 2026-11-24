@@ -44,8 +44,8 @@ class _BaqyLogoPainter extends CustomPainter {
     canvas.save();
     canvas.scale(scale, scale);
 
-    final Color bgColor = isSplash ? AppColors.background : AppColors.darkGreen;
-    final Color outlineColor = isSplash ? AppColors.background : AppColors.darkGreen;
+    final Color bgColor = isSplash ? AppColors.lightBackground : AppColors.darkGreen;
+    final Color outlineColor = isSplash ? AppColors.lightBackground : AppColors.darkGreen;
 
     // 1. Draw rounded square (100x100, rx: 28)
     final RRect rrect = RRect.fromRectAndRadius(

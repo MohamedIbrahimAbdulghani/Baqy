@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../../core/widgets/action_feedback_dialog.dart';
+import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../../../shell/presentation/providers/tab_provider.dart';
 import '../../domain/models/debt_item.dart';
 import '../../domain/models/debt_payment_item.dart';
@@ -43,7 +44,7 @@ class DebtDetailsScreen extends ConsumerWidget {
 
     if (isSettled) {
       dialogTitle = 'حذف نهائي؟';
-      dialogBody = 'في حالة الحذف هيتم حذفه نهائياً من التطبيق ومش هتقدر تعرضه تاني.';
+      dialogBody = 'في حالة الحذف هيتم حذف سجل الدين نهائياً، والمصاريف والمدفوعات اللي اتسجلت بالفعل مش هتتأثر.';
       confirmBtnText = 'حذف نهائياً';
     } else if (isOwe) {
       dialogTitle = 'حذف الدين؟';
@@ -118,7 +119,7 @@ class DebtDetailsScreen extends ConsumerWidget {
 
         if (isSettled) {
           feedbackTitle = 'تم الحذف نهائياً';
-          feedbackSubtitle = 'تم حذف سجل $name نهائياً من التطبيق.';
+          feedbackSubtitle = 'تم حذف سجل $name نهائياً مع الحفاظ على المصاريف المسجلة.';
         } else if (isOwe) {
           feedbackTitle = 'تم حذف الدين';
           feedbackSubtitle = 'اتحذف الدين الخاص بـ $name ورجعت الحسابات زي ما كانت.';
@@ -140,15 +141,107 @@ class DebtDetailsScreen extends ConsumerWidget {
     }
   }
 
-  void _showRecordPaymentSheet(BuildContext context, WidgetRef ref, DebtItem debt) {
+  void _showRecordPaymentSheet(
+    BuildContext context,
+    WidgetRef ref,
+    DebtItem debt,
+    int availableMoneyPiastres,
+    bool hasBudget,
+  ) {
     if (debt.remaining <= 0) return;
+
+    final isOwe = debt.direction == 'owe';
+
+    // إذا كان الدين عليا وفيه ميزانية محددة، لكن الفلوس خلصت (<= 0)
+    if (isOwe && hasBudget && availableMoneyPiastres <= 0) {
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            backgroundColor: AppColors.card,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.0),
+            ),
+            title: Row(
+              children: [
+                const Icon(
+                  Icons.info_outline_rounded,
+                  color: Color(0xFFE65100),
+                  size: 24.0,
+                ),
+                const SizedBox(width: 8.0),
+                Expanded(
+                  child: Text(
+                    'لا يوجد رصيد متبقٍ',
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18.0,
+                      color: AppColors.text,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              'رصيدك المتبقي في ميزانية هذا الشهر 0 جنيه. لا يمكنك تسجيل دفعة حتى تتوفر سيولة في الميزانية.',
+              style: TextStyle(
+                fontFamily: AppTheme.fontFamily,
+                fontSize: 14.0,
+                color: AppColors.secondaryText,
+                height: 1.5,
+              ),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4A7C59),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                ),
+                child: const Text(
+                  'حسناً',
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      return;
+    }
+
+    final int maxAllowedPiastres;
+    final String? customLimitError;
+    final String? helperText;
+
+    if (isOwe && hasBudget && availableMoneyPiastres < debt.remaining) {
+      maxAllowedPiastres = availableMoneyPiastres;
+      final availFormatted = NumberFormatter.formatCurrency(availableMoneyPiastres ~/ 100);
+      customLimitError = 'المبلغ أكبر من المتوفر معاك في الميزانية ($availFormatted جنيه)';
+      helperText = 'المتوفر معاك: $availFormatted جنيه';
+    } else {
+      maxAllowedPiastres = debt.remaining;
+      customLimitError = null;
+      helperText = null;
+    }
 
     int? recordedPaymentId;
     int? recordedAmountPiastres;
 
     RecordPaymentSheet.show(
       context: context,
-      maxRemainingPiastres: debt.remaining,
+      maxRemainingPiastres: maxAllowedPiastres,
+      customMaxError: customLimitError,
+      helperText: helperText,
       onSave: (amountPiastres) async {
         final paymentId = await ref.read(debtRepositoryProvider).recordPayment(
               debtId: debt.id,
@@ -165,7 +258,6 @@ class DebtDetailsScreen extends ConsumerWidget {
       final amountPiastres = recordedAmountPiastres!;
       final paymentId = recordedPaymentId!;
       final newRemaining = debt.remaining - amountPiastres;
-      final isOwe = debt.direction == 'owe';
       final formattedAmount = '${NumberFormatter.formatCurrency(amountPiastres ~/ 100)} جنيه';
 
       if (newRemaining <= 0) {
@@ -203,20 +295,237 @@ class DebtDetailsScreen extends ConsumerWidget {
     });
   }
 
+  Future<void> _showPayFullDialog(
+    BuildContext context,
+    WidgetRef ref,
+    DebtItem debt,
+    int availableMoneyPiastres,
+    bool hasBudget,
+  ) async {
+    if (debt.remaining <= 0) return;
+
+    final isOwe = debt.direction == 'owe';
+    final remainingFormatted =
+        NumberFormatter.formatCurrency(debt.remaining ~/ 100);
+
+    // إذا كان الدين عليا وفيه ميزانية، والمبلغ المطلوب لسداد الدين أكبر من الفلوس المتوفرة
+    if (isOwe && hasBudget && debt.remaining > availableMoneyPiastres) {
+      final availableEgp = availableMoneyPiastres > 0 ? (availableMoneyPiastres ~/ 100) : 0;
+      final availableFormatted = NumberFormatter.formatCurrency(availableEgp);
+
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            backgroundColor: AppColors.card,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.0),
+            ),
+            title: Row(
+              children: [
+                const Icon(
+                  Icons.info_outline_rounded,
+                  color: Color(0xFFE65100),
+                  size: 24.0,
+                ),
+                const SizedBox(width: 8.0),
+                Expanded(
+                  child: Text(
+                    'المبلغ أكبر من المتوفر معاك',
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18.0,
+                      color: AppColors.text,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              availableMoneyPiastres <= 0
+                  ? 'المتبقي عليك لسداد الدين بالكامل هو $remainingFormatted جنيه، ولكن ليس لديك رصيد كافٍ في ميزانية هذا الشهر لسداد الدين.'
+                  : 'المتبقي عليك لسداد الدين بالكامل هو $remainingFormatted جنيه، والمبلغ المتوفر معاك في ميزانية الشهر حالياً هو $availableFormatted جنيه فقط.\n\nيمكنك تسجيل دفعة جزئية بالمبلغ المتوفر بدلاً من سداد الدين بالكامل.',
+              style: TextStyle(
+                fontFamily: AppTheme.fontFamily,
+                fontSize: 14.0,
+                color: AppColors.secondaryText,
+                height: 1.5,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(
+                  'إلغاء',
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ),
+              if (availableMoneyPiastres > 0)
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    _showRecordPaymentSheet(context, ref, debt, availableMoneyPiastres, hasBudget);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A7C59),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10.0),
+                    ),
+                  ),
+                  child: const Text(
+                    'تسجيل دفعة جزئية',
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: AppColors.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0),
+          ),
+          title: Text(
+            'هل تريد سداد المبلغ بالكامل؟',
+            style: TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              fontWeight: FontWeight.bold,
+              fontSize: 18.0,
+              color: AppColors.text,
+            ),
+          ),
+          content: Text(
+            isOwe
+                ? 'سيتم سداد المبلغ المتبقي بالكامل ($remainingFormatted جنيه) وخصمه من ميزانية الشهر ونقل الدين إلى قائمة تم سدادها.'
+                : 'سيتم تسجيل استلام المبلغ المتبقي بالكامل ($remainingFormatted جنيه) وإضافته لميزانية الشهر ونقل الدين إلى قائمة تم سدادها.',
+            style: TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 14.0,
+              color: AppColors.secondaryText,
+              height: 1.5,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(
+                'لا',
+                style: TextStyle(
+                  fontFamily: AppTheme.fontFamily,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15.0,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2E7D32),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+              ),
+              child: const Text(
+                'نعم',
+                style: TextStyle(
+                  fontFamily: AppTheme.fontFamily,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15.0,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final paymentId = await ref.read(debtRepositoryProvider).recordPayment(
+            debtId: debt.id,
+            amount: debt.remaining,
+            paidAt: DateTime.now(),
+          );
+
+      if (!context.mounted) return;
+
+      _popOrGoToDebts(context, ref);
+
+      final targetContext =
+          rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+      if (targetContext != null && targetContext.mounted) {
+        await ActionFeedbackDialog.show(
+          context: targetContext,
+          type: ActionFeedbackType.settled,
+          title: 'تم سداد المبلغ بنجاح',
+          subtitle: isOwe
+              ? 'سددت كل اللي عليك لـ ${debt.personName}، واتنقل لقائمة تم سدادها.'
+              : 'استلمت كل اللي ليك عند ${debt.personName}، واتنقل لقائمة تم سدادها.',
+          onUndo: () async {
+            await ref.read(debtRepositoryProvider).undoPayment(paymentId);
+          },
+        );
+      }
+    }
+  }
+
   void _showEditPaymentSheet(
     BuildContext context,
     WidgetRef ref,
     DebtItem debt,
     DebtPaymentItem payment,
+    int availableMoneyPiastres,
+    bool hasBudget,
   ) {
     int? updatedNewAmount;
     final initialRemaining = debt.remaining;
+    final isOwe = debt.direction == 'owe';
+
+    final int maxAllowed;
+    final String? customError;
+    final String? helperText;
+
+    if (isOwe && hasBudget && (availableMoneyPiastres + payment.amount) < (debt.remaining + payment.amount)) {
+      maxAllowed = availableMoneyPiastres + payment.amount;
+      final availFormatted = NumberFormatter.formatCurrency(maxAllowed ~/ 100);
+      customError = 'المبلغ أكبر من المتوفر معاك في الميزانية ($availFormatted جنيه)';
+      helperText = 'المتوفر معاك: $availFormatted جنيه';
+    } else {
+      maxAllowed = debt.remaining + payment.amount;
+      customError = null;
+      helperText = null;
+    }
 
     RecordPaymentSheet.show(
       context: context,
       title: 'تعديل الدفعة',
       initialAmountPiastres: payment.amount,
-      maxRemainingPiastres: debt.remaining + payment.amount,
+      maxRemainingPiastres: maxAllowed,
+      customMaxError: customError,
+      helperText: helperText,
       onSave: (newAmount) async {
         await ref.read(debtRepositoryProvider).updatePayment(
               paymentId: payment.id,
@@ -229,7 +538,6 @@ class DebtDetailsScreen extends ConsumerWidget {
 
       final newAmount = updatedNewAmount!;
       final newRemaining = (initialRemaining + payment.amount) - newAmount;
-      final isOwe = debt.direction == 'owe';
 
       if (newRemaining <= 0) {
         _popOrGoToDebts(context, ref);
@@ -332,6 +640,10 @@ class DebtDetailsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final debtAsync = ref.watch(debtDetailsStreamProvider(debtId));
     final paymentsAsync = ref.watch(debtPaymentsStreamProvider(debtId));
+    final monthRemainingAsync = ref.watch(currentMonthRemainingProvider);
+    final monthRemaining = monthRemainingAsync.value;
+    final hasBudget = monthRemaining != null && monthRemaining.monthMoney > 0;
+    final availableMoneyPiastres = monthRemaining?.remaining ?? 0;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -355,10 +667,15 @@ class DebtDetailsScreen extends ConsumerWidget {
           final totalFormatted = NumberFormatter.formatCurrency(totalEgp);
           final paidFormatted = NumberFormatter.formatCurrency(paidEgp);
 
+          final availableEgp = availableMoneyPiastres > 0 ? (availableMoneyPiastres ~/ 100) : 0;
+          final availableFormatted = NumberFormatter.formatCurrency(availableEgp);
+
           final verbText = isOwe ? 'دفعت' : 'استلمت';
           final remainingLabel = isOwe ? 'المتبقي عليك' : 'المتبقي ليك';
           final monthNote = isOwe
-              ? 'الدفعة بتتخصم من ميزانية الشهر وبتتسجل تحت نوع «ديون»'
+              ? (hasBudget && availableMoneyPiastres < debt.remaining
+                  ? 'المتوفر معاك حالياً: $availableFormatted جنيه • الدفعة بتتخصم من ميزانية الشهر'
+                  : 'الدفعة بتتخصم من ميزانية الشهر وبتتسجل تحت نوع «ديون»')
               : 'الدفعة بتضاف لميزانية الشهر';
 
           return Scaffold(
@@ -570,7 +887,14 @@ class DebtDetailsScreen extends ConsumerWidget {
                                               const SizedBox(width: 12.0),
                                               // Edit button
                                               InkWell(
-                                                onTap: () => _showEditPaymentSheet(context, ref, debt, p),
+                                                onTap: () => _showEditPaymentSheet(
+                                                  context,
+                                                  ref,
+                                                  debt,
+                                                  p,
+                                                  availableMoneyPiastres,
+                                                  hasBudget,
+                                                ),
                                                 borderRadius: BorderRadius.circular(8.0),
                                                 child: Padding(
                                                   padding: const EdgeInsets.all(6.0),
@@ -668,31 +992,119 @@ class DebtDetailsScreen extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(height: 12.0),
-                              SizedBox(
-                                width: double.infinity,
-                                height: 52.0,
-                                child: ElevatedButton(
-                                  onPressed: debt.remaining > 0
-                                      ? () => _showRecordPaymentSheet(context, ref, debt)
-                                      : null,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF4A7C59),
-                                    foregroundColor: Colors.white,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14.0),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 52.0,
+                                      child: OutlinedButton(
+                                        onPressed: debt.remaining > 0
+                                            ? () => _showRecordPaymentSheet(
+                                                  context,
+                                                  ref,
+                                                  debt,
+                                                  availableMoneyPiastres,
+                                                  hasBudget,
+                                                )
+                                            : null,
+                                        style: OutlinedButton.styleFrom(
+                                          backgroundColor: AppColors.isDark
+                                              ? const Color(0xFF1B2822)
+                                              : const Color(0xFFEEF6F1),
+                                          foregroundColor: AppColors.isDark
+                                              ? const Color(0xFF81C784)
+                                              : const Color(0xFF235C47),
+                                          side: BorderSide(
+                                            color: AppColors.isDark
+                                                ? const Color(0xFF3E6652)
+                                                : const Color(0xFF7BAF95),
+                                            width: 1.5,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(14.0),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.add_circle_outline_rounded,
+                                              size: 18.0,
+                                              color: AppColors.isDark
+                                                  ? const Color(0xFF81C784)
+                                                  : const Color(0xFF235C47),
+                                            ),
+                                            const SizedBox(width: 6.0),
+                                            const Flexible(
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: Text(
+                                                  'تسجيل دفعة',
+                                                  style: TextStyle(
+                                                    fontFamily: AppTheme.fontFamily,
+                                                    fontSize: 15.0,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                  child: const Text(
-                                    'تسجيل دفعة',
-                                    style: TextStyle(
-                                      fontFamily: AppTheme.fontFamily,
-                                      fontSize: 17.0,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
+                                  const SizedBox(width: 12.0),
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 52.0,
+                                      child: ElevatedButton(
+                                        onPressed: debt.remaining > 0
+                                            ? () => _showPayFullDialog(
+                                                  context,
+                                                  ref,
+                                                  debt,
+                                                  availableMoneyPiastres,
+                                                  hasBudget,
+                                                )
+                                            : null,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF2E7D32),
+                                          foregroundColor: Colors.white,
+                                          elevation: 1,
+                                          shadowColor: const Color(0x332E7D32),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(14.0),
+                                          ),
+                                        ),
+                                        child: const Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.check_circle_rounded,
+                                              size: 18.0,
+                                              color: Colors.white,
+                                            ),
+                                            SizedBox(width: 6.0),
+                                            Flexible(
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: Text(
+                                                  'سداد المبلغ بالكامل',
+                                                  style: TextStyle(
+                                                    fontFamily: AppTheme.fontFamily,
+                                                    fontSize: 14.5,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
+                                ],
                               ),
                             ],
                           ),

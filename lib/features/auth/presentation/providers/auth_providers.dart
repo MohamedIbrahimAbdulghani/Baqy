@@ -86,16 +86,21 @@ class AuthController extends AsyncNotifier<void> {
   }
 
   Future<void> signOut() async {
+    isSigningOut = true;
     isAccountSuspended = false;
     isCheckingAccountSecurity = false;
-    final currentDb = ref.read(activeDatabaseProvider);
-    ref.read(activeDatabaseProvider.notifier).setDatabase(null);
-    ref.read(activeUserIdProvider.notifier).setUserId(null);
+    try {
+      final currentDb = ref.read(activeDatabaseProvider);
+      ref.read(activeDatabaseProvider.notifier).setDatabase(null);
+      ref.read(activeUserIdProvider.notifier).setUserId(null);
 
-    final repo = ref.read(authRepositoryProvider);
-    await repo.signOut();
-    if (currentDb != null) {
-      await currentDb.close();
+      final repo = ref.read(authRepositoryProvider);
+      await repo.signOut();
+      if (currentDb != null) {
+        await currentDb.close();
+      }
+    } finally {
+      isSigningOut = false;
     }
   }
 

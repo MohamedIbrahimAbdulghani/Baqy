@@ -8,6 +8,8 @@ import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/category_icon_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../../core/widgets/action_feedback_dialog.dart';
+import '../../../backup/presentation/controllers/backup_sync_controller.dart';
+import '../../../backup/presentation/providers/backup_providers.dart';
 import '../../../shell/presentation/providers/tab_provider.dart';
 import '../../domain/models/transaction_item.dart';
 import '../providers/expense_providers.dart';
@@ -403,6 +405,7 @@ abstract final class TransactionActionsHelper {
       ref.invalidate(monthCategoryTotalsProvider);
       ref.invalidate(currentMonthRemainingProvider);
       ref.invalidate(recentTransactionsProvider);
+      ref.read(backupSyncControllerProvider)?.flush();
 
       if (context.mounted) {
         final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
@@ -445,6 +448,7 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
   late final TextEditingController _amountController;
   late final TextEditingController _descController;
   late final TextEditingController _noteController;
+  BackupSyncController? _syncController;
   late int _selectedCategoryId;
   String? _amountError;
   String? _descError;
@@ -453,6 +457,8 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
   @override
   void initState() {
     super.initState();
+    _syncController = ref.read(backupSyncControllerProvider);
+    _syncController?.setExpenseScreenOpen(true);
     _amountController = TextEditingController(
       text: (widget.transaction.amount ~/ 100).toString(),
     );
@@ -463,6 +469,7 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
 
   @override
   void dispose() {
+    _syncController?.setExpenseScreenOpen(false);
     _amountController.dispose();
     _descController.dispose();
     _noteController.dispose();
@@ -512,6 +519,8 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
           categoryId: _selectedCategoryId,
         );
       }
+
+      ref.read(backupSyncControllerProvider)?.flush();
 
       if (mounted) {
         Navigator.of(context).pop();

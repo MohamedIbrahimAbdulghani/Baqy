@@ -85,5 +85,10 @@
   "monthSep": "سبتمبر",
   "monthOct": "أكتوبر",
   "monthNov": "نوفمبر",
-  "monthDec": "ديسمبر"
+  "monthDec": "ديسمبر",
+  "backupDataUpdatedSnackbar": "تم تحديث بياناتك",
+  "backupConflictDialogTitle": "في تعارض في البيانات",
+  "backupConflictDialogBody": "في تعديلات على الموبايل ده ومش اتحفظت، وفي نسخة أحدث على حسابك. تحب تحتفظ بإيه؟",
+  "backupConflictKeepLocal": "اللي على الموبايل ده",
+  "backupConflictKeepCloud": "النسخة اللي على الحساب"
 }

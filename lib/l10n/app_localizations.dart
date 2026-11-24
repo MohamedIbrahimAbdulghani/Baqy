@@ -529,6 +529,36 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'ديسمبر'**
   String get monthDec;
+
+  /// No description provided for @backupDataUpdatedSnackbar.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم تحديث بياناتك'**
+  String get backupDataUpdatedSnackbar;
+
+  /// No description provided for @backupConflictDialogTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'في تعارض في البيانات'**
+  String get backupConflictDialogTitle;
+
+  /// No description provided for @backupConflictDialogBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'في تعديلات على الموبايل ده ومش اتحفظت، وفي نسخة أحدث على حسابك. تحب تحتفظ بإيه؟'**
+  String get backupConflictDialogBody;
+
+  /// No description provided for @backupConflictKeepLocal.
+  ///
+  /// In ar, this message translates to:
+  /// **'اللي على الموبايل ده'**
+  String get backupConflictKeepLocal;
+
+  /// No description provided for @backupConflictKeepCloud.
+  ///
+  /// In ar, this message translates to:
+  /// **'النسخة اللي على الحساب'**
+  String get backupConflictKeepCloud;
 }
 
 class _AppLocalizationsDelegate

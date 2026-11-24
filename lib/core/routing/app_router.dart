@@ -33,6 +33,9 @@ bool isAccountSuspended = false;
 /// Set to true during an active account security check to prevent race-condition redirects.
 bool isCheckingAccountSecurity = false;
 
+/// Set to true when user intentionally signs out to avoid false-positive security checks.
+bool isSigningOut = false;
+
 /// Listenable that notifies GoRouter whenever auth state changes
 class AppAuthNotifier extends ChangeNotifier {
   StreamSubscription? _sub;

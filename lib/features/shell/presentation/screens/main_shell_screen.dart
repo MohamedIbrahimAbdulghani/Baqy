@@ -137,13 +137,18 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
   }
 
   Future<void> _checkSecurityStatus() async {
-    if (!mounted || _isCheckingSecurity || _hasTriggeredSecurityDialog) return;
+    if (!mounted || isSigningOut || _isCheckingSecurity || _hasTriggeredSecurityDialog) return;
+    final repo = ref.read(authRepositoryProvider);
+    if (repo.currentUser == null || ref.read(activeUserIdProvider) == null) {
+      _securityCheckTimer?.cancel();
+      _securityCheckTimer = null;
+      return;
+    }
     _isCheckingSecurity = true;
     isCheckingAccountSecurity = true;
     try {
-      final repo = ref.read(authRepositoryProvider);
       final status = await repo.checkAccountStatus();
-      if (!mounted) return;
+      if (!mounted || isSigningOut || repo.currentUser == null) return;
 
       if (status == AccountStatus.disabled || status == AccountStatus.deleted) {
         _hasTriggeredSecurityDialog = true;

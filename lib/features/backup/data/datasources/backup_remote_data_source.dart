@@ -18,4 +18,7 @@ abstract class BackupRemoteDataSource {
     required List<Uint8List> chunks,
     Map<String, dynamic>? readableSummary,
   });
+
+  /// Deletes backup metadata and chunks from cloud storage for [uid].
+  Future<void> deleteBackup(String uid);
 }

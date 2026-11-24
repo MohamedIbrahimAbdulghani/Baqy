@@ -77,29 +77,29 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.darkGreen,
+    return const Scaffold(
+      backgroundColor: AppColors.lightDarkGreen,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const BaqyLogo(
+            BaqyLogo(
               size: 100,
               isSplash: true,
             ),
-            const SizedBox(height: 28),
+            SizedBox(height: 28),
             Text(
               'باقي',
               style: TextStyle(
                 fontFamily: AppTheme.fontFamily,
                 fontWeight: FontWeight.w700,
                 fontSize: 44,
-                color: AppColors.background,
+                color: AppColors.lightBackground,
                 height: 1.2,
               ),
             ),
-            const SizedBox(height: 12),
-            const Text(
+            SizedBox(height: 12),
+            Text(
               'BAQY',
               style: TextStyle(
                 fontFamily: AppTheme.fontFamily,

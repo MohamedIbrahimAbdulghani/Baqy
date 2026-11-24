@@ -92,6 +92,7 @@ BackupSnapshot _isolateReassembleAndDecompress(({List<Uint8List> chunks, String 
 
 class BackupRepositoryImpl implements BackupRepository {
   final BackupRemoteDataSource _remoteDataSource;
+  bool _isRestoring = false;
 
   static const List<String> userTableNames = [
     'categories',
@@ -118,7 +119,7 @@ class BackupRepositoryImpl implements BackupRepository {
 
     return BackupSnapshot(
       schemaVersion: db.schemaVersion,
-      createdAt: DateTime.now().toUtc(),
+      createdAt: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
       tables: tables,
     );
   }
@@ -177,12 +178,14 @@ class BackupRepositoryImpl implements BackupRepository {
     String? knownContentHash,
   }) async {
     final hasData = await hasUserData(db);
-    final cloudMeta = await _remoteDataSource.getMeta(uid);
-    final backupExists = cloudMeta != null && cloudMeta.chunkCount > 0;
+    if (!hasData) {
+      final cloudMeta = await _remoteDataSource.getMeta(uid);
+      final backupExists = cloudMeta != null && cloudMeta.chunkCount > 0;
 
-    // Rule: NEVER upload snapshot of an empty database if a cloud backup exists!
-    if (!hasData && backupExists) {
-      throw const EmptyDatabaseOverwriteException();
+      // Rule: NEVER upload snapshot of an empty database if a cloud backup exists!
+      if (backupExists) {
+        throw const EmptyDatabaseOverwriteException();
+      }
     }
 
     final snapshot = await exportSnapshot(db);
@@ -336,6 +339,11 @@ class BackupRepositoryImpl implements BackupRepository {
     required AppDatabase db,
     BackupMeta? remoteMeta,
   }) async {
+    if (_isRestoring) {
+      debugPrint('[BACKUP_REPO] restoreBackup already in progress, skipping duplicate call.');
+      return;
+    }
+    _isRestoring = true;
     try {
       final meta = remoteMeta ?? await _remoteDataSource.getMeta(uid);
       if (meta == null || meta.chunkCount == 0) {
@@ -357,6 +365,8 @@ class BackupRepositoryImpl implements BackupRepository {
     } catch (e, st) {
       debugPrint('[BACKUP_REPO_ERROR] restoreBackup failed: $e\n$st');
       rethrow;
+    } finally {
+      _isRestoring = false;
     }
   }
 
@@ -558,5 +568,10 @@ class BackupRepositoryImpl implements BackupRepository {
     } catch (_) {
       // Notification rescheduling error should not prevent restore completion
     }
+  }
+
+  @override
+  Future<void> deleteCloudBackup(String uid) async {
+    await _remoteDataSource.deleteBackup(uid);
   }
 }

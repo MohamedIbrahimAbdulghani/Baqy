@@ -18,10 +18,15 @@ class AuthRepositoryImpl implements AuthRepository {
   final GoogleSignIn _googleSignIn;
   bool _isGoogleSignInInitialized = false;
 
+  static const String _serverClientId =
+      '340670824976-hqsu4qg4lgv0m5n6kn5nu1vu8vqtuo8p.apps.googleusercontent.com';
+
   Future<void> _ensureInitialized() async {
     if (!_isGoogleSignInInitialized) {
       try {
-        await _googleSignIn.initialize();
+        await _googleSignIn.initialize(
+          serverClientId: _serverClientId,
+        );
       } catch (_) {}
       _isGoogleSignInInitialized = true;
     }
@@ -57,24 +62,16 @@ class AuthRepositoryImpl implements AuthRepository {
     String? userEmail;
     try {
       await _ensureInitialized();
-      GoogleSignInAccount? account;
+      final GoogleSignInAccount account;
       try {
-        account = await _googleSignIn.attemptLightweightAuthentication();
-        debugPrint('[AUTH_DEBUG] attemptLightweightAuthentication result: ${account?.email}');
-      } catch (e) {
-        debugPrint('[AUTH_DEBUG] attemptLightweightAuthentication caught: $e');
-      }
-
-      if (account == null) {
-        try {
-          account = await _googleSignIn.authenticate();
-        } on GoogleSignInException catch (e, st) {
-          debugPrint('[AUTH_DEBUG] authenticate caught: ${e.code} - ${e.description}\n$st');
-          if (e.code == GoogleSignInExceptionCode.canceled) {
-            return null;
-          }
-          rethrow;
+        account = await _googleSignIn.authenticate();
+      } on GoogleSignInException catch (e, st) {
+        debugPrint('[AUTH_DEBUG] authenticate caught: ${e.code} - ${e.description}\n$st');
+        if (e.code == GoogleSignInExceptionCode.canceled ||
+            (e.description?.contains('No credential') ?? false)) {
+          return null;
         }
+        rethrow;
       }
 
       userEmail = account.email;
@@ -126,7 +123,8 @@ class AuthRepositoryImpl implements AuthRepository {
       rethrow;
     } on GoogleSignInException catch (e, st) {
       debugPrint('[AUTH_DEBUG] GoogleSignInException: ${e.code} - ${e.description}\n$st');
-      if (e.code == GoogleSignInExceptionCode.canceled) {
+      if (e.code == GoogleSignInExceptionCode.canceled ||
+          (e.description?.contains('No credential') ?? false)) {
         return null;
       }
       rethrow;
@@ -153,12 +151,14 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       await user.reload();
       await user.getIdToken(true);
-      final freshUser = _firebaseAuth.currentUser;
-      if (freshUser == null) {
-        return AccountStatus.deleted;
+      if (_firebaseAuth.currentUser == null) {
+        return AccountStatus.active;
       }
       return AccountStatus.active;
     } on FirebaseAuthException catch (e) {
+      if (_firebaseAuth.currentUser == null) {
+        return AccountStatus.active;
+      }
       if (e.code == 'user-disabled') {
         return AccountStatus.disabled;
       } else if (e.code == 'user-not-found') {
@@ -166,11 +166,14 @@ class AuthRepositoryImpl implements AuthRepository {
       }
       return AccountStatus.active;
     } catch (e) {
+      if (_firebaseAuth.currentUser == null) {
+        return AccountStatus.active;
+      }
       final str = e.toString().toLowerCase();
-      if (str.contains('user-disabled') || str.contains('disabled')) {
+      if (str.contains('user-disabled')) {
         return AccountStatus.disabled;
       }
-      if (str.contains('user-not-found') || str.contains('deleted')) {
+      if (str.contains('user-not-found')) {
         return AccountStatus.deleted;
       }
       return AccountStatus.active;

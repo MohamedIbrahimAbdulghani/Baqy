@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_dimensions.dart';
@@ -12,15 +13,21 @@ import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../../core/widgets/action_feedback_dialog.dart';
 import '../../../../core/widgets/whatsapp_icon.dart';
+import '../../../../core/services/notification_service.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../backup/presentation/providers/backup_providers.dart';
 import '../../../backup/presentation/widgets/backup_settings_card.dart';
+import '../../../debts/presentation/providers/debt_providers.dart';
 import '../../../expenses/presentation/providers/expense_providers.dart';
+import '../../../expenses/presentation/widgets/month_rollover_dialog.dart';
+import '../../../goals/presentation/providers/goal_providers.dart';
 import '../../../home/presentation/controllers/budget_monitor_controller.dart';
 import '../../../home/presentation/widgets/budget_bottom_sheet.dart';
+import '../../../reminders/presentation/providers/reminder_providers.dart';
 import '../../../security/presentation/providers/security_providers.dart';
 import '../../../security/presentation/widgets/pin_setup_sheet.dart';
+import '../../../shell/presentation/providers/tab_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -97,6 +104,226 @@ class SettingsScreen extends ConsumerWidget {
         title: 'تم تعديل الميزانية بنجاح',
         subtitle: 'تم ضبط ميزانية شهر $monthName بمبلغ $formatted وتحديث الحسابات.',
       );
+    }
+  }
+
+  Future<void> _confirmResetData(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: AppColors.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD9534F).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Color(0xFFD9534F),
+                  size: 26.0,
+                ),
+              ),
+              const SizedBox(width: 10.0),
+              Expanded(
+                child: Text(
+                  'تصفير جميع البيانات؟',
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18.0,
+                    color: AppColors.text,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'هل أنت متأكد من رغبتك في حذف كافة البيانات والبدء من جديد تماماً؟',
+                style: TextStyle(
+                  fontFamily: AppTheme.fontFamily,
+                  fontSize: 14.0,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.text,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 12.0),
+              Text(
+                '• سيتم مسح جميع المصاريف والمعاملات المسجلة.\n'
+                '• سيتم تصفير الميزانيات وأهداف التوفير والديون.\n'
+                '• سيتم مسح النسخة الاحتياطية السحابية للبدء بحساب نظيف.\n'
+                '• لا يمكن التراجع عن هذه الخطوة بعد التأكيد.',
+                style: TextStyle(
+                  fontFamily: AppTheme.fontFamily,
+                  fontSize: 13.0,
+                  color: AppColors.secondaryText,
+                  height: 1.6,
+                ),
+              ),
+            ],
+          ),
+          actionsPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(
+                'إلغاء',
+                style: TextStyle(
+                  fontFamily: AppTheme.fontFamily,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15.0,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD9534F),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 10.0),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+              ),
+              child: const Text(
+                'تصفير البيانات',
+                style: TextStyle(
+                  fontFamily: AppTheme.fontFamily,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15.0,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      // Show loading indicator
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const PopScope(
+          canPop: false,
+          child: Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD9534F)),
+            ),
+          ),
+        ),
+      );
+
+      try {
+        final db = ref.read(appDatabaseProvider);
+        await db.clearAllData();
+
+        // Cancel debt and reminder notifications
+        await NotificationService.instance.rescheduleDebts([]);
+        await NotificationService.instance.rescheduleReminders([]);
+
+        // Handle backup & sync reset
+        final syncController = ref.read(backupSyncControllerProvider);
+        if (syncController != null) {
+          await syncController.handleDataReset();
+        } else {
+          final uid = ref.read(activeUserIdProvider);
+          if (uid != null) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('backup_last_upload_time_$uid');
+            await prefs.remove('backup_last_content_hash_$uid');
+            await prefs.setBool('backup_start_fresh_$uid', true);
+            try {
+              await ref.read(backupRepositoryProvider).deleteCloudBackup(uid);
+            } catch (_) {}
+          }
+        }
+
+        // Reset providers & budget monitor
+        final now = DateTime.now();
+        final currentYm = ArabicDateHelper.formatYearMonthKey(now.year, now.month);
+        final userId = ref.read(activeUserIdProvider);
+        await BudgetMonitorController.resetAlertFlag(currentYm, userId: userId);
+
+        // Clear stored rollover & alert keys from SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        final allKeys = prefs.getKeys();
+        for (final key in allKeys) {
+          if (key.startsWith('month_rollover_handled_') ||
+              key.startsWith('budget_alert_threshold_25_')) {
+            await prefs.remove(key);
+          }
+        }
+        MonthRolloverHelper.resetSession();
+
+        ref.read(lastBackupTimeProvider.notifier).update(null);
+        ref.read(selectedYearMonthProvider.notifier).selectYearMonth(currentYm);
+        ref.read(hasAutoOpenedBudgetForMonthProvider.notifier).markOpened(currentYm);
+        ref.read(tabIndexProvider.notifier).selectTab(0);
+
+        ref.invalidate(recentTransactionsProvider);
+        ref.invalidate(currentMonthRemainingProvider);
+        ref.invalidate(yearsWithDataProvider);
+        ref.invalidate(monthsWithDataProvider(now.year));
+        ref.invalidate(monthCategoryTotalsProvider(currentYm));
+        ref.invalidate(categoriesProvider);
+        ref.invalidate(activeDebtsStreamProvider);
+        ref.invalidate(settledDebtsStreamProvider);
+        ref.invalidate(goalsStreamProvider);
+        ref.invalidate(remindersStreamProvider);
+      } finally {
+        if (context.mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(); // dismiss loading
+        }
+      }
+
+      if (context.mounted) {
+        final targetContext = rootNavigatorKey.currentContext ?? context;
+        await ActionFeedbackDialog.show(
+          context: targetContext,
+          type: ActionFeedbackType.deleted,
+          title: 'تم تصفير البيانات بنجاح',
+          subtitle: 'تم مسح كافة البيانات بنجاح. يمكنك الآن إدخال ميزانيتك الجديدة للبدء من جديد.',
+        );
+
+        final now = DateTime.now();
+        final currentYm = ArabicDateHelper.formatYearMonthKey(now.year, now.month);
+
+        if (context.mounted) {
+          if (GoRouter.maybeOf(context) != null) {
+            context.go('/main');
+          }
+
+          // Open Budget Sheet immediately on the Home screen so the user enters a new budget
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            final mainContext = rootNavigatorKey.currentContext;
+            if (mainContext != null && mainContext.mounted) {
+              await _openBudgetSheet(
+                mainContext,
+                ref,
+                currentYm,
+                now.month,
+                0,
+              );
+            }
+          });
+        }
+      }
     }
   }
 
@@ -920,11 +1147,86 @@ class SettingsScreen extends ConsumerWidget {
 
               const SizedBox(height: 16),
 
+              // Reset Data Card
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _confirmResetData(context, ref),
+                  borderRadius: BorderRadius.circular(16.0),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(16.0),
+                      border: Border.all(
+                        color: const Color(0xFFD9534F).withValues(alpha: 0.25),
+                        width: 1.0,
+                      ),
+                      boxShadow: AppDimensions.cardShadow,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44.0,
+                          height: 44.0,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD9534F).withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(12.0),
+                          ),
+                          child: const Icon(
+                            Icons.restart_alt_rounded,
+                            color: Color(0xFFD9534F),
+                            size: 24.0,
+                          ),
+                        ),
+                        const SizedBox(width: 14.0),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'تصفير جميع البيانات',
+                                style: TextStyle(
+                                  fontFamily: AppTheme.fontFamily,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFFD9534F),
+                                ),
+                              ),
+                              const SizedBox(height: 3.0),
+                              Text(
+                                'حذف كافة المصاريف والديون والميزانيات للبدء من جديد',
+                                style: TextStyle(
+                                  fontFamily: AppTheme.fontFamily,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w400,
+                                  color: AppColors.secondaryText,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8.0),
+                        Icon(
+                          Icons.chevron_left_rounded,
+                          color: AppColors.secondaryText.withValues(alpha: 0.6),
+                          size: 24.0,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
               // 5. Logout Card
               Material(
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: () async {
+                    isSigningOut = true;
                     // Flush any pending backup before signing out
                     try {
                       final syncController = ref.read(backupSyncControllerProvider);
