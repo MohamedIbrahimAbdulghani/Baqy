@@ -1,13 +1,21 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/database/app_database.dart';
+import '../../../../core/network/network_checker.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../data/repositories/backup_repository_impl.dart';
 import '../../domain/exceptions/backup_exceptions.dart';
 import '../../domain/models/backup_meta.dart';
 import '../../domain/repositories/backup_repository.dart';
 import '../widgets/backup_conflict_dialog.dart';
+
+enum SyncRefreshResult {
+  success,
+  offline,
+  failure,
+}
 
 class BackupSyncController with WidgetsBindingObserver {
   final BackupRepository repository;
@@ -29,6 +37,7 @@ class BackupSyncController with WidgetsBindingObserver {
   bool _isDisposed = false;
   bool _isPolling = false;
   bool _isAppForeground = true;
+  bool _isManualRefreshing = false;
   DateTime? _fastPulseUntil;
   final bool enablePolling;
 
@@ -291,7 +300,9 @@ class BackupSyncController with WidgetsBindingObserver {
       await prefs.setString('backup_last_content_hash_$uid', _lastContentHash!);
 
       onBackupSuccess?.call(_lastUploadTime);
-      onSilentRestoreSuccess?.call();
+      if (!_isManualRefreshing) {
+        onSilentRestoreSuccess?.call();
+      }
       debugPrint('[BACKUP_SYNC] Auto-restore completed successfully!');
     } catch (e, st) {
       debugPrint('[BACKUP_SYNC_ERROR] Auto-restore failed: $e\n$st');
@@ -374,6 +385,61 @@ class BackupSyncController with WidgetsBindingObserver {
     }
   }
 
+  /// Runs a manual pull-to-refresh sync:
+  /// 1. Checks internet connectivity. If offline, returns [SyncRefreshResult.offline].
+  /// 2. If signed in, checks cloud backup meta once with [timeout] (default 8s).
+  /// 3. If newer cloud backup exists and no unsynced local changes, silent restore.
+  /// 4. If unsynced local changes exist, try upload first.
+  /// 5. Respects existing sync controller shared lock and limits.
+  Future<SyncRefreshResult> syncOnManualRefresh({
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    if (_isDisposed || uid == null) {
+      return SyncRefreshResult.success;
+    }
+
+    final isOnline = await NetworkChecker.isOnline();
+    if (!isOnline) {
+      return SyncRefreshResult.offline;
+    }
+
+    if (_isUploading || _isRestoring) {
+      debugPrint('[BACKUP_SYNC] Sync already in progress during manual refresh.');
+      return SyncRefreshResult.success;
+    }
+
+    _isManualRefreshing = true;
+    try {
+      final remoteMeta =
+          await repository.getCloudBackupMeta(uid!).timeout(timeout);
+
+      final hasNewerBackup = remoteMeta != null &&
+          remoteMeta.contentHash.isNotEmpty &&
+          remoteMeta.contentHash != _lastContentHash;
+
+      if (hasNewerBackup && !_hasUnsyncedLocalChanges) {
+        await _performSilentRestore(remoteMeta);
+      } else if (_hasUnsyncedLocalChanges) {
+        if (remoteMeta != null) {
+          await _handleRemoteMeta(remoteMeta);
+        } else {
+          await _triggerBackupInternal();
+        }
+      }
+      return SyncRefreshResult.success;
+    } on TimeoutException {
+      debugPrint('[BACKUP_SYNC] Manual refresh timed out while reading meta.');
+      return SyncRefreshResult.failure;
+    } on SocketException {
+      return SyncRefreshResult.offline;
+    } catch (e, st) {
+      debugPrint('[BACKUP_SYNC] Manual refresh error: $e\n$st');
+      return SyncRefreshResult.failure;
+    } finally {
+      _isManualRefreshing = false;
+    }
+  }
+
   /// Handles full data reset: cancels timers, clears sync state, marks start fresh,
   /// and deletes the cloud backup from Firestore if online.
   Future<void> handleDataReset() async {
@@ -398,7 +464,10 @@ class BackupSyncController with WidgetsBindingObserver {
       } catch (_) {}
 
       try {
-        await repository.deleteCloudBackup(uid!);
+        await repository.deleteCloudBackup(uid!).timeout(
+          const Duration(seconds: 6),
+          onTimeout: () => debugPrint('[BACKUP_SYNC] deleteCloudBackup timed out'),
+        );
       } catch (_) {}
     }
   }

@@ -90,5 +90,7 @@
   "backupConflictDialogTitle": "في تعارض في البيانات",
   "backupConflictDialogBody": "في تعديلات على الموبايل ده ومش اتحفظت، وفي نسخة أحدث على حسابك. تحب تحتفظ بإيه؟",
   "backupConflictKeepLocal": "اللي على الموبايل ده",
-  "backupConflictKeepCloud": "النسخة اللي على الحساب"
+  "backupConflictKeepCloud": "النسخة اللي على الحساب",
+  "refreshOffline": "مفيش اتصال، اتعرضت البيانات اللي على الموبايل",
+  "refreshFailed": "مقدرتش أحدّث، جرّب تاني"
 }

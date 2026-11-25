@@ -250,4 +250,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupConflictKeepCloud => 'Keep account version';
+
+  @override
+  String get refreshOffline =>
+      'No connection, showing data stored on this device';
+
+  @override
+  String get refreshFailed => 'Couldn\'t refresh, try again';
 }

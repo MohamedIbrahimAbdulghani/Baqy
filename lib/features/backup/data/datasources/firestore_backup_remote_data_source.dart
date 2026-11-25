@@ -172,7 +172,7 @@ class FirestoreBackupRemoteDataSource implements BackupRemoteDataSource {
     // Commit all in ONE batched write
     try {
       debugPrint('[FIRESTORE_REMOTE] Committing batch for uid: $uid, chunks=${chunks.length}');
-      await batch.commit();
+      await batch.commit().timeout(const Duration(seconds: 10));
       debugPrint('[FIRESTORE_REMOTE] Batch committed successfully!');
     } catch (e, st) {
       debugPrint('[FIRESTORE_REMOTE_ERROR] batch.commit failed: $e\n$st');
@@ -190,7 +190,7 @@ class FirestoreBackupRemoteDataSource implements BackupRemoteDataSource {
       for (int i = 0; i < 20; i++) {
         batch.delete(backupCol.doc('chunk_$i'));
       }
-      await batch.commit();
+      await batch.commit().timeout(const Duration(seconds: 8));
       debugPrint('[FIRESTORE_REMOTE] Backup documents deleted for uid: $uid');
     } catch (e, st) {
       debugPrint('[FIRESTORE_REMOTE_ERROR] deleteBackup failed: $e\n$st');

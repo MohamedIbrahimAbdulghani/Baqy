@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../../core/widgets/action_feedback_dialog.dart';
+import '../../../../core/widgets/baqy_refresh.dart';
 import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../../../shell/presentation/providers/tab_provider.dart';
 import '../../domain/models/debt_item.dart';
@@ -731,9 +732,16 @@ class DebtDetailsScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-                      child: Column(
+                    child: BaqyRefresh(
+                      onRefresh: () async {
+                        ref.invalidate(databaseChangesProvider);
+                        ref.invalidate(debtDetailsStreamProvider(debtId));
+                        ref.invalidate(debtPaymentsStreamProvider(debtId));
+                      },
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+                        child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           // Top Summary Card
@@ -935,6 +943,7 @@ class DebtDetailsScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
+                ),
 
                   // Bottom Note & "تسجيل دفعة" button OR Settled History banner
                   Padding(

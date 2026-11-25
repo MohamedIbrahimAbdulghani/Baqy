@@ -12,6 +12,7 @@ import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../../core/widgets/action_feedback_dialog.dart';
+import '../../../../core/widgets/baqy_refresh.dart';
 import '../../../../core/widgets/whatsapp_icon.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -75,35 +76,42 @@ class SettingsScreen extends ConsumerWidget {
     if (!context.mounted) return;
 
     int? savedBudgetPiastres;
-    await BudgetBottomSheet.show(
-      context: context,
-      monthNumber: monthNumber,
-      initialBudgetEgp: initialBudgetEgp,
-      onSave: (budgetPiastres) async {
-        await ref.read(setMonthBudgetUseCaseProvider)(
-          yearMonth: yearMonth,
-          amount: budgetPiastres,
-        );
-        savedBudgetPiastres = budgetPiastres;
-        final userId = ref.read(activeUserIdProvider);
-        await BudgetMonitorController.resetAlertFlag(yearMonth, userId: userId);
-        ref.invalidate(currentMonthRemainingProvider);
-        ref.invalidate(yearsWithDataProvider);
-        final (year, _) = ArabicDateHelper.parseYearMonthKey(yearMonth);
-        ref.invalidate(monthsWithDataProvider(year));
-      },
-    );
+    try {
+      await BudgetBottomSheet.show(
+        context: context,
+        monthNumber: monthNumber,
+        initialBudgetEgp: initialBudgetEgp,
+        onSave: (budgetPiastres) async {
+          final container = ProviderScope.containerOf(context, listen: false);
+          await container.read(setMonthBudgetUseCaseProvider)(
+            yearMonth: yearMonth,
+            amount: budgetPiastres,
+          );
+          savedBudgetPiastres = budgetPiastres;
+          final userId = container.read(activeUserIdProvider);
+          await BudgetMonitorController.resetAlertFlag(yearMonth, userId: userId);
+          container.invalidate(currentMonthRemainingProvider);
+          container.invalidate(yearsWithDataProvider);
+          final (year, _) = ArabicDateHelper.parseYearMonthKey(yearMonth);
+          container.invalidate(monthsWithDataProvider(year));
+        },
+      );
+    } catch (e) {
+      debugPrint('[SETTINGS] Error showing budget sheet: $e');
+    }
 
-    if (savedBudgetPiastres != null && context.mounted) {
+    if (savedBudgetPiastres != null) {
       final monthName = ArabicDateHelper.getMonthName(monthNumber);
       final formatted = '${NumberFormatter.formatCurrency(savedBudgetPiastres! ~/ 100)} جنيه';
-      final targetContext = rootNavigatorKey.currentContext ?? context;
-      await ActionFeedbackDialog.show(
-        context: targetContext,
-        type: ActionFeedbackType.updated,
-        title: 'تم تعديل الميزانية بنجاح',
-        subtitle: 'تم ضبط ميزانية شهر $monthName بمبلغ $formatted وتحديث الحسابات.',
-      );
+      final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+      if (targetContext != null && targetContext.mounted) {
+        await ActionFeedbackDialog.show(
+          context: targetContext,
+          type: ActionFeedbackType.updated,
+          title: 'تم تعديل الميزانية بنجاح',
+          subtitle: 'تم ضبط ميزانية شهر $monthName بمبلغ $formatted وتحديث الحسابات.',
+        );
+      }
     }
   }
 
@@ -240,7 +248,10 @@ class SettingsScreen extends ConsumerWidget {
         // Handle backup & sync reset
         final syncController = ref.read(backupSyncControllerProvider);
         if (syncController != null) {
-          await syncController.handleDataReset();
+          await syncController.handleDataReset().timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => debugPrint('[SETTINGS] handleDataReset timed out'),
+          );
         } else {
           final uid = ref.read(activeUserIdProvider);
           if (uid != null) {
@@ -249,7 +260,10 @@ class SettingsScreen extends ConsumerWidget {
             await prefs.remove('backup_last_content_hash_$uid');
             await prefs.setBool('backup_start_fresh_$uid', true);
             try {
-              await ref.read(backupRepositoryProvider).deleteCloudBackup(uid);
+              await ref.read(backupRepositoryProvider).deleteCloudBackup(uid).timeout(
+                const Duration(seconds: 5),
+                onTimeout: () {},
+              );
             } catch (_) {}
           }
         }
@@ -273,7 +287,8 @@ class SettingsScreen extends ConsumerWidget {
 
         ref.read(lastBackupTimeProvider.notifier).update(null);
         ref.read(selectedYearMonthProvider.notifier).selectYearMonth(currentYm);
-        ref.read(hasAutoOpenedBudgetForMonthProvider.notifier).markOpened(currentYm);
+        // Reset auto-open flag so HomeScreen natively prompts for the fresh month's budget
+        ref.read(hasAutoOpenedBudgetForMonthProvider.notifier).reset();
         ref.read(tabIndexProvider.notifier).selectTab(0);
 
         ref.invalidate(recentTransactionsProvider);
@@ -301,27 +316,10 @@ class SettingsScreen extends ConsumerWidget {
           subtitle: 'تم مسح كافة البيانات بنجاح. يمكنك الآن إدخال ميزانيتك الجديدة للبدء من جديد.',
         );
 
-        final now = DateTime.now();
-        final currentYm = ArabicDateHelper.formatYearMonthKey(now.year, now.month);
-
         if (context.mounted) {
           if (GoRouter.maybeOf(context) != null) {
             context.go('/main');
           }
-
-          // Open Budget Sheet immediately on the Home screen so the user enters a new budget
-          WidgetsBinding.instance.addPostFrameCallback((_) async {
-            final mainContext = rootNavigatorKey.currentContext;
-            if (mainContext != null && mainContext.mounted) {
-              await _openBudgetSheet(
-                mainContext,
-                ref,
-                currentYm,
-                now.month,
-                0,
-              );
-            }
-          });
         }
       }
     }
@@ -343,9 +341,16 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-          child: Column(
+        child: BaqyRefresh(
+          onRefresh: () async {
+            ref.invalidate(databaseChangesProvider);
+            ref.invalidate(lastBackupTimeProvider);
+            ref.invalidate(currentMonthRemainingProvider);
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Header: Back button + Title
@@ -1282,6 +1287,7 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }

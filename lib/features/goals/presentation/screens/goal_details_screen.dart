@@ -9,6 +9,7 @@ import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/utils/goal_icon_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../../core/widgets/action_feedback_dialog.dart';
+import '../../../../core/widgets/baqy_refresh.dart';
 import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../../domain/models/goal_item.dart';
 import '../providers/goal_providers.dart';
@@ -307,8 +308,15 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                   const SizedBox(height: 20.0),
 
                   Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
+                    child: BaqyRefresh(
+                      onRefresh: () async {
+                        ref.invalidate(databaseChangesProvider);
+                        ref.invalidate(goalByIdProvider(widget.goalId));
+                        ref.invalidate(currentMonthRemainingProvider);
+                      },
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           // Card 1: Goal Progress Chart with Animated Gauge & Stats
@@ -431,6 +439,7 @@ class _GoalDetailsScreenState extends ConsumerState<GoalDetailsScreen> {
                       ),
                     ),
                   ),
+                ),
 
                   // Bottom Area: Settled history badge if achieved, OR action buttons if active
                   Padding(

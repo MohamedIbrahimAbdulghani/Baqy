@@ -62,10 +62,10 @@ final lastBackupTimeProvider =
 
 final backupSyncControllerProvider = Provider<BackupSyncController?>((ref) {
   final uid = ref.watch(activeUserIdProvider);
+  if (uid == null) return null;
+
   final db = ref.watch(appDatabaseProvider);
   final repo = ref.watch(backupRepositoryProvider);
-
-  if (uid == null) return null;
 
   final controller = BackupSyncController(
     repository: repo,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -76,11 +77,23 @@ class _BudgetBottomSheetState extends State<BudgetBottomSheet> {
     });
 
     final budgetPiastres = parsed * 100;
-    await widget.onSave(budgetPiastres);
-    NotificationService.instance.requestPermissions();
+    try {
+      await widget.onSave(budgetPiastres);
+      try {
+        unawaited(NotificationService.instance.requestPermissions());
+      } catch (_) {}
 
-    if (mounted) {
-      Navigator.of(context).pop();
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (e, st) {
+      debugPrint('[BUDGET_SHEET_ERROR] Error saving budget: $e\n$st');
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _errorMessage = 'حدث خطأ أثناء حفظ الميزانية، برجاء المحاولة مرة أخرى';
+        });
+      }
     }
   }
 

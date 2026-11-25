@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/baqy_refresh.dart';
 import '../../../../core/widgets/empty_state_welcome_card.dart';
+import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../providers/debt_providers.dart';
 import '../widgets/debt_card.dart';
 import '../widgets/debt_direction_switch.dart';
@@ -61,39 +63,54 @@ class DebtsTabScreen extends ConsumerWidget {
 
               // Debts Content or empty
               Expanded(
-                child: activeDebtsAsync.when(
-                  data: (activeDebts) {
-                    return settledDebtsAsync.when(
-                      data: (settledDebts) {
-                        final hasNoDebts = activeDebts.isEmpty && settledDebts.isEmpty;
-                        if (hasNoDebts) {
-                          final isOwe = direction == 'owe';
-                          return Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                              child: EmptyStateWelcomeCard(
-                                icon: isOwe
-                                    ? Icons.handshake_outlined
-                                    : Icons.payments_outlined,
-                                title: isOwe
-                                    ? 'سجّل اللي عليك ونظم ديونك'
-                                    : 'تابع فلوسك واللي ليك برّه',
-                                subtitle: isOwe
-                                    ? 'تقدر تسجل أي دين أو سلفة عليك بالضغط على (+) وتتابع سدادها أول بأول.'
-                                    : 'سجّل المبالغ اللي ليك عند الناس بالضغط على (+) والتطبيق هيفكرك بيها دايماً.',
+                child: BaqyRefresh(
+                  onRefresh: () async {
+                    ref.invalidate(databaseChangesProvider);
+                    ref.invalidate(activeDebtsStreamProvider(direction));
+                    ref.invalidate(settledDebtsStreamProvider(direction));
+                  },
+                  child: activeDebtsAsync.when(
+                    data: (activeDebts) {
+                      return settledDebtsAsync.when(
+                        data: (settledDebts) {
+                          final hasNoDebts = activeDebts.isEmpty && settledDebts.isEmpty;
+                          if (hasNoDebts) {
+                            final isOwe = direction == 'owe';
+                            return LayoutBuilder(
+                              builder: (context, constraints) => SingleChildScrollView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                                  child: Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                                      child: EmptyStateWelcomeCard(
+                                        icon: isOwe
+                                            ? Icons.handshake_outlined
+                                            : Icons.payments_outlined,
+                                        title: isOwe
+                                            ? 'سجّل اللي عليك ونظم ديونك'
+                                            : 'تابع فلوسك واللي ليك برّه',
+                                        subtitle: isOwe
+                                            ? 'تقدر تسجل أي دين أو سلفة عليك بالضغط على (+) وتتابع سدادها أول بأول.'
+                                            : 'سجّل المبالغ اللي ليك عند الناس بالضغط على (+) والتطبيق هيفكرك بيها دايماً.',
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          );
-                        }
+                            );
+                          }
 
-                        return ListView(
-                          padding: const EdgeInsets.only(
-                            left: 20.0,
-                            right: 20.0,
-                            top: 4.0,
-                            bottom: 110.0, // Space above bottom FAB and nav bar
-                          ),
-                          children: [
+                          return ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.only(
+                              left: 20.0,
+                              right: 20.0,
+                              top: 4.0,
+                              bottom: 110.0, // Space above bottom FAB and nav bar
+                            ),
+                            children: [
                             // Summary Card
                             DebtSummaryCard(
                               direction: direction,
@@ -135,6 +152,7 @@ class DebtsTabScreen extends ConsumerWidget {
                   error: (e, s) => const SizedBox.shrink(),
                 ),
               ),
+            ),
             ],
           ),
         ),

@@ -559,6 +559,18 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'النسخة اللي على الحساب'**
   String get backupConflictKeepCloud;
+
+  /// No description provided for @refreshOffline.
+  ///
+  /// In ar, this message translates to:
+  /// **'مفيش اتصال، اتعرضت البيانات اللي على الموبايل'**
+  String get refreshOffline;
+
+  /// No description provided for @refreshFailed.
+  ///
+  /// In ar, this message translates to:
+  /// **'مقدرتش أحدّث، جرّب تاني'**
+  String get refreshFailed;
 }
 
 class _AppLocalizationsDelegate

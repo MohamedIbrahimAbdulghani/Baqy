@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/widgets/baqy_refresh.dart';
 import '../../../../core/widgets/empty_state_welcome_card.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../../../goals/domain/models/goal_item.dart';
 import '../../../goals/presentation/providers/goal_providers.dart';
 import '../../../goals/presentation/widgets/completed_goals_section.dart';
@@ -44,48 +46,63 @@ class GoalsTab extends ConsumerWidget {
 
               // Goals List / Empty State
               Expanded(
-                child: goalsAsync.when(
-                  data: (List<GoalItem> goals) {
-                    if (goals.isEmpty) {
-                      return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4.0),
-                          child: EmptyStateWelcomeCard(
-                            icon: Icons.stars_rounded,
-                            title: 'خطوتك الأولى نحو تحقيق أحلامك',
-                            subtitle:
-                                'سجل هدفك المالي (عربية، سفرية، جهاز جديد...) وتابع تقدم تحويشك خطوة بخطوة بالضغط على (+).',
-                          ),
-                        ),
-                      );
-                    }
-
-                    final activeGoals = goals.where((g) => !g.isAchieved).toList();
-                    final completedGoals = goals.where((g) => g.isAchieved).toList();
-
-                    return ListView(
-                      padding: const EdgeInsets.only(bottom: 90.0),
-                      children: [
-                        // Active Goals
-                        ...activeGoals.map((goal) => GoalCard(goal: goal)),
-
-                        // Completed Goals Section (Accordion like Settled Debts)
-                        if (completedGoals.isNotEmpty) ...[
-                          const SizedBox(height: 8.0),
-                          CompletedGoalsSection(
-                            completedGoals: completedGoals,
-                            onGoalTap: (goal) {
-                              context.push('/goal-details', extra: goal.id);
-                            },
-                          ),
-                        ],
-                      ],
-                    );
+                child: BaqyRefresh(
+                  onRefresh: () async {
+                    ref.invalidate(databaseChangesProvider);
+                    ref.invalidate(goalsStreamProvider);
                   },
-                  loading: () => const Center(
-                    child: CircularProgressIndicator(color: AppColors.mainGreen),
+                  child: goalsAsync.when(
+                    data: (List<GoalItem> goals) {
+                      if (goals.isEmpty) {
+                        return LayoutBuilder(
+                          builder: (context, constraints) => SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                              child: const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 4.0),
+                                  child: EmptyStateWelcomeCard(
+                                    icon: Icons.stars_rounded,
+                                    title: 'خطوتك الأولى نحو تحقيق أحلامك',
+                                    subtitle:
+                                        'سجل هدفك المالي (عربية، سفرية، جهاز جديد...) وتابع تقدم تحويشك خطوة بخطوة بالضغط على (+).',
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+
+                      final activeGoals = goals.where((g) => !g.isAchieved).toList();
+                      final completedGoals = goals.where((g) => g.isAchieved).toList();
+
+                      return ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.only(bottom: 90.0),
+                        children: [
+                          // Active Goals
+                          ...activeGoals.map((goal) => GoalCard(goal: goal)),
+
+                          // Completed Goals Section (Accordion like Settled Debts)
+                          if (completedGoals.isNotEmpty) ...[
+                            const SizedBox(height: 8.0),
+                            CompletedGoalsSection(
+                              completedGoals: completedGoals,
+                              onGoalTap: (goal) {
+                                context.push('/goal-details', extra: goal.id);
+                              },
+                            ),
+                          ],
+                        ],
+                      );
+                    },
+                    loading: () => const Center(
+                      child: CircularProgressIndicator(color: AppColors.mainGreen),
+                    ),
+                    error: (_, _) => const SizedBox.shrink(),
                   ),
-                  error: (_, _) => const SizedBox.shrink(),
                 ),
               ),
             ],

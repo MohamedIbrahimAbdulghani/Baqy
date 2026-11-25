@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/category_icon_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
+import '../../../../core/widgets/baqy_refresh.dart';
 import '../../domain/models/category_details_args.dart';
 import '../../domain/models/category_item.dart';
 import '../providers/expense_providers.dart';
@@ -194,9 +195,17 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
 
               // Scrollable body
               Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  children: [
+                child: BaqyRefresh(
+                  onRefresh: () async {
+                    ref.invalidate(databaseChangesProvider);
+                    ref.invalidate(monthCategoryTotalsProvider(_currentYearMonth));
+                    ref.invalidate(dayCategoryTotalsProvider(_selectedDay));
+                    ref.invalidate(currentMonthRemainingProvider);
+                  },
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                    children: [
                     const SizedBox(height: 8.0),
 
                     // 1. Month Expenses Card with Vertical Bar Chart
@@ -519,6 +528,7 @@ class _MonthDetailsScreenState extends ConsumerState<MonthDetailsScreen> {
                   ],
                 ),
               ),
+            ),
             ],
           ),
         ),

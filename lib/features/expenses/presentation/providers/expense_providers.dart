@@ -773,6 +773,71 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     state = true;
   }
 
+  /// Cancels and discards the ongoing recording completely:
+  /// stops the mic, deletes the audio file from disk, cancels timers,
+  /// clears text buffers, and resets all recording state.
+  Future<void> cancelRecording({BuildContext? context}) async {
+    if (!state) return;
+
+    // Light haptic feedback on cancellation
+    HapticFeedback.lightImpact();
+
+    // Disable wakelock
+    unawaited(WakelockPlus.disable().catchError((_) {}));
+
+    _durationTimer?.cancel();
+    _durationTimer = null;
+    _maxDurationTimer?.cancel();
+    _maxDurationTimer = null;
+    _amplitudeSubscription?.cancel();
+    _amplitudeSubscription = null;
+
+    if (_speechService != null && _speechService is! SpeechToTextServiceImpl) {
+      try {
+        await _speechService!.stop().timeout(
+          const Duration(milliseconds: 300),
+          onTimeout: () {},
+        );
+      } catch (_) {}
+    }
+
+    ref.read(voiceAmplitudeProvider.notifier).setVal(0.0);
+    ref.read(voiceRecordingDurationProvider.notifier).setVal(0);
+    state = false;
+
+    final service = _audioService;
+    if (service != null) {
+      try {
+        final savedPath = await service.stopRecording();
+        if (savedPath != null) {
+          final file = File(savedPath);
+          if (await file.exists()) {
+            await file.delete();
+          }
+        }
+      } catch (e) {
+        debugPrint('[VOICE_CANCEL] Error deleting audio file: $e');
+      }
+    }
+
+    // Clear any pending recording pointers
+    try {
+      await PendingRecordingStorage.clear();
+      ref.read(pendingVoiceAudioPathProvider.notifier).setVal(null);
+    } catch (_) {}
+
+    _committedText = '';
+    _currentPartialText = '';
+
+    final activeContext = context ?? _currentContext;
+    if (activeContext != null && activeContext.mounted) {
+      _showVoiceFeedbackSnackBar(
+        context: activeContext,
+        message: 'تم إلغاء التسجيل',
+      );
+    }
+  }
+
   Future<void> stopRecording({BuildContext? context}) async {
     if (!state) return;
     final totalSw = Stopwatch()..start();

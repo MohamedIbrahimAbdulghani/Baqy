@@ -257,32 +257,55 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
     final themeMode = ref.watch(themeModeProvider);
     final isDark = themeMode == ThemeMode.dark;
     final int selectedIndex = ref.watch(tabIndexProvider);
+    final isRecording = ref.watch(voiceRecordingProvider);
+    final isAnalyzing = ref.watch(voiceIsAnalyzingProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: IndexedStack(
-        index: selectedIndex,
-        children: [
-          HomeTab(key: ValueKey('home_${isDark ? 'dark' : 'light'}')),
-          GoalsTab(key: ValueKey('goals_${isDark ? 'dark' : 'light'}')),
-          AppointmentsTab(key: ValueKey('appts_${isDark ? 'dark' : 'light'}')),
-          DebtsTab(key: ValueKey('debts_${isDark ? 'dark' : 'light'}')),
-        ],
-      ),
-      floatingActionButton: selectedIndex == 0
-          ? const HomeSpeedDialFab()
-          : (selectedIndex == 1
-              ? const GoalsSpeedDialFab()
-              : (selectedIndex == 2
-                  ? const RemindersSpeedDialFab()
-                  : (selectedIndex == 3 ? const DebtsFab() : null))),
-      floatingActionButtonLocation: const AboveBottomBarFabLocation(gap: 14.0),
-      bottomNavigationBar: CustomBottomNavBar(
-        currentIndex: selectedIndex,
-        onTap: (index) {
-          ref.read(tabIndexProvider.notifier).selectTab(index);
-        },
-      ),
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: AppColors.background,
+          body: IndexedStack(
+            index: selectedIndex,
+            children: [
+              HomeTab(key: ValueKey('home_${isDark ? 'dark' : 'light'}')),
+              GoalsTab(key: ValueKey('goals_${isDark ? 'dark' : 'light'}')),
+              AppointmentsTab(key: ValueKey('appts_${isDark ? 'dark' : 'light'}')),
+              DebtsTab(key: ValueKey('debts_${isDark ? 'dark' : 'light'}')),
+            ],
+          ),
+          floatingActionButton: (isRecording || isAnalyzing)
+              ? null
+              : (selectedIndex == 0
+                  ? const HomeSpeedDialFab()
+                  : (selectedIndex == 1
+                      ? const GoalsSpeedDialFab()
+                      : (selectedIndex == 2
+                          ? const RemindersSpeedDialFab()
+                          : (selectedIndex == 3 ? const DebtsFab() : null)))),
+          floatingActionButtonLocation: const AboveBottomBarFabLocation(gap: 14.0),
+          bottomNavigationBar: CustomBottomNavBar(
+            currentIndex: selectedIndex,
+            onTap: (index) {
+              if (isRecording || isAnalyzing) return;
+              ref.read(tabIndexProvider.notifier).selectTab(index);
+            },
+          ),
+        ),
+        if (isRecording || isAnalyzing)
+          VoiceRecordingFocusedOverlay(
+            isAnalyzing: isAnalyzing,
+            onStop: () {
+              if (!isAnalyzing) {
+                ref.read(voiceRecordingProvider.notifier).stopRecording(context: context);
+              }
+            },
+            onCancel: () {
+              if (!isAnalyzing) {
+                ref.read(voiceRecordingProvider.notifier).cancelRecording(context: context);
+              }
+            },
+          ),
+      ],
     );
   }
 }

@@ -6,6 +6,7 @@ import '../../../../core/constants/app_dimensions.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
+import '../../../../core/widgets/baqy_refresh.dart';
 import '../../domain/models/category_details_args.dart';
 import '../../domain/models/transaction_item.dart';
 import '../providers/expense_providers.dart';
@@ -170,7 +171,14 @@ class CategoryDetailsScreen extends ConsumerWidget {
               const SizedBox(height: 8.0),
 
               Expanded(
-                child: transactionsAsync.when(
+                child: BaqyRefresh(
+                  onRefresh: () async {
+                    ref.invalidate(databaseChangesProvider);
+                    if (txProvider != null) {
+                      ref.invalidate(txProvider);
+                    }
+                  },
+                  child: transactionsAsync.when(
                   loading: () => const Center(
                     child: CircularProgressIndicator(color: AppColors.mainGreen),
                   ),
@@ -213,6 +221,7 @@ class CategoryDetailsScreen extends ConsumerWidget {
                     final int totalEgp = totalPiastres ~/ 100;
 
                     return ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.symmetric(horizontal: 20.0),
                       children: [
                         const SizedBox(height: 16.0),
@@ -421,6 +430,7 @@ class CategoryDetailsScreen extends ConsumerWidget {
                   },
                 ),
               ),
+            ),
             ],
           ),
         ),

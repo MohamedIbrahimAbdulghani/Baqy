@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../../core/widgets/action_feedback_dialog.dart';
+import '../../../../core/widgets/baqy_refresh.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../backup/presentation/providers/backup_providers.dart';
 import '../../../expenses/domain/models/month_remaining.dart';
@@ -118,86 +119,111 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  bool _isBudgetSheetOpen = false;
+
   Future<void> _openBudgetSheet(
     String yearMonth,
     int monthNumber,
     int currentBudgetPiastres,
   ) async {
-    if (!mounted || ref.read(activeUserIdProvider) == null) return;
+    if (_isBudgetSheetOpen) return;
+    _isBudgetSheetOpen = true;
+    try {
+      if (!mounted || ref.read(activeUserIdProvider) == null) return;
 
-    final now = DateTime.now();
-    final currentYm = ArabicDateHelper.formatYearMonthKey(now.year, now.month);
-    if (yearMonth.compareTo(currentYm) < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'هذا الشهر مؤرشف للاطلاع فقط ولا يمكن تعديل ميزانيته.',
-            textDirection: TextDirection.rtl,
-            style: TextStyle(fontFamily: AppTheme.fontFamily),
+      final now = DateTime.now();
+      final currentYm = ArabicDateHelper.formatYearMonthKey(now.year, now.month);
+      if (yearMonth.compareTo(currentYm) < 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'هذا الشهر مؤرشف للاطلاع فقط ولا يمكن تعديل ميزانيته.',
+              textDirection: TextDirection.rtl,
+              style: TextStyle(fontFamily: AppTheme.fontFamily),
+            ),
+            duration: Duration(seconds: 2),
           ),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-
-    // Prompt rollover if pending for this month before setting budget
-    await MonthRolloverHelper.checkAndPromptRollover(
-      context: context,
-      ref: ref,
-      currentYearMonth: yearMonth,
-    );
-    if (!mounted || ref.read(activeUserIdProvider) == null) return;
-
-    int? initialBudgetEgp;
-
-    if (currentBudgetPiastres > 0) {
-      initialBudgetEgp = currentBudgetPiastres ~/ 100;
-    } else {
-      // At the start of a new month, pre-fill with last month's budget
-      final prevYm = ArabicDateHelper.getPreviousYearMonth(yearMonth);
-      final prevBudgetPiastres = await ref.read(getMonthBudgetUseCaseProvider)(
-        prevYm,
-      );
-      if (prevBudgetPiastres != null && prevBudgetPiastres > 0) {
-        initialBudgetEgp = prevBudgetPiastres ~/ 100;
-      }
-    }
-
-    if (!mounted || ref.read(activeUserIdProvider) == null) return;
-
-    int? savedBudgetPiastres;
-    await BudgetBottomSheet.show(
-      context: context,
-      monthNumber: monthNumber,
-      initialBudgetEgp: initialBudgetEgp,
-      onSave: (budgetPiastres) async {
-        await ref.read(setMonthBudgetUseCaseProvider)(
-          yearMonth: yearMonth,
-          amount: budgetPiastres,
         );
-        savedBudgetPiastres = budgetPiastres;
-        final userId = ref.read(activeUserIdProvider);
-        await BudgetMonitorController.resetAlertFlag(yearMonth, userId: userId);
-        ref.invalidate(currentMonthRemainingProvider);
-        ref.invalidate(yearsWithDataProvider);
-        final (year, _) = ArabicDateHelper.parseYearMonthKey(yearMonth);
-        ref.invalidate(monthsWithDataProvider(year));
-      },
-    );
-
-    if (savedBudgetPiastres != null && mounted) {
-      final monthName = ArabicDateHelper.getMonthName(monthNumber);
-      final formatted = '${NumberFormatter.formatCurrency(savedBudgetPiastres! ~/ 100)} جنيه';
-      final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
-      if (targetContext != null && targetContext.mounted) {
-        await ActionFeedbackDialog.show(
-          context: targetContext,
-          type: ActionFeedbackType.updated,
-          title: 'تم تعديل الميزانية بنجاح',
-          subtitle: 'تم ضبط ميزانية شهر $monthName بمبلغ $formatted وتحديث الحسابات.',
-        );
+        return;
       }
+
+      // Prompt rollover if pending for this month before setting budget
+      await MonthRolloverHelper.checkAndPromptRollover(
+        context: context,
+        ref: ref,
+        currentYearMonth: yearMonth,
+      );
+      if (!mounted || ref.read(activeUserIdProvider) == null) return;
+
+      int? initialBudgetEgp;
+
+      if (currentBudgetPiastres > 0) {
+        initialBudgetEgp = currentBudgetPiastres ~/ 100;
+      } else {
+        // At the start of a new month, pre-fill with last month's budget
+        final prevYm = ArabicDateHelper.getPreviousYearMonth(yearMonth);
+        final prevBudgetPiastres = await ref.read(getMonthBudgetUseCaseProvider)(
+          prevYm,
+        );
+        if (prevBudgetPiastres != null && prevBudgetPiastres > 0) {
+          initialBudgetEgp = prevBudgetPiastres ~/ 100;
+        }
+      }
+
+      if (!mounted || ref.read(activeUserIdProvider) == null) return;
+
+      int? savedBudgetPiastres;
+      await BudgetBottomSheet.show(
+        context: context,
+        monthNumber: monthNumber,
+        initialBudgetEgp: initialBudgetEgp,
+        onSave: (budgetPiastres) async {
+          final targetRef = mounted ? ref : null;
+          if (targetRef != null) {
+            await targetRef.read(setMonthBudgetUseCaseProvider)(
+              yearMonth: yearMonth,
+              amount: budgetPiastres,
+            );
+            savedBudgetPiastres = budgetPiastres;
+            final userId = targetRef.read(activeUserIdProvider);
+            await BudgetMonitorController.resetAlertFlag(yearMonth, userId: userId);
+            targetRef.invalidate(currentMonthRemainingProvider);
+            targetRef.invalidate(yearsWithDataProvider);
+            final (year, _) = ArabicDateHelper.parseYearMonthKey(yearMonth);
+            targetRef.invalidate(monthsWithDataProvider(year));
+          } else {
+            final targetContext = rootNavigatorKey.currentContext ?? context;
+            final container = ProviderScope.containerOf(targetContext, listen: false);
+            await container.read(setMonthBudgetUseCaseProvider)(
+              yearMonth: yearMonth,
+              amount: budgetPiastres,
+            );
+            savedBudgetPiastres = budgetPiastres;
+            final userId = container.read(activeUserIdProvider);
+            await BudgetMonitorController.resetAlertFlag(yearMonth, userId: userId);
+            container.invalidate(currentMonthRemainingProvider);
+            container.invalidate(yearsWithDataProvider);
+            final (year, _) = ArabicDateHelper.parseYearMonthKey(yearMonth);
+            container.invalidate(monthsWithDataProvider(year));
+          }
+        },
+      );
+
+      if (savedBudgetPiastres != null && mounted) {
+        final monthName = ArabicDateHelper.getMonthName(monthNumber);
+        final formatted = '${NumberFormatter.formatCurrency(savedBudgetPiastres! ~/ 100)} جنيه';
+        final targetContext = rootNavigatorKey.currentContext ?? (context.mounted ? context : null);
+        if (targetContext != null && targetContext.mounted) {
+          await ActionFeedbackDialog.show(
+            context: targetContext,
+            type: ActionFeedbackType.updated,
+            title: 'تم تعديل الميزانية بنجاح',
+            subtitle: 'تم ضبط ميزانية شهر $monthName بمبلغ $formatted وتحديث الحسابات.',
+          );
+        }
+      }
+    } finally {
+      _isBudgetSheetOpen = false;
     }
   }
 
@@ -229,10 +255,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           // Main Scrollable Content
           SafeArea(
             bottom: false,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.only(bottom: 150.0),
-              child: Column(
+            child: BaqyRefresh(
+              onRefresh: () async {
+                ref.invalidate(databaseChangesProvider);
+                ref.invalidate(recentTransactionsProvider);
+                ref.invalidate(currentMonthRemainingProvider);
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 150.0),
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Top Row: "صباح الخير", Month Selector, and Settings Icon
@@ -404,6 +436,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           ),
+        ),
 
           // Transparent barrier & Month Selector Popup (no dimming of background)
           if (_isMonthPopupOpen) ...[

@@ -248,4 +248,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get backupConflictKeepCloud => 'النسخة اللي على الحساب';
+
+  @override
+  String get refreshOffline => 'مفيش اتصال، اتعرضت البيانات اللي على الموبايل';
+
+  @override
+  String get refreshFailed => 'مقدرتش أحدّث، جرّب تاني';
 }

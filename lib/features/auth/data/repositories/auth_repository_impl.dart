@@ -62,16 +62,26 @@ class AuthRepositoryImpl implements AuthRepository {
     String? userEmail;
     try {
       await _ensureInitialized();
-      final GoogleSignInAccount account;
+      GoogleSignInAccount? account;
       try {
         account = await _googleSignIn.authenticate();
       } on GoogleSignInException catch (e, st) {
         debugPrint('[AUTH_DEBUG] authenticate caught: ${e.code} - ${e.description}\n$st');
-        if (e.code == GoogleSignInExceptionCode.canceled ||
-            (e.description?.contains('No credential') ?? false)) {
-          return null;
+        if (e.description?.contains('No credential') ?? false) {
+          try {
+            debugPrint('[AUTH_DEBUG] Trying attemptLightweightAuthentication fallback...');
+            account = await _googleSignIn.attemptLightweightAuthentication();
+          } catch (e2, st2) {
+            debugPrint('[AUTH_DEBUG] attemptLightweightAuthentication fallback caught: $e2\n$st2');
+          }
         }
-        rethrow;
+        if (account == null) {
+          if (e.code == GoogleSignInExceptionCode.canceled ||
+              (e.description?.contains('No credential') ?? false)) {
+            return null;
+          }
+          rethrow;
+        }
       }
 
       userEmail = account.email;
