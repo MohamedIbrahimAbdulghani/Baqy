@@ -257,4 +257,138 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get refreshFailed => 'Couldn\'t refresh, try again';
+
+  @override
+  String get exportPdfTooltip => 'Export as PDF';
+
+  @override
+  String get exportPdfSemantics => 'Export month details as PDF';
+
+  @override
+  String get exportExcelTooltip => 'Export as Excel';
+
+  @override
+  String get exportExcelSemantics => 'Export month details as Excel';
+
+  @override
+  String get exportNoOperationsSnackbar => 'No operations in this month';
+
+  @override
+  String get exportFailedSnackbar => 'Couldn\'t prepare the file, try again';
+
+  @override
+  String get exportSummaryTitle => 'Month Summary';
+
+  @override
+  String get exportTotalExpenses => 'Total Expenses';
+
+  @override
+  String get exportTotalIncome => 'Total Income';
+
+  @override
+  String get exportMonthBudget => 'Month Budget';
+
+  @override
+  String get exportRemainingAmount => 'Remaining Amount';
+
+  @override
+  String get exportOperationsCount => 'Operations Count';
+
+  @override
+  String get exportCreatedAt => 'Created At';
+
+  @override
+  String get exportSheetSummary => 'Summary';
+
+  @override
+  String get exportSheetOperations => 'Operations';
+
+  @override
+  String get exportChartCategoryExpenses => 'Expenses by Category';
+
+  @override
+  String get exportChartDailyExpenses => 'Daily Expenses';
+
+  @override
+  String get exportChartCategoryPercentage => 'Category Percentage Share';
+
+  @override
+  String get exportColCategory => 'Category';
+
+  @override
+  String get exportColOperationsCount => 'Operations';
+
+  @override
+  String get exportColTotal => 'Total';
+
+  @override
+  String get exportColPercentage => 'Percentage';
+
+  @override
+  String get exportColDate => 'Date';
+
+  @override
+  String get exportColDay => 'Day';
+
+  @override
+  String get exportColTime => 'Time';
+
+  @override
+  String get exportColDescription => 'Description / Note';
+
+  @override
+  String get exportColType => 'Type';
+
+  @override
+  String get exportColAmount => 'Amount';
+
+  @override
+  String get exportTypeExpense => 'Expense';
+
+  @override
+  String get exportTypeIncome => 'Income';
+
+  @override
+  String get exportTypeSaving => 'Saving';
+
+  @override
+  String exportPageOf(String current, String total) {
+    return 'Page $current of $total';
+  }
+
+  @override
+  String get daySaturday => 'Saturday';
+
+  @override
+  String get daySunday => 'Sunday';
+
+  @override
+  String get dayMonday => 'Monday';
+
+  @override
+  String get dayTuesday => 'Tuesday';
+
+  @override
+  String get dayWednesday => 'Wednesday';
+
+  @override
+  String get dayThursday => 'Thursday';
+
+  @override
+  String get dayFriday => 'Friday';
+
+  @override
+  String get exportDownloadButton => 'Download to Phone';
+
+  @override
+  String get exportShareButton => 'Share File';
+
+  @override
+  String get exportSavedSuccess => 'File saved to Downloads folder';
+
+  @override
+  String get exportVisualChart => 'Visual Distribution';
+
+  @override
+  String get exportTotalLabel => 'Grand Total';
 }

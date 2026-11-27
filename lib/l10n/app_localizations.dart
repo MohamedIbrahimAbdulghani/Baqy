@@ -571,6 +571,270 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'مقدرتش أحدّث، جرّب تاني'**
   String get refreshFailed;
+
+  /// No description provided for @exportPdfTooltip.
+  ///
+  /// In ar, this message translates to:
+  /// **'تصدير كملف PDF'**
+  String get exportPdfTooltip;
+
+  /// No description provided for @exportPdfSemantics.
+  ///
+  /// In ar, this message translates to:
+  /// **'تصدير تفاصيل الشهر كملف PDF'**
+  String get exportPdfSemantics;
+
+  /// No description provided for @exportExcelTooltip.
+  ///
+  /// In ar, this message translates to:
+  /// **'تصدير كملف Excel'**
+  String get exportExcelTooltip;
+
+  /// No description provided for @exportExcelSemantics.
+  ///
+  /// In ar, this message translates to:
+  /// **'تصدير تفاصيل الشهر كملف Excel'**
+  String get exportExcelSemantics;
+
+  /// No description provided for @exportNoOperationsSnackbar.
+  ///
+  /// In ar, this message translates to:
+  /// **'مفيش عمليات في الشهر ده'**
+  String get exportNoOperationsSnackbar;
+
+  /// No description provided for @exportFailedSnackbar.
+  ///
+  /// In ar, this message translates to:
+  /// **'مقدرتش أجهّز الملف، جرّب تاني'**
+  String get exportFailedSnackbar;
+
+  /// No description provided for @exportSummaryTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'ملخص الشهر'**
+  String get exportSummaryTitle;
+
+  /// No description provided for @exportTotalExpenses.
+  ///
+  /// In ar, this message translates to:
+  /// **'إجمالي المصاريف'**
+  String get exportTotalExpenses;
+
+  /// No description provided for @exportTotalIncome.
+  ///
+  /// In ar, this message translates to:
+  /// **'إجمالي الدخل'**
+  String get exportTotalIncome;
+
+  /// No description provided for @exportMonthBudget.
+  ///
+  /// In ar, this message translates to:
+  /// **'ميزانية الشهر'**
+  String get exportMonthBudget;
+
+  /// No description provided for @exportRemainingAmount.
+  ///
+  /// In ar, this message translates to:
+  /// **'المبلغ المتبقي'**
+  String get exportRemainingAmount;
+
+  /// No description provided for @exportOperationsCount.
+  ///
+  /// In ar, this message translates to:
+  /// **'عدد العمليات'**
+  String get exportOperationsCount;
+
+  /// No description provided for @exportCreatedAt.
+  ///
+  /// In ar, this message translates to:
+  /// **'تاريخ الإنشاء'**
+  String get exportCreatedAt;
+
+  /// No description provided for @exportSheetSummary.
+  ///
+  /// In ar, this message translates to:
+  /// **'ملخص'**
+  String get exportSheetSummary;
+
+  /// No description provided for @exportSheetOperations.
+  ///
+  /// In ar, this message translates to:
+  /// **'العمليات'**
+  String get exportSheetOperations;
+
+  /// No description provided for @exportChartCategoryExpenses.
+  ///
+  /// In ar, this message translates to:
+  /// **'توزيع المصاريف حسب التصنيف'**
+  String get exportChartCategoryExpenses;
+
+  /// No description provided for @exportChartDailyExpenses.
+  ///
+  /// In ar, this message translates to:
+  /// **'المصاريف اليومية خلال الشهر'**
+  String get exportChartDailyExpenses;
+
+  /// No description provided for @exportChartCategoryPercentage.
+  ///
+  /// In ar, this message translates to:
+  /// **'نسبة كل تصنيف من المصاريف'**
+  String get exportChartCategoryPercentage;
+
+  /// No description provided for @exportColCategory.
+  ///
+  /// In ar, this message translates to:
+  /// **'التصنيف'**
+  String get exportColCategory;
+
+  /// No description provided for @exportColOperationsCount.
+  ///
+  /// In ar, this message translates to:
+  /// **'عدد العمليات'**
+  String get exportColOperationsCount;
+
+  /// No description provided for @exportColTotal.
+  ///
+  /// In ar, this message translates to:
+  /// **'الإجمالي'**
+  String get exportColTotal;
+
+  /// No description provided for @exportColPercentage.
+  ///
+  /// In ar, this message translates to:
+  /// **'النسبة'**
+  String get exportColPercentage;
+
+  /// No description provided for @exportColDate.
+  ///
+  /// In ar, this message translates to:
+  /// **'التاريخ'**
+  String get exportColDate;
+
+  /// No description provided for @exportColDay.
+  ///
+  /// In ar, this message translates to:
+  /// **'اليوم'**
+  String get exportColDay;
+
+  /// No description provided for @exportColTime.
+  ///
+  /// In ar, this message translates to:
+  /// **'الوقت'**
+  String get exportColTime;
+
+  /// No description provided for @exportColDescription.
+  ///
+  /// In ar, this message translates to:
+  /// **'البيان / الملاحظة'**
+  String get exportColDescription;
+
+  /// No description provided for @exportColType.
+  ///
+  /// In ar, this message translates to:
+  /// **'النوع'**
+  String get exportColType;
+
+  /// No description provided for @exportColAmount.
+  ///
+  /// In ar, this message translates to:
+  /// **'المبلغ'**
+  String get exportColAmount;
+
+  /// No description provided for @exportTypeExpense.
+  ///
+  /// In ar, this message translates to:
+  /// **'مصروف'**
+  String get exportTypeExpense;
+
+  /// No description provided for @exportTypeIncome.
+  ///
+  /// In ar, this message translates to:
+  /// **'دخل'**
+  String get exportTypeIncome;
+
+  /// No description provided for @exportTypeSaving.
+  ///
+  /// In ar, this message translates to:
+  /// **'تحويش'**
+  String get exportTypeSaving;
+
+  /// No description provided for @exportPageOf.
+  ///
+  /// In ar, this message translates to:
+  /// **'صفحة {current} من {total}'**
+  String exportPageOf(String current, String total);
+
+  /// No description provided for @daySaturday.
+  ///
+  /// In ar, this message translates to:
+  /// **'السبت'**
+  String get daySaturday;
+
+  /// No description provided for @daySunday.
+  ///
+  /// In ar, this message translates to:
+  /// **'الأحد'**
+  String get daySunday;
+
+  /// No description provided for @dayMonday.
+  ///
+  /// In ar, this message translates to:
+  /// **'الاثنين'**
+  String get dayMonday;
+
+  /// No description provided for @dayTuesday.
+  ///
+  /// In ar, this message translates to:
+  /// **'الثلاثاء'**
+  String get dayTuesday;
+
+  /// No description provided for @dayWednesday.
+  ///
+  /// In ar, this message translates to:
+  /// **'الأربعاء'**
+  String get dayWednesday;
+
+  /// No description provided for @dayThursday.
+  ///
+  /// In ar, this message translates to:
+  /// **'الخميس'**
+  String get dayThursday;
+
+  /// No description provided for @dayFriday.
+  ///
+  /// In ar, this message translates to:
+  /// **'الجمعة'**
+  String get dayFriday;
+
+  /// No description provided for @exportDownloadButton.
+  ///
+  /// In ar, this message translates to:
+  /// **'تحميل على الهاتف'**
+  String get exportDownloadButton;
+
+  /// No description provided for @exportShareButton.
+  ///
+  /// In ar, this message translates to:
+  /// **'مشاركة الملف'**
+  String get exportShareButton;
+
+  /// No description provided for @exportSavedSuccess.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم حفظ الملف في مجلد التنزيلات (Downloads)'**
+  String get exportSavedSuccess;
+
+  /// No description provided for @exportVisualChart.
+  ///
+  /// In ar, this message translates to:
+  /// **'التمثيل البياني'**
+  String get exportVisualChart;
+
+  /// No description provided for @exportTotalLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'الإجمالي العام'**
+  String get exportTotalLabel;
 }
 
 class _AppLocalizationsDelegate

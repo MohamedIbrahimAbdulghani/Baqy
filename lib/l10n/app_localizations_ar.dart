@@ -254,4 +254,138 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get refreshFailed => 'مقدرتش أحدّث، جرّب تاني';
+
+  @override
+  String get exportPdfTooltip => 'تصدير كملف PDF';
+
+  @override
+  String get exportPdfSemantics => 'تصدير تفاصيل الشهر كملف PDF';
+
+  @override
+  String get exportExcelTooltip => 'تصدير كملف Excel';
+
+  @override
+  String get exportExcelSemantics => 'تصدير تفاصيل الشهر كملف Excel';
+
+  @override
+  String get exportNoOperationsSnackbar => 'مفيش عمليات في الشهر ده';
+
+  @override
+  String get exportFailedSnackbar => 'مقدرتش أجهّز الملف، جرّب تاني';
+
+  @override
+  String get exportSummaryTitle => 'ملخص الشهر';
+
+  @override
+  String get exportTotalExpenses => 'إجمالي المصاريف';
+
+  @override
+  String get exportTotalIncome => 'إجمالي الدخل';
+
+  @override
+  String get exportMonthBudget => 'ميزانية الشهر';
+
+  @override
+  String get exportRemainingAmount => 'المبلغ المتبقي';
+
+  @override
+  String get exportOperationsCount => 'عدد العمليات';
+
+  @override
+  String get exportCreatedAt => 'تاريخ الإنشاء';
+
+  @override
+  String get exportSheetSummary => 'ملخص';
+
+  @override
+  String get exportSheetOperations => 'العمليات';
+
+  @override
+  String get exportChartCategoryExpenses => 'توزيع المصاريف حسب التصنيف';
+
+  @override
+  String get exportChartDailyExpenses => 'المصاريف اليومية خلال الشهر';
+
+  @override
+  String get exportChartCategoryPercentage => 'نسبة كل تصنيف من المصاريف';
+
+  @override
+  String get exportColCategory => 'التصنيف';
+
+  @override
+  String get exportColOperationsCount => 'عدد العمليات';
+
+  @override
+  String get exportColTotal => 'الإجمالي';
+
+  @override
+  String get exportColPercentage => 'النسبة';
+
+  @override
+  String get exportColDate => 'التاريخ';
+
+  @override
+  String get exportColDay => 'اليوم';
+
+  @override
+  String get exportColTime => 'الوقت';
+
+  @override
+  String get exportColDescription => 'البيان / الملاحظة';
+
+  @override
+  String get exportColType => 'النوع';
+
+  @override
+  String get exportColAmount => 'المبلغ';
+
+  @override
+  String get exportTypeExpense => 'مصروف';
+
+  @override
+  String get exportTypeIncome => 'دخل';
+
+  @override
+  String get exportTypeSaving => 'تحويش';
+
+  @override
+  String exportPageOf(String current, String total) {
+    return 'صفحة $current من $total';
+  }
+
+  @override
+  String get daySaturday => 'السبت';
+
+  @override
+  String get daySunday => 'الأحد';
+
+  @override
+  String get dayMonday => 'الاثنين';
+
+  @override
+  String get dayTuesday => 'الثلاثاء';
+
+  @override
+  String get dayWednesday => 'الأربعاء';
+
+  @override
+  String get dayThursday => 'الخميس';
+
+  @override
+  String get dayFriday => 'الجمعة';
+
+  @override
+  String get exportDownloadButton => 'تحميل على الهاتف';
+
+  @override
+  String get exportShareButton => 'مشاركة الملف';
+
+  @override
+  String get exportSavedSuccess => 'تم حفظ الملف في مجلد التنزيلات (Downloads)';
+
+  @override
+  String get exportVisualChart => 'التمثيل البياني';
+
+  @override
+  String get exportTotalLabel => 'الإجمالي العام';
 }

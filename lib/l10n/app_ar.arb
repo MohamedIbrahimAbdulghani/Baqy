@@ -92,5 +92,59 @@
   "backupConflictKeepLocal": "اللي على الموبايل ده",
   "backupConflictKeepCloud": "النسخة اللي على الحساب",
   "refreshOffline": "مفيش اتصال، اتعرضت البيانات اللي على الموبايل",
-  "refreshFailed": "مقدرتش أحدّث، جرّب تاني"
+  "refreshFailed": "مقدرتش أحدّث، جرّب تاني",
+  "exportPdfTooltip": "تصدير كملف PDF",
+  "exportPdfSemantics": "تصدير تفاصيل الشهر كملف PDF",
+  "exportExcelTooltip": "تصدير كملف Excel",
+  "exportExcelSemantics": "تصدير تفاصيل الشهر كملف Excel",
+  "exportNoOperationsSnackbar": "مفيش عمليات في الشهر ده",
+  "exportFailedSnackbar": "مقدرتش أجهّز الملف، جرّب تاني",
+  "exportSummaryTitle": "ملخص الشهر",
+  "exportTotalExpenses": "إجمالي المصاريف",
+  "exportTotalIncome": "إجمالي الدخل",
+  "exportMonthBudget": "ميزانية الشهر",
+  "exportRemainingAmount": "المبلغ المتبقي",
+  "exportOperationsCount": "عدد العمليات",
+  "exportCreatedAt": "تاريخ الإنشاء",
+  "exportSheetSummary": "ملخص",
+  "exportSheetOperations": "العمليات",
+  "exportChartCategoryExpenses": "توزيع المصاريف حسب التصنيف",
+  "exportChartDailyExpenses": "المصاريف اليومية خلال الشهر",
+  "exportChartCategoryPercentage": "نسبة كل تصنيف من المصاريف",
+  "exportColCategory": "التصنيف",
+  "exportColOperationsCount": "عدد العمليات",
+  "exportColTotal": "الإجمالي",
+  "exportColPercentage": "النسبة",
+  "exportColDate": "التاريخ",
+  "exportColDay": "اليوم",
+  "exportColTime": "الوقت",
+  "exportColDescription": "البيان / الملاحظة",
+  "exportColType": "النوع",
+  "exportColAmount": "المبلغ",
+  "exportTypeExpense": "مصروف",
+  "exportTypeIncome": "دخل",
+  "exportTypeSaving": "تحويش",
+  "exportPageOf": "صفحة {current} من {total}",
+  "@exportPageOf": {
+    "placeholders": {
+      "current": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "daySaturday": "السبت",
+  "daySunday": "الأحد",
+  "dayMonday": "الاثنين",
+  "dayTuesday": "الثلاثاء",
+  "dayWednesday": "الأربعاء",
+  "dayThursday": "الخميس",
+  "dayFriday": "الجمعة",
+  "exportDownloadButton": "تحميل على الهاتف",
+  "exportShareButton": "مشاركة الملف",
+  "exportSavedSuccess": "تم حفظ الملف في مجلد التنزيلات (Downloads)",
+  "exportVisualChart": "التمثيل البياني",
+  "exportTotalLabel": "الإجمالي العام"
 }

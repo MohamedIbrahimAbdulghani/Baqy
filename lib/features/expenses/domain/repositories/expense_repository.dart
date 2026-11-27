@@ -48,6 +48,9 @@ abstract class ExpenseRepository {
   /// Transactions for a specific UTC calendar day
   Future<List<TransactionItem>> getTransactionsForDay(DateTime day);
 
+  /// All transactions for a specific month (including goal savings), ordered by createdAt ASC (newest last)
+  Future<List<TransactionItem>> getAllTransactionsForMonth(String yearMonth);
+
   /// The 3 most recent transactions ordered by createdAt DESC
   Future<List<TransactionItem>> getLast3Transactions();
 

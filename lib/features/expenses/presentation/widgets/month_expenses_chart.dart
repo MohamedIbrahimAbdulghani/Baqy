@@ -22,56 +22,16 @@ class MonthExpensesChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Only include categories that actually have expenses and operations (> 0)
+    final validTotals = categoryTotals
+        .where((e) => e.totalAmount > 0 && e.transactionCount > 0)
+        .toList();
+
     final totalSum =
-        categoryTotals.fold<int>(0, (sum, e) => sum + e.totalAmount);
+        validTotals.fold<int>(0, (sum, e) => sum + e.totalAmount);
+    final totalEgp = totalSum ~/ 100;
 
-    final List<CategoryTotal> displayTotals = [];
-    int otherSum = 0;
-    int otherCount = 0;
-
-    for (final item in categoryTotals) {
-      final double ratio = totalSum > 0 ? (item.totalAmount / totalSum) : 0.0;
-      // Group categories that are very small (< 4% of total) under 'أخرى' when there are > 5 categories
-      // "تحويش" is a virtual category that is never grouped under 'أخرى'
-      if (categoryTotals.length > 5 &&
-          ratio < 0.04 &&
-          item.category.name != 'أخرى' &&
-          item.category.name != 'تحويش' &&
-          item.category.id >= 0) {
-        otherSum += item.totalAmount;
-        otherCount += item.transactionCount;
-      } else {
-        displayTotals.add(item);
-      }
-    }
-
-    if (otherSum > 0) {
-      final existingOtherIndex =
-          displayTotals.indexWhere((e) => e.category.name == 'أخرى');
-      if (existingOtherIndex >= 0) {
-        final existing = displayTotals[existingOtherIndex];
-        displayTotals[existingOtherIndex] = CategoryTotal(
-          category: existing.category,
-          totalAmount: existing.totalAmount + otherSum,
-          transactionCount: existing.transactionCount + otherCount,
-        );
-      } else {
-        displayTotals.add(
-          CategoryTotal(
-            category: const CategoryItem(
-              id: 999999,
-              name: 'أخرى',
-              icon: 'other',
-              color: '#9A9488',
-            ),
-            totalAmount: otherSum,
-            transactionCount: otherCount,
-          ),
-        );
-      }
-    }
-
-    final sortedTotals = [...displayTotals]
+    final sortedTotals = [...validTotals]
       ..sort((a, b) => a.category.id.compareTo(b.category.id));
 
     return Container(
@@ -85,15 +45,56 @@ class MonthExpensesChartCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Card Title: "مصاريف شهر <month>"
-          Text(
-            'مصاريف شهر $monthName',
-            style: TextStyle(
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 18.0,
-              fontWeight: FontWeight.w700,
-              color: AppColors.text,
-            ),
+          // Card Header: Title & Total Month Expenses
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'مصاريف شهر $monthName',
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: 18.0,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.text,
+                    ),
+                  ),
+                  const SizedBox(height: 3.0),
+                  Text(
+                    'إجمالي المصاريف',
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.secondaryText,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12.0,
+                  vertical: 6.0,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.lightGreen,
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+                child: Text(
+                  '${NumberFormatter.formatCurrency(totalEgp)} جنيه',
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 16.0,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.darkGreen,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16.0),
 
@@ -119,18 +120,26 @@ class MonthExpensesChartCard extends StatelessWidget {
                 final count = sortedTotals.length;
                 final maxAmount =
                     sortedTotals.map((e) => e.totalAmount).reduce(max);
-                final slotWidth = constraints.maxWidth / count;
+
+                // When there are many categories, ensure a minimum slot width of 64px
+                // so columns, icons, and texts remain comfortably legible and scrollable.
+                const minSlotWidth = 64.0;
+                final calculatedWidth = constraints.maxWidth / count;
+                final bool isScrollable = calculatedWidth < minSlotWidth;
+                final slotWidth = isScrollable ? minSlotWidth : calculatedWidth;
+                final totalChartWidth = slotWidth * count;
+
                 final barWidth = (slotWidth * 0.38).clamp(16.0, 32.0);
-                final circleSize = count > 5 ? 30.0 : 34.0;
-                final iconSize = count > 5 ? 15.0 : 17.0;
+                final circleSize = isScrollable ? 32.0 : (count > 4 ? 30.0 : 34.0);
+                final iconSize = isScrollable ? 16.0 : (count > 4 ? 15.0 : 17.0);
                 final amountFontSize =
-                    count > 5 ? 11.0 : (count > 4 ? 12.0 : 13.5);
+                    isScrollable ? 12.0 : (count > 5 ? 11.0 : (count > 4 ? 12.0 : 13.5));
                 final nameFontSize =
-                    count > 5 ? 9.5 : (count > 4 ? 10.5 : 12.0);
+                    isScrollable ? 11.0 : (count > 5 ? 9.5 : (count > 4 ? 10.5 : 12.0));
 
                 const barAreaHeight = 105.0;
 
-                return Stack(
+                Widget chartContent = Stack(
                   children: [
                     // 1. Background Grid Lines & Baseline
                     Positioned(
@@ -178,12 +187,13 @@ class MonthExpensesChartCard extends StatelessWidget {
 
                         // Multi-line word splitting for longer labels
                         String formattedName = item.category.name;
-                        if (count >= 4 && formattedName.contains(' ')) {
+                        if ((count >= 4 || isScrollable) && formattedName.contains(' ')) {
                           formattedName =
                               formattedName.replaceFirst(' ', '\n');
                         }
 
-                        return Expanded(
+                        return SizedBox(
+                          width: slotWidth,
                           child: InkWell(
                             onTap: () => onTapCategory(item.category),
                             borderRadius: BorderRadius.circular(10.0),
@@ -299,6 +309,22 @@ class MonthExpensesChartCard extends StatelessWidget {
                       }).toList(),
                     ),
                   ],
+                );
+
+                if (isScrollable) {
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: SizedBox(
+                      width: totalChartWidth,
+                      child: chartContent,
+                    ),
+                  );
+                }
+
+                return SizedBox(
+                  width: constraints.maxWidth,
+                  child: chartContent,
                 );
               },
             ),

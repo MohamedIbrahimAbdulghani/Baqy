@@ -436,7 +436,7 @@ void main() {
       expect(withdrawnAmount, equals(500 * 100));
     });
 
-    testWidgets('BudgetRing displays "صرفت X وحوّشت Z من Y" when savedPiastres > 0', (tester) async {
+    testWidgets('BudgetRing displays spent and savings text when savedPiastres > 0', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -451,12 +451,13 @@ void main() {
         ),
       );
 
-      final expectedText =
-          'صرفت ${NumberFormatter.formatCurrency(1000)} وحوّشت ${NumberFormatter.formatCurrency(4500)} من ${NumberFormatter.formatCurrency(10000)}';
-      expect(find.text(expectedText), findsOneWidget);
+      final expectedSpentWithSavings =
+          '${NumberFormatter.formatCurrency(1000)} جنيه (وحوّشت ${NumberFormatter.formatCurrency(4500)})';
+      expect(find.text(expectedSpentWithSavings), findsOneWidget);
+      expect(find.text('${NumberFormatter.formatCurrency(10000)} جنيه'), findsOneWidget);
     });
 
-    testWidgets('BudgetRing displays standard "صرفت X من Y" when savedPiastres == 0', (tester) async {
+    testWidgets('BudgetRing displays standard spent when savedPiastres == 0', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -471,9 +472,10 @@ void main() {
         ),
       );
 
-      final expectedText =
-          'صرفت ${NumberFormatter.formatCurrency(1000)} من ${NumberFormatter.formatCurrency(10000)}';
-      expect(find.text(expectedText), findsOneWidget);
+      expect(find.text('${NumberFormatter.formatCurrency(1000)} جنيه'), findsOneWidget);
+      expect(find.text('${NumberFormatter.formatCurrency(10000)} جنيه'), findsOneWidget);
+      expect(find.text(NumberFormatter.formatCurrency(9000)), findsOneWidget);
+      expect(find.text('جنيه متبقي'), findsOneWidget);
     });
 
     testWidgets('RecentTransactionsSection renders withdrawal with minus sign and disables tap', (tester) async {

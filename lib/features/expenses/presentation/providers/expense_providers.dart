@@ -32,6 +32,7 @@ import '../../../goals/presentation/providers/goal_providers.dart';
 import '../../domain/usecases/add_category_usecase.dart';
 import '../../domain/usecases/add_expense_usecase.dart';
 import '../../domain/usecases/archive_category_usecase.dart';
+import '../../domain/usecases/build_month_export_data_usecase.dart';
 import '../../domain/usecases/check_month_rollover_usecase.dart';
 import '../../domain/usecases/execute_rollover_usecase.dart';
 import '../../domain/usecases/delete_transaction_usecase.dart';
@@ -97,6 +98,12 @@ final getCategoryTransactionsForDayUseCaseProvider =
     Provider<GetCategoryTransactionsForDayUseCase>((ref) {
       final repo = ref.watch(expenseRepositoryProvider);
       return GetCategoryTransactionsForDayUseCase(repo);
+    });
+
+final buildMonthExportDataUseCaseProvider =
+    Provider<BuildMonthExportDataUseCase>((ref) {
+      final repo = ref.watch(expenseRepositoryProvider);
+      return BuildMonthExportDataUseCase(repo);
     });
 
 final getCategoryTransactionsForMonthUseCaseProvider =
@@ -319,6 +326,21 @@ final currentMonthRemainingProvider = FutureProvider.autoDispose<MonthRemaining>
     );
   }
   return result;
+});
+
+/// Fetches remaining budget and expenses for the month immediately preceding the given yearMonth
+final previousMonthRemainingProvider = FutureProvider.autoDispose.family<MonthRemaining?, String>((
+  ref,
+  currentYm,
+) async {
+  ref.watch(databaseChangesProvider);
+  final prevYm = ArabicDateHelper.getPreviousYearMonth(currentYm);
+  final useCase = ref.watch(getMonthRemainingUseCaseProvider);
+  try {
+    return await useCase(prevYm);
+  } catch (_) {
+    return null;
+  }
 });
 
 /// Last 3 transactions for the currently selected month

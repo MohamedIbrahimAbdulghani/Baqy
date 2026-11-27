@@ -14,9 +14,11 @@ import '../../../expenses/domain/models/month_remaining.dart';
 import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../../../expenses/presentation/widgets/month_rollover_dialog.dart';
 import '../controllers/budget_monitor_controller.dart';
+import '../../domain/utils/month_insights_calculator.dart';
 import '../widgets/budget_bottom_sheet.dart';
 import '../widgets/budget_ring.dart';
 import '../widgets/home_top_bar.dart';
+import '../widgets/month_overview_card.dart';
 import '../widgets/month_selector_popup.dart';
 import '../widgets/recent_transactions_section.dart';
 import '../../../../core/theme/theme_provider.dart';
@@ -235,6 +237,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final selectedMonthText = ArabicDateHelper.formatMonthYear(year, month);
 
     final monthRemainingAsync = ref.watch(currentMonthRemainingProvider);
+    final prevMonthRemainingAsync =
+        ref.watch(previousMonthRemainingProvider(selectedYm));
     final recentTransactionsAsync = ref.watch(recentTransactionsProvider);
     final yearsAsync = ref.watch(yearsWithDataProvider);
     final monthsWithDataAsync = ref.watch(monthsWithDataProvider(year));
@@ -315,24 +319,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                   const SizedBox(height: 20.0),
 
-                  // Center: Big Ring
+                  // Center: Budget Card
                   monthRemainingAsync.when(
                     data: (remaining) => BudgetRing(
                       remainingPiastres: remaining.remaining,
                       spentPiastres: remaining.expenses,
                       monthMoneyPiastres: remaining.monthMoney,
                       savedPiastres: remaining.goalSavings,
+                      year: year,
+                      month: month,
                       isReadOnly: isViewingPastMonth,
                       onTap: () =>
                           _openBudgetSheet(selectedYm, month, remaining.budget),
                     ),
-                    loading: () => const Center(
-                      child: SizedBox(
-                        height: 250.0,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.mainGreen,
-                          ),
+                    loading: () => Container(
+                      height: 160.0,
+                      margin: const EdgeInsets.symmetric(horizontal: 20.0),
+                      decoration: BoxDecoration(
+                        color: AppColors.card,
+                        borderRadius: BorderRadius.circular(20.0),
+                      ),
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.mainGreen,
                         ),
                       ),
                     ),
@@ -379,6 +388,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                       ),
                     ),
+                  ),
+
+                  const SizedBox(height: 16.0),
+
+                  // "نظرة على شهرك" Insights Card
+                  monthRemainingAsync.when(
+                    data: (remaining) {
+                      final currMonthName =
+                          ArabicDateHelper.getMonthName(month);
+                      final prevYm =
+                          ArabicDateHelper.getPreviousYearMonth(selectedYm);
+                      final (_, prevMonth) =
+                          ArabicDateHelper.parseYearMonthKey(prevYm);
+                      final prevMonthName =
+                          ArabicDateHelper.getMonthName(prevMonth);
+
+                      final insights = MonthInsightsCalculator.calculate(
+                        year: year,
+                        month: month,
+                        remainingPiastres: remaining.remaining,
+                        spentPiastres: remaining.expenses,
+                        monthMoneyPiastres: remaining.monthMoney,
+                        prevMonthSpentPiastres:
+                            prevMonthRemainingAsync.value?.expenses,
+                        prevMonthBudgetPiastres:
+                            prevMonthRemainingAsync.value?.monthMoney,
+                        currMonthName: currMonthName,
+                        prevMonthName: prevMonthName,
+                      );
+
+                      return MonthOverviewCard(insights: insights);
+                    },
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, _) => const SizedBox.shrink(),
                   ),
 
                   const SizedBox(height: 28.0),

@@ -92,5 +92,59 @@
   "backupConflictKeepLocal": "Keep device version",
   "backupConflictKeepCloud": "Keep account version",
   "refreshOffline": "No connection, showing data stored on this device",
-  "refreshFailed": "Couldn't refresh, try again"
+  "refreshFailed": "Couldn't refresh, try again",
+  "exportPdfTooltip": "Export as PDF",
+  "exportPdfSemantics": "Export month details as PDF",
+  "exportExcelTooltip": "Export as Excel",
+  "exportExcelSemantics": "Export month details as Excel",
+  "exportNoOperationsSnackbar": "No operations in this month",
+  "exportFailedSnackbar": "Couldn't prepare the file, try again",
+  "exportSummaryTitle": "Month Summary",
+  "exportTotalExpenses": "Total Expenses",
+  "exportTotalIncome": "Total Income",
+  "exportMonthBudget": "Month Budget",
+  "exportRemainingAmount": "Remaining Amount",
+  "exportOperationsCount": "Operations Count",
+  "exportCreatedAt": "Created At",
+  "exportSheetSummary": "Summary",
+  "exportSheetOperations": "Operations",
+  "exportChartCategoryExpenses": "Expenses by Category",
+  "exportChartDailyExpenses": "Daily Expenses",
+  "exportChartCategoryPercentage": "Category Percentage Share",
+  "exportColCategory": "Category",
+  "exportColOperationsCount": "Operations",
+  "exportColTotal": "Total",
+  "exportColPercentage": "Percentage",
+  "exportColDate": "Date",
+  "exportColDay": "Day",
+  "exportColTime": "Time",
+  "exportColDescription": "Description / Note",
+  "exportColType": "Type",
+  "exportColAmount": "Amount",
+  "exportTypeExpense": "Expense",
+  "exportTypeIncome": "Income",
+  "exportTypeSaving": "Saving",
+  "exportPageOf": "Page {current} of {total}",
+  "@exportPageOf": {
+    "placeholders": {
+      "current": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "daySaturday": "Saturday",
+  "daySunday": "Sunday",
+  "dayMonday": "Monday",
+  "dayTuesday": "Tuesday",
+  "dayWednesday": "Wednesday",
+  "dayThursday": "Thursday",
+  "dayFriday": "Friday",
+  "exportDownloadButton": "Download to Phone",
+  "exportShareButton": "Share File",
+  "exportSavedSuccess": "File saved to Downloads folder",
+  "exportVisualChart": "Visual Distribution",
+  "exportTotalLabel": "Grand Total"
 }

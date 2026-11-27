@@ -249,6 +249,94 @@ void main() {
       // Yesterday shows bills (300 جنيه), food is not in yesterday's list
       expect(find.text('٣٠٠ جنيه'), findsOneWidget);
     });
+
+    testWidgets('Chart displays total month expenses and never shows categories with 0 operations or fake أخرى',
+        (WidgetTester tester) async {
+      final categories = await repository.getCategories();
+      final catFood = categories.firstWhere((c) => c.name == 'أكل');
+      final catBills = categories.firstWhere((c) => c.name == 'استثمار وادخار');
+      final catClothes = categories.firstWhere((c) => c.name == 'ديون وأقساط');
+      final catHealth = categories.firstWhere((c) => c.name == 'صحة');
+      final catCafe = categories.firstWhere((c) => c.name == 'مشروبات وكافيهات');
+      final catCharity = categories.firstWhere((c) => c.name == 'صدقات');
+
+      final today = DateTime.now();
+      final currentYm = ArabicDateHelper.formatYearMonthKey(today.year, today.month);
+
+      // Seed 6 categories (one with a very small ratio: 50 EGP vs 18800 EGP)
+      await repository.addTransaction(
+        amount: 1880000, // 18,800 EGP
+        description: 'استثمار',
+        categoryId: catBills.id,
+        kind: 'expense',
+        source: 'text',
+        createdAt: DateTime.utc(today.year, today.month, today.day, 10, 0),
+      );
+      await repository.addTransaction(
+        amount: 330000, // 3,300 EGP
+        description: 'ديون',
+        categoryId: catFood.id,
+        kind: 'expense',
+        source: 'text',
+        createdAt: DateTime.utc(today.year, today.month, today.day, 11, 0),
+      );
+      await repository.addTransaction(
+        amount: 130000, // 1,300 EGP
+        description: 'أكل',
+        categoryId: catClothes.id,
+        kind: 'expense',
+        source: 'text',
+        createdAt: DateTime.utc(today.year, today.month, today.day, 12, 0),
+      );
+      await repository.addTransaction(
+        amount: 50000, // 500 EGP
+        description: 'صدقة',
+        categoryId: catCharity.id,
+        kind: 'expense',
+        source: 'text',
+        createdAt: DateTime.utc(today.year, today.month, today.day, 13, 0),
+      );
+      await repository.addTransaction(
+        amount: 40000, // 400 EGP
+        description: 'صيدلية',
+        categoryId: catHealth.id,
+        kind: 'expense',
+        source: 'text',
+        createdAt: DateTime.utc(today.year, today.month, today.day, 14, 0),
+      );
+      await repository.addTransaction(
+        amount: 20000, // 200 EGP (very small < 1% of total)
+        description: 'قهوة',
+        categoryId: catCafe.id,
+        kind: 'expense',
+        source: 'text',
+        createdAt: DateTime.utc(today.year, today.month, today.day, 15, 0),
+      );
+
+      // Total = 18800 + 3300 + 1300 + 500 + 400 + 200 = 24,500 EGP
+
+      await tester.pumpWidget(
+        createTestWidget(
+          MonthDetailsScreen(initialYearMonth: currentYm),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Total month expenses is displayed in the card header
+      expect(find.text('إجمالي المصاريف'), findsOneWidget);
+      expect(find.text('٢٤,٥٠٠ جنيه'), findsOneWidget);
+
+      // The small category (catCafe) must be displayed directly as itself, NOT grouped into 'أخرى'
+      expect(find.text(catCafe.name), findsWidgets);
+      expect(find.text(catCharity.name), findsWidgets);
+
+      // Categories with 0 expenses (e.g. any other category that wasn't used) must NOT be in the chart
+      final unusedCategory = categories.firstWhere(
+        (c) => ![catBills.id, catFood.id, catClothes.id, catCharity.id, catHealth.id, catCafe.id]
+            .contains(c.id),
+      );
+      expect(find.text(unusedCategory.name), findsNothing);
+    });
   });
 
   group('Step 5 Widget Tests: CategoryDetailsScreen (Day and Month Modes)', () {

@@ -126,6 +126,7 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     final query = _monthCategoryTotalsQuery(yearMonth, totalAmountExp, countExp);
     final rows = await query.get();
     final results = _mapCategoryTotalRows(rows, totalAmountExp, countExp);
+    results.retainWhere((item) => item.totalAmount > 0 && item.transactionCount > 0);
 
     // Goal savings as virtual category "تحويش" with goal's icon (shown only if net saved > 0)
     final (start, end) = _getMonthRange(yearMonth);
@@ -245,6 +246,7 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     final query = _dayCategoryTotalsQuery(day, totalAmountExp, countExp);
     final rows = await query.get();
     final results = _mapCategoryTotalRows(rows, totalAmountExp, countExp);
+    results.retainWhere((item) => item.totalAmount > 0 && item.transactionCount > 0);
 
     // Goal savings on this day (net of savings and withdrawals, grouped by goal)
     final (start, end) = _getDayRange(day);
@@ -269,23 +271,25 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
           0,
           (sum, r) => sum + r.readTable(_db.goalSavings).amount,
         );
-        final goalIconKey =
-            (firstGoal.icon != null && firstGoal.icon!.isNotEmpty)
-                ? firstGoal.icon!
-                : GoalIconHelper.resolveIconKeyFromName(firstGoal.name);
+        if (netGoalSavings > 0) {
+          final goalIconKey =
+              (firstGoal.icon != null && firstGoal.icon!.isNotEmpty)
+                  ? firstGoal.icon!
+                  : GoalIconHelper.resolveIconKeyFromName(firstGoal.name);
 
-        results.add(
-          CategoryTotal(
-            category: CategoryItem(
-              id: goalToVirtualCategoryId(firstGoal.id),
-              name: firstGoal.name,
-              icon: goalIconKey,
-              color: CategoryItem.virtualSavings.color,
+          results.add(
+            CategoryTotal(
+              category: CategoryItem(
+                id: goalToVirtualCategoryId(firstGoal.id),
+                name: firstGoal.name,
+                icon: goalIconKey,
+                color: CategoryItem.virtualSavings.color,
+              ),
+              totalAmount: netGoalSavings,
+              transactionCount: rowsForGoal.length,
             ),
-            totalAmount: netGoalSavings,
-            transactionCount: rowsForGoal.length,
-          ),
-        );
+          );
+        }
       }
     }
 
@@ -547,6 +551,66 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
       final local = dt.toLocal();
       return DateTime(local.year, local.month, local.day);
     });
+  }
+
+  @override
+  Future<List<TransactionItem>> getAllTransactionsForMonth(String yearMonth) async {
+    final (start, end) = _getMonthRange(yearMonth);
+
+    // 1. Regular transactions
+    final query = _db.select(_db.transactions).join([
+      leftOuterJoin(
+        _db.categories,
+        _db.categories.id.equalsExp(_db.transactions.categoryId),
+      ),
+    ])
+      ..where(
+        _db.transactions.createdAt.isBiggerOrEqualValue(start) &
+            _db.transactions.createdAt.isSmallerThanValue(end),
+      )
+      ..orderBy([OrderingTerm.asc(_db.transactions.createdAt)]);
+
+    final rows = await query.get();
+    final txList = rows.map(_mapTransactionRow).toList();
+
+    // 2. Goal savings in the month
+    final savingsQuery = _db.select(_db.goalSavings).join([
+      innerJoin(_db.goals, _db.goals.id.equalsExp(_db.goalSavings.goalId)),
+    ])
+      ..where(_db.goalSavings.savedAt.isBiggerOrEqualValue(start) &
+          _db.goalSavings.savedAt.isSmallerThanValue(end))
+      ..orderBy([OrderingTerm.asc(_db.goalSavings.savedAt)]);
+
+    final savingsRows = await savingsQuery.get();
+    final savingsList = savingsRows.map((row) {
+      final saving = row.readTable(_db.goalSavings);
+      final goal = row.readTable(_db.goals);
+      final goalIconKey = (goal.icon != null && goal.icon!.isNotEmpty)
+          ? goal.icon!
+          : GoalIconHelper.resolveIconKeyFromName(goal.name);
+      return TransactionItem(
+        id: -saving.id,
+        amount: saving.amount,
+        description: goal.name,
+        categoryId: CategoryItem.virtualSavings.id,
+        kind: 'saving',
+        source: 'goal',
+        note: saving.amount < 0 ? 'سحب من الهدف' : null,
+        createdAt: saving.savedAt,
+        category: CategoryItem(
+          id: CategoryItem.virtualSavings.id,
+          name: 'تحويش',
+          icon: goalIconKey,
+          color: CategoryItem.virtualSavings.color,
+        ),
+      );
+    }).toList();
+
+    // 3. Merge and sort oldest first (newest last)
+    final combined = [...txList, ...savingsList]
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    return combined;
   }
 
   @override
