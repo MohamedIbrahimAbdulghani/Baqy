@@ -4,11 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/routing/app_router.dart';
+import '../../../../core/services/app_shortcut_service.dart';
 import '../../../../core/services/notification_service.dart';
+import '../../../../core/services/widget_recording_service.dart';
 import '../../../auth/domain/models/account_status.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../auth/presentation/widgets/account_status_dialog.dart';
 import '../../../backup/presentation/providers/backup_providers.dart';
+import '../../../backup/presentation/widgets/restore_prompt_dialog.dart';
+import '../../../security/presentation/providers/security_providers.dart';
 import '../../../expenses/domain/models/month_remaining.dart';
 import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../../../goals/presentation/widgets/goals_speed_dial_fab.dart';
@@ -48,6 +52,9 @@ class AboveBottomBarFabLocation extends FloatingActionButtonLocation {
 class MainShellScreen extends ConsumerStatefulWidget {
   const MainShellScreen({super.key});
 
+  @visibleForTesting
+  static bool enableSecurityTimer = true;
+
   @override
   ConsumerState<MainShellScreen> createState() => _MainShellScreenState();
 }
@@ -58,6 +65,8 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
   bool _isCheckingSecurity = false;
   bool _hasTriggeredSecurityDialog = false;
   String? _cachedUserEmail;
+  StreamSubscription<String>? _shortcutSubscription;
+  String? _pendingShortcutAction;
 
   @override
   void initState() {
@@ -70,11 +79,33 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
       }
     };
 
+    AppShortcutService.instance.initialize();
+    _shortcutSubscription =
+        AppShortcutService.instance.actionStream.listen((action) {
+      if (mounted) {
+        _onShortcutReceived(action);
+      }
+    });
+
+    // Listen for instant audio ready event when user finishes recording from widget
+    WidgetRecordingService.setAudioReadyHandler((path) {
+      if (mounted) {
+        _processWidgetAudio(path);
+      }
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final pending = NotificationService.consumePendingTabSelection();
       if (pending != null && mounted) {
         ref.read(tabIndexProvider.notifier).selectTab(pending);
       }
+
+      // Check for cold start app shortcut action
+      AppShortcutService.instance.checkInitialShortcut().then((action) {
+        if (action != null && mounted) {
+          _onShortcutReceived(action);
+        }
+      });
 
       // Request notification permissions so budget threshold warnings and reminders work on Android 13+
       NotificationService.instance.requestPermissions();
@@ -95,6 +126,9 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
 
       // Check if this is a new phone with empty local DB and an existing cloud backup
       _checkCloudBackupOnLaunch();
+
+      // Check for any audio recorded via the home screen widget before the app was opened
+      _checkWidgetPendingAudio();
     });
   }
 
@@ -129,7 +163,70 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
     }
   }
 
+  /// Checks if the home screen widget left a pending audio recording.
+  /// If yes, feeds it into the existing Gemini processing pipeline (processAudioFile)
+  /// which shows the undo snackbar for a clear result, or the review sheet for an
+  /// unclear result. Identical to what happens for a shortcut-initiated recording,
+  /// except the flag [isFromShortcut] is kept true so auto-save applies.
+  Future<void> _checkWidgetPendingAudio() async {
+    if (!mounted) return;
+    // Only process if user is signed in and app is not locked
+    final userId = ref.read(activeUserIdProvider);
+    if (userId == null) return;
+    final isLocked = ref.read(isAppLockedProvider);
+    if (isLocked) return;
+
+    final path = await WidgetRecordingService.checkWidgetPendingAudio();
+    if (path == null || !mounted) return;
+
+    // Clear native side and pending storage so we don't reprocess on next resume
+    await WidgetRecordingService.clearWidgetPendingAudio();
+    await PendingRecordingStorage.clear();
+    ref.read(pendingVoiceAudioPathProvider.notifier).setVal(null);
+
+    // If currently recording something, don't start a second process
+    final isRecording = ref.read(voiceRecordingProvider);
+    if (isRecording) return;
+
+    final ctx = context;
+    if (!ctx.mounted) return;
+
+    // Feed directly into the existing audio processing pipeline (Gemini + auto-save) silently
+    await ref.read(voiceRecordingProvider.notifier).processAudioFile(
+      path,
+      context: ctx,
+      isFromShortcut: true, // triggers auto-save on clear result
+      showAnalyzingOverlay: false, // silent background processing, no blocking overlay
+    );
+  }
+
+  /// Processes widget audio immediately when the widget stops recording,
+  /// without waiting for the app to open.
+  Future<void> _processWidgetAudio(String path) async {
+    if (!mounted) return;
+    final userId = ref.read(activeUserIdProvider);
+    if (userId == null) return;
+
+    // Clear native side and pending storage so we don't reprocess on resume
+    await WidgetRecordingService.clearWidgetPendingAudio();
+    await PendingRecordingStorage.clear();
+    ref.read(pendingVoiceAudioPathProvider.notifier).setVal(null);
+
+    // If currently recording something, don't start a second process
+    final isRecording = ref.read(voiceRecordingProvider);
+    if (isRecording) return;
+
+    // Feed directly into Gemini auto-save pipeline silently without blocking overlay
+    await ref.read(voiceRecordingProvider.notifier).processAudioFile(
+      path,
+      context: mounted ? context : null,
+      isFromShortcut: true,
+      showAnalyzingOverlay: false,
+    );
+  }
+
   void _startSecurityMonitor() {
+    if (!MainShellScreen.enableSecurityTimer) return;
     _securityCheckTimer?.cancel();
     _securityCheckTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       _checkSecurityStatus();
@@ -184,11 +281,21 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
     } finally {
       _isCheckingSecurity = false;
       isCheckingAccountSecurity = false;
+      if (_pendingShortcutAction != null && mounted && !isAccountSuspended) {
+        final action = _pendingShortcutAction!;
+        _pendingShortcutAction = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _executeShortcutAction(action);
+          }
+        });
+      }
     }
   }
 
   @override
   void dispose() {
+    _shortcutSubscription?.cancel();
     _securityCheckTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     NotificationService.onSelectTab = null;
@@ -200,6 +307,8 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
     if (state == AppLifecycleState.resumed && mounted) {
       setState(() {});
       _checkSecurityStatus();
+      // Check for any recording left behind by the home screen widget
+      _checkWidgetPendingAudio();
     }
   }
 
@@ -207,6 +316,26 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
   Widget build(BuildContext context) {
     // Keep background backup sync controller active while user is on the main shell
     ref.watch(backupSyncControllerProvider);
+
+    ref.listen<bool>(isAppLockedProvider, (previous, isLocked) {
+      if (previous == true && !isLocked) {
+        if (_pendingShortcutAction != null) {
+          final action = _pendingShortcutAction!;
+          _pendingShortcutAction = null;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _executeShortcutAction(action);
+            }
+          });
+        }
+        // Also check if there was an audio recording made via widget while the app was locked
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _checkWidgetPendingAudio();
+          }
+        });
+      }
+    });
 
     ref.listen<AsyncValue<MonthRemaining>>(currentMonthRemainingProvider, (prev, next) {
       // Ignore initial load or when account is switching / mounting:
@@ -307,5 +436,73 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
           ),
       ],
     );
+  }
+
+  void _onShortcutReceived(String action) {
+    if (action != AppShortcutService.actionRecordVoice) return;
+
+    final user = ref.read(authRepositoryProvider).currentUser;
+    final activeUid = ref.read(activeUserIdProvider);
+    if (user == null || activeUid == null) {
+      // User is not signed in: do not start recording
+      return;
+    }
+
+    final repo = ref.read(securityRepositoryProvider);
+    final settings = ref.read(securitySettingsProvider).value;
+    final isLockEnabled =
+        settings?.isAppLockEnabled ?? repo.isAppLockEnabledSync;
+    final isLocked = ref.read(isAppLockedProvider);
+
+    if (isLockEnabled && isLocked) {
+      _pendingShortcutAction = action;
+      return;
+    }
+
+    if (isCheckingAccountSecurity || _isCheckingSecurity) {
+      _pendingShortcutAction = action;
+      return;
+    }
+
+    _executeShortcutAction(action);
+  }
+
+  void _executeShortcutAction(String action) {
+    if (action != AppShortcutService.actionRecordVoice) return;
+    if (!mounted) return;
+
+    final user = ref.read(authRepositoryProvider).currentUser;
+    if (user == null) return;
+
+    if (ref.read(tabIndexProvider) != 0) {
+      ref.read(tabIndexProvider.notifier).selectTab(0);
+    }
+
+    final isRecording = ref.read(voiceRecordingProvider);
+    final isAnalyzing = ref.read(voiceIsAnalyzingProvider);
+    if (isRecording || isAnalyzing) {
+      return;
+    }
+
+    final syncCtrl = ref.read(backupSyncControllerProvider);
+    if (syncCtrl != null &&
+        (syncCtrl.isRestoring ||
+            syncCtrl.isUploading ||
+            syncCtrl.isConflictDialogShowing)) {
+      return;
+    }
+    if (RestorePromptDialog.isShowing) {
+      return;
+    }
+    if (isAccountSuspended ||
+        AccountStatusDialog.isShowing ||
+        isCheckingAccountSecurity) {
+      return;
+    }
+
+    ref.read(voiceRecordingProvider.notifier).startRecording(
+          context: context,
+          isFromShortcut: true,
+        );
   }
 }

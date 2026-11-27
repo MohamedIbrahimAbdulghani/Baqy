@@ -7,6 +7,9 @@ import '../../../../l10n/app_localizations.dart';
 import '../../domain/models/backup_meta.dart';
 
 class RestorePromptDialog {
+  /// Flag to track if the restore prompt dialog is currently visible
+  static bool isShowing = false;
+
   /// Shows the dialog when an existing backup is found on a new phone.
   /// Title: "لقينا نسخة احتياطية"
   /// Body: "لقينا بيانات محفوظة على حسابك (آخر تحديث <التاريخ والوقت>). تحب نسترجعها؟"
@@ -19,12 +22,14 @@ class RestorePromptDialog {
     required VoidCallback onRestoreConfirmed,
     required VoidCallback onStartFreshConfirmed,
   }) async {
-    final l10n = AppLocalizations.of(context);
-    final formattedDate = ArabicDateHelper.formatDateTime(meta.updatedAt);
-    final bodyText = l10n?.backupFoundDialogBody(formattedDate) ??
-        'لقينا بيانات محفوظة على حسابك (آخر تحديث $formattedDate). تحب نسترجعها؟';
+    isShowing = true;
+    try {
+      final l10n = AppLocalizations.of(context);
+      final formattedDate = ArabicDateHelper.formatDateTime(meta.updatedAt);
+      final bodyText = l10n?.backupFoundDialogBody(formattedDate) ??
+          'لقينا بيانات محفوظة على حسابك (آخر تحديث $formattedDate). تحب نسترجعها؟';
 
-    await showDialog<void>(
+      await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogCtx) {
@@ -101,6 +106,9 @@ class RestorePromptDialog {
         );
       },
     );
+    } finally {
+      isShowing = false;
+    }
   }
 
   /// Second dialog when "ابدأ من جديد" is clicked:
@@ -115,7 +123,9 @@ class RestorePromptDialog {
     required VoidCallback onRestoreConfirmed,
     required VoidCallback onStartFreshConfirmed,
   }) async {
-    final l10n = AppLocalizations.of(context);
+    isShowing = true;
+    try {
+      final l10n = AppLocalizations.of(context);
 
     await showDialog<void>(
       context: context,
@@ -196,10 +206,14 @@ class RestorePromptDialog {
         );
       },
     );
+    } finally {
+      isShowing = false;
+    }
   }
 
   /// Progress dialog while restoring: "بنسترجع بياناتك..."
   static void showLoading(BuildContext context) {
+    isShowing = true;
     final l10n = AppLocalizations.of(context);
     showDialog<void>(
       context: context,
@@ -232,7 +246,9 @@ class RestorePromptDialog {
           ),
         );
       },
-    );
+    ).whenComplete(() {
+      isShowing = false;
+    });
   }
 }
 

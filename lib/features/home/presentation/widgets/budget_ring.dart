@@ -102,7 +102,7 @@ class BudgetRing extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(20.0),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 18.0),
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
             decoration: BoxDecoration(
               color: AppColors.card,
               borderRadius: BorderRadius.circular(20.0),
@@ -152,7 +152,7 @@ class BudgetRing extends StatelessWidget {
                                   : 'غير محددة',
                               style: TextStyle(
                                 fontFamily: AppTheme.fontFamily,
-                                fontSize: 20.0,
+                                fontSize: 21.0,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.text,
                                 height: 1.2,
@@ -189,7 +189,7 @@ class BudgetRing extends StatelessWidget {
                         spentText,
                         style: TextStyle(
                           fontFamily: AppTheme.fontFamily,
-                          fontSize: 20.0,
+                          fontSize: 21.0,
                           fontWeight: FontWeight.w700,
                           color: AppColors.text,
                           height: 1.2,
@@ -215,13 +215,13 @@ class BudgetRing extends StatelessWidget {
 
                 // Circular Progress Indicator (Left side in RTL)
                 SizedBox(
-                  width: 110.0,
-                  height: 110.0,
+                  width: 126.0,
+                  height: 126.0,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
                       CustomPaint(
-                        size: const Size(110.0, 110.0),
+                        size: const Size(126.0, 126.0),
                         painter: _RingProgressPainter(
                           progress: progress,
                           progressColor: progressColor,
@@ -241,7 +241,7 @@ class BudgetRing extends StatelessWidget {
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontFamily: AppTheme.fontFamily,
-                                  fontSize: 22.0,
+                                  fontSize: 24.0,
                                   fontWeight: FontWeight.w700,
                                   color: progressColor,
                                   height: 1.1,
@@ -254,7 +254,7 @@ class BudgetRing extends StatelessWidget {
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontFamily: AppTheme.fontFamily,
-                                fontSize: 11.5,
+                                fontSize: 12.0,
                                 fontWeight: FontWeight.w500,
                                 color: AppColors.secondaryText,
                               ),
@@ -285,7 +285,7 @@ class _RingProgressPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const double strokeWidth = 11.0;
+    const double strokeWidth = 12.5;
     final Offset center = Offset(size.width / 2, size.height / 2);
     final double radius = (size.width - strokeWidth) / 2;
 

@@ -43,6 +43,7 @@ class BackupSyncController with WidgetsBindingObserver {
 
   bool get isRestoring => _isRestoring;
   bool get isUploading => _isUploading;
+  bool get isConflictDialogShowing => _isConflictDialogShowing;
   bool get isExpenseScreenOpen => _isExpenseScreenOpen;
   bool get hasUnsyncedLocalChanges => _hasUnsyncedLocalChanges;
   bool get isAppForeground => _isAppForeground;

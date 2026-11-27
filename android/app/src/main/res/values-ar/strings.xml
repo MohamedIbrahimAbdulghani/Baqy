@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_record_voice_short">تسجيل بالصوت</string>
+    <string name="shortcut_record_voice_long">تسجيل بالصوت</string>
+    <string name="widget_description">سجّل مصاريفك بالصوت مباشرةً من الشاشة الرئيسية</string>
+</resources>

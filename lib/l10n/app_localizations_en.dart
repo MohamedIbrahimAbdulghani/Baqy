@@ -391,4 +391,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exportTotalLabel => 'Grand Total';
+
+  @override
+  String shortcutExpenseRecordedSingle(String amount, String category) {
+    return 'Recorded $amount EGP in $category';
+  }
+
+  @override
+  String shortcutExpenseRecordedMultiple(int count, String amount) {
+    return 'Recorded $count expenses totaling $amount EGP';
+  }
+
+  @override
+  String get undo => 'Undo';
+
+  @override
+  String get shortcutVoiceRecord => 'Voice Record';
 }

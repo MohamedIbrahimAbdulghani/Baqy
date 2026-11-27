@@ -146,5 +146,29 @@
   "exportShareButton": "Share File",
   "exportSavedSuccess": "File saved to Downloads folder",
   "exportVisualChart": "Visual Distribution",
-  "exportTotalLabel": "Grand Total"
+  "exportTotalLabel": "Grand Total",
+  "shortcutExpenseRecordedSingle": "Recorded {amount} EGP in {category}",
+  "@shortcutExpenseRecordedSingle": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "category": {
+        "type": "String"
+      }
+    }
+  },
+  "shortcutExpenseRecordedMultiple": "Recorded {count} expenses totaling {amount} EGP",
+  "@shortcutExpenseRecordedMultiple": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "undo": "Undo",
+  "shortcutVoiceRecord": "Voice Record"
 }

@@ -146,5 +146,29 @@
   "exportShareButton": "مشاركة الملف",
   "exportSavedSuccess": "تم حفظ الملف في مجلد التنزيلات (Downloads)",
   "exportVisualChart": "التمثيل البياني",
-  "exportTotalLabel": "الإجمالي العام"
+  "exportTotalLabel": "الإجمالي العام",
+  "shortcutExpenseRecordedSingle": "تم تسجيل {amount} جنيه في {category}",
+  "@shortcutExpenseRecordedSingle": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "category": {
+        "type": "String"
+      }
+    }
+  },
+  "shortcutExpenseRecordedMultiple": "تم تسجيل {count} مصاريف بقيمة {amount} جنيه",
+  "@shortcutExpenseRecordedMultiple": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "undo": "تراجع",
+  "shortcutVoiceRecord": "تسجيل بالصوت"
 }

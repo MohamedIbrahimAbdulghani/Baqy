@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Microphone icon for the idle state of the widget — white -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Mic body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,1 C10.34,1 9,2.34 9,4 L9,12 C9,13.66 10.34,15 12,15 C13.66,15 15,13.66 15,12 L15,4 C15,2.34 13.66,1 12,1 Z" />
+    <!-- Stand arc -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M17,12 C17,14.76 14.76,17 12,17 C9.24,17 7,14.76 7,12 L5,12 C5,15.53 7.61,18.43 11,18.93 L11,21 L13,21 L13,18.93 C16.39,18.43 19,15.53 19,12 Z" />
+</vector>

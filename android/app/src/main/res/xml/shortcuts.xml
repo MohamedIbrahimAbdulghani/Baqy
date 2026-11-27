@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="record_voice"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_mic"
+        android:shortcutShortLabel="@string/shortcut_record_voice_short"
+        android:shortcutLongLabel="@string/shortcut_record_voice_long">
+        <intent
+            android:action="record_voice"
+            android:targetPackage="com.mohamedibrahim.baqy"
+            android:targetClass="com.mohamedibrahim.baqy.MainActivity" />
+    </shortcut>
+</shortcuts>

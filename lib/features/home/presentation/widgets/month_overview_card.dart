@@ -18,7 +18,7 @@ class MonthOverviewCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Container(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
         decoration: BoxDecoration(
           color: AppColors.card,
           borderRadius: BorderRadius.circular(20.0),
@@ -45,12 +45,12 @@ class MonthOverviewCard extends StatelessWidget {
               'نظرة على شهرك',
               style: TextStyle(
                 fontFamily: AppTheme.fontFamily,
-                fontSize: 17.0,
+                fontSize: 15.0,
                 fontWeight: FontWeight.w700,
                 color: AppColors.text,
               ),
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: 10.0),
 
             // 1. Burn Rate Pacing
             _buildInsightRow(
@@ -114,19 +114,19 @@ class MonthOverviewCard extends StatelessWidget {
             text,
             style: TextStyle(
               fontFamily: AppTheme.fontFamily,
-              fontSize: 13.5,
+              fontSize: 12.5,
               fontWeight: FontWeight.w600,
               color: AppColors.text,
-              height: 1.45,
+              height: 1.35,
             ),
           ),
         ),
-        const SizedBox(width: 14.0),
+        const SizedBox(width: 10.0),
 
         // Circular Icon Badge (Left side in RTL)
         Container(
-          width: 38.0,
-          height: 38.0,
+          width: 32.0,
+          height: 32.0,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: badgeBg,
@@ -134,7 +134,7 @@ class MonthOverviewCard extends StatelessWidget {
           ),
           child: Icon(
             icon,
-            size: 20.0,
+            size: 17.0,
             color: badgeFg,
           ),
         ),
@@ -144,7 +144,7 @@ class MonthOverviewCard extends StatelessWidget {
 
   Widget _buildDivider() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Divider(
         height: 1.0,
         thickness: 1.0,

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_record_voice_short">Voice Record</string>
+    <string name="shortcut_record_voice_long">Voice Record</string>
+    <string name="widget_description">Record expenses by voice directly from the home screen</string>
+</resources>

@@ -835,6 +835,30 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'الإجمالي العام'**
   String get exportTotalLabel;
+
+  /// No description provided for @shortcutExpenseRecordedSingle.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم تسجيل {amount} جنيه في {category}'**
+  String shortcutExpenseRecordedSingle(String amount, String category);
+
+  /// No description provided for @shortcutExpenseRecordedMultiple.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم تسجيل {count} مصاريف بقيمة {amount} جنيه'**
+  String shortcutExpenseRecordedMultiple(int count, String amount);
+
+  /// No description provided for @undo.
+  ///
+  /// In ar, this message translates to:
+  /// **'تراجع'**
+  String get undo;
+
+  /// No description provided for @shortcutVoiceRecord.
+  ///
+  /// In ar, this message translates to:
+  /// **'تسجيل بالصوت'**
+  String get shortcutVoiceRecord;
 }
 
 class _AppLocalizationsDelegate

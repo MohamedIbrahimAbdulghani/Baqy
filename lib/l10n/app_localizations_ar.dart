@@ -388,4 +388,20 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get exportTotalLabel => 'الإجمالي العام';
+
+  @override
+  String shortcutExpenseRecordedSingle(String amount, String category) {
+    return 'تم تسجيل $amount جنيه في $category';
+  }
+
+  @override
+  String shortcutExpenseRecordedMultiple(int count, String amount) {
+    return 'تم تسجيل $count مصاريف بقيمة $amount جنيه';
+  }
+
+  @override
+  String get undo => 'تراجع';
+
+  @override
+  String get shortcutVoiceRecord => 'تسجيل بالصوت';
 }

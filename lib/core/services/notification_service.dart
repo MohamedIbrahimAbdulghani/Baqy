@@ -568,4 +568,51 @@ class NotificationService {
       payload: 'home',
     );
   }
+
+  /// Displays an instant confirmation notification when an expense is recorded via the home screen widget.
+  /// Automatically disappears after 5 seconds as requested.
+  Future<void> showExpenseRecordedNotification({
+    required String title,
+    required String body,
+  }) async {
+    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'expense_recording_channel',
+      'تسجيل المصاريف',
+      channelDescription: 'إشعارات تأكيد تسجيل المصاريف بالصوت من الودجت',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+      color: const Color(0xFF2F6B5A),
+      showWhen: true,
+      enableVibration: true,
+      playSound: true,
+      timeoutAfter: 5000,
+    );
+
+    const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    final NotificationDetails notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    try {
+      await _notificationsPlugin.show(
+        202,
+        title,
+        body,
+        notificationDetails,
+        payload: 'home',
+      );
+
+      // Auto cancel after 5 seconds to ensure disappearance across all Android versions
+      Future.delayed(const Duration(seconds: 5), () {
+        _notificationsPlugin.cancel(202).catchError((_) {});
+      });
+    } catch (_) {}
+  }
 }

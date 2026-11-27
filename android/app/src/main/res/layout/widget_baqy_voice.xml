@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Widget layout for Baqy Voice Recording widget.
+  2×1 cell (110dp × 50dp minimum).
+  Dark green background (#2F6B5A), white icons and text.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:gravity="center"
+    android:padding="8dp"
+    android:background="@drawable/widget_background">
+
+    <!-- Microphone / Stop icon button -->
+    <ImageButton
+        android:id="@+id/widget_mic_button"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="@drawable/widget_icon_bg"
+        android:src="@drawable/ic_widget_mic"
+        android:scaleType="centerInside"
+        android:padding="10dp"
+        android:contentDescription="تسجيل صوتي" />
+
+    <!-- Text column -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:layout_marginStart="8dp">
+
+        <TextView
+            android:id="@+id/widget_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="باقي"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="اضغط للتسجيل"
+            android:textColor="#CCFFFFFF"
+            android:textSize="11sp" />
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -10,10 +10,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/database/app_database.dart';
+import '../../../../core/services/notification_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/arabic_date_helper.dart';
 import '../../../../core/utils/category_matcher.dart';
 import '../../../../core/utils/goal_icon_helper.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/repositories/expense_repository_impl.dart';
 import '../../data/services/audio_recording_service.dart';
 import '../../data/services/gemini_expense_parser.dart';
@@ -595,16 +597,16 @@ class PendingRecordingStorage {
   static Future<void> save(String path) async {
     try {
       final f = await _getFile();
-      await f.writeAsString(path);
+      f.writeAsStringSync(path);
     } catch (_) {}
   }
 
   static Future<String?> load() async {
     try {
       final f = await _getFile();
-      if (await f.exists()) {
-        final path = (await f.readAsString()).trim();
-        if (path.isNotEmpty && await File(path).exists()) {
+      if (f.existsSync()) {
+        final path = f.readAsStringSync().trim();
+        if (path.isNotEmpty && File(path).existsSync()) {
           return path;
         }
       }
@@ -615,8 +617,8 @@ class PendingRecordingStorage {
   static Future<void> clear() async {
     try {
       final f = await _getFile();
-      if (await f.exists()) {
-        await f.delete();
+      if (f.existsSync()) {
+        f.deleteSync();
       }
     } catch (_) {}
   }
@@ -635,6 +637,9 @@ class VoiceRecordingNotifier extends Notifier<bool> {
 
   VoiceRecordingMode _mode = VoiceRecordingMode.expense;
   VoiceRecordingMode get mode => _mode;
+
+  bool _isFromShortcut = false;
+  bool get isFromShortcut => _isFromShortcut;
 
   // Multi-session text buffers & committed text across sessions
   String _committedText = '';
@@ -699,12 +704,14 @@ class VoiceRecordingNotifier extends Notifier<bool> {
   Future<void> startRecording({
     required BuildContext context,
     VoiceRecordingMode mode = VoiceRecordingMode.expense,
+    bool isFromShortcut = false,
   }) async {
     if (state) return;
     final service = _audioService;
     if (service == null) return;
 
     _mode = mode;
+    _isFromShortcut = isFromShortcut;
     _currentContext = context;
     _committedText = '';
     _currentPartialText = '';
@@ -800,6 +807,7 @@ class VoiceRecordingNotifier extends Notifier<bool> {
   /// clears text buffers, and resets all recording state.
   Future<void> cancelRecording({BuildContext? context}) async {
     if (!state) return;
+    _isFromShortcut = false;
 
     // Light haptic feedback on cancellation
     HapticFeedback.lightImpact();
@@ -833,8 +841,8 @@ class VoiceRecordingNotifier extends Notifier<bool> {
         final savedPath = await service.stopRecording();
         if (savedPath != null) {
           final file = File(savedPath);
-          if (await file.exists()) {
-            await file.delete();
+          if (file.existsSync()) {
+            file.deleteSync();
           }
         }
       } catch (e) {
@@ -862,6 +870,8 @@ class VoiceRecordingNotifier extends Notifier<bool> {
 
   Future<void> stopRecording({BuildContext? context}) async {
     if (!state) return;
+    final fromShortcut = _isFromShortcut;
+    _isFromShortcut = false;
     final totalSw = Stopwatch()..start();
     final activeContext = context ?? _currentContext;
     final messenger = (activeContext != null && activeContext.mounted)
@@ -927,7 +937,7 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     }
 
     final file = File(savedPath);
-    if (!await file.exists() || await file.length() < 100) {
+    if (!file.existsSync() || file.lengthSync() < 100) {
       if (activeContext != null && activeContext.mounted) {
         _showVoiceFeedbackSnackBar(
           context: activeContext,
@@ -958,6 +968,7 @@ class VoiceRecordingNotifier extends Notifier<bool> {
           : null,
       totalSw: totalSw,
       stopToRecognizeMs: stopToRecognizeMs,
+      isFromShortcut: fromShortcut,
     );
   }
 
@@ -1067,11 +1078,15 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     BuildContext? context,
     Stopwatch? totalSw,
     int stopToRecognizeMs = 0,
+    bool isFromShortcut = false,
+    bool showAnalyzingOverlay = true,
   }) async {
     final activeContext = context ?? _currentContext;
 
-    // Show analyzing state
-    ref.read(voiceIsAnalyzingProvider.notifier).setVal(true);
+    // Show analyzing state only if requested (e.g. not for background widget processing)
+    if (showAnalyzingOverlay) {
+      ref.read(voiceIsAnalyzingProvider.notifier).setVal(true);
+    }
 
     final parser = ref.read(geminiExpenseParserProvider);
     final key = parser.apiKey;
@@ -1145,6 +1160,7 @@ class VoiceRecordingNotifier extends Notifier<bool> {
             audioPath,
             fallbackSpeechText: fallbackSpeechText,
             context: activeContext,
+            isFromShortcut: isFromShortcut,
           ),
           onManual: () {
             activeContext.push('/add-expense');
@@ -1155,22 +1171,85 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     }
 
     if (result.operations.isEmpty) {
-      if (activeContext != null && activeContext.mounted) {
-        _showVoiceFeedbackSnackBar(
-          context: activeContext,
-          message: 'ماسمعتش مبالغ في التسجيل، جرّب تاني',
-        );
+      if (isFromShortcut) {
+        // Unclear result from shortcut (no recognized expenses): show review screen so user can fix it
+        if (activeContext != null && activeContext.mounted) {
+          await VoiceExpenseReviewSheet.show(
+            context: activeContext,
+            initialExpenses: const [],
+            categories: categories,
+            transcript: result.transcript,
+            onSave: (reviewedExpenses) async {
+              await _saveExpenses(
+                expenses: reviewedExpenses,
+                categories: categories,
+              );
+              await _deleteAudioAfterSuccess(audioPath);
+            },
+          );
+        }
+      } else {
+        if (activeContext != null && activeContext.mounted) {
+          _showVoiceFeedbackSnackBar(
+            context: activeContext,
+            message: 'ماسمعتش مبالغ في التسجيل، جرّب تاني',
+          );
+        }
       }
       return;
     }
 
+    // Determine whether the parsed result is clear:
+    // A result is clear if:
+    // 1. It has operations.
+    // 2. Every operation has an amount > 0, non-empty description, non-empty category, and does NOT need review.
+    final bool isClear = result.operations.isNotEmpty &&
+        result.operations.every((op) =>
+            op.amount != null &&
+            op.amount! > 0 &&
+            op.description.trim().isNotEmpty &&
+            !op.needsReview);
+
     final skipReview = ref.read(skipVoiceReviewProvider);
 
     final saveSw = Stopwatch()..start();
-    if (skipReview || activeContext == null || !activeContext.mounted) {
+    if (isFromShortcut && isClear) {
+      // Shortcut / widget auto-save: persist through repository, delete audio, show undo snackbar
+      final insertedIds = await _saveExpenses(
+        expenses: result.operations,
+        categories: categories,
+      );
+      await _deleteAudioAfterSuccess(audioPath);
+
+      // Notification text for background confirmation
+      String notifBody;
+      if (result.operations.length == 1) {
+        final exp = result.operations.first;
+        notifBody = 'تم تسجيل ${exp.amount} جنيه في ${exp.category}';
+      } else {
+        final total = result.operations.fold<int>(0, (sum, e) => sum + (e.amount ?? 0));
+        notifBody = 'تم تسجيل ${result.operations.length} مصاريف بقيمة $total جنيه';
+      }
+
+      try {
+        await NotificationService.instance.showExpenseRecordedNotification(
+          title: 'باقي',
+          body: notifBody,
+        );
+      } catch (_) {}
+
+      if (activeContext != null && activeContext.mounted) {
+        _showShortcutUndoSnackBar(
+          context: activeContext,
+          expenses: result.operations,
+          insertedIds: insertedIds,
+        );
+      }
+    } else if (skipReview || activeContext == null || !activeContext.mounted) {
       await _saveExpenses(expenses: result.operations, categories: categories);
       await _deleteAudioAfterSuccess(audioPath);
     } else {
+      // Normal microphone flow or unclear shortcut result: show review screen
       await VoiceExpenseReviewSheet.show(
         context: activeContext,
         initialExpenses: result.operations,
@@ -1200,8 +1279,8 @@ class VoiceRecordingNotifier extends Notifier<bool> {
   Future<void> _deleteAudioAfterSuccess(String audioPath) async {
     try {
       final f = File(audioPath);
-      if (await f.exists()) {
-        await f.delete();
+      if (f.existsSync()) {
+        f.deleteSync();
       }
     } catch (_) {}
     await PendingRecordingStorage.clear();
@@ -1213,8 +1292,8 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     if (current != null) {
       try {
         final f = File(current);
-        if (await f.exists()) {
-          await f.delete();
+        if (f.existsSync()) {
+          f.deleteSync();
         }
       } catch (_) {}
     }
@@ -1439,13 +1518,14 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     return '$cTrim $nTrim';
   }
 
-  Future<void> _saveExpenses({
+  Future<List<int>> _saveExpenses({
     required List<ParsedExpense> expenses,
     required List<CategoryItem> categories,
   }) async {
     final addExpense = ref.read(addExpenseUseCaseProvider);
     final addCategory = ref.read(addCategoryUseCaseProvider);
     final now = DateTime.now().toUtc();
+    final List<int> insertedIds = [];
 
     // Clear committed accumulator after save
     _committedText = '';
@@ -1497,7 +1577,7 @@ class VoiceRecordingNotifier extends Notifier<bool> {
         }
       }
 
-      await addExpense(
+      final id = await addExpense(
         amountInPiastres: exp.amountInPiastres,
         description: exp.description,
         categoryId: matchedCategory.id,
@@ -1507,6 +1587,7 @@ class VoiceRecordingNotifier extends Notifier<bool> {
         foreignCurrency: exp.foreignCurrency,
         createdAt: now,
       );
+      insertedIds.add(id);
     }
 
     // Refresh Home data
@@ -1517,6 +1598,76 @@ class VoiceRecordingNotifier extends Notifier<bool> {
     final currentYm = ArabicDateHelper.formatYearMonthKey(now.year, now.month);
     ref.invalidate(monthCategoryTotalsProvider(currentYm));
     ref.invalidate(categoriesProvider);
+
+    return insertedIds;
+  }
+
+  void _showShortcutUndoSnackBar({
+    required BuildContext context,
+    required List<ParsedExpense> expenses,
+    required List<int> insertedIds,
+  }) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+
+    final l10n = AppLocalizations.of(context);
+    String message;
+    if (expenses.length == 1) {
+      final exp = expenses.first;
+      final amount = exp.amount?.toString() ?? '0';
+      final category = exp.category;
+      message = l10n?.shortcutExpenseRecordedSingle(amount, category) ??
+          'تم تسجيل $amount جنيه في $category';
+    } else {
+      final total = expenses.fold<int>(0, (sum, e) => sum + (e.amount ?? 0));
+      final count = expenses.length;
+      final amount = total.toString();
+      message = l10n?.shortcutExpenseRecordedMultiple(count, amount) ??
+          'تم تسجيل $count مصاريف بقيمة $amount جنيه';
+    }
+
+    final undoLabel = l10n?.undo ?? 'تراجع';
+
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        dismissDirection: DismissDirection.horizontal,
+        margin: const EdgeInsets.only(left: 20.0, right: 20.0, bottom: 84.0),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.0),
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontFamily: AppTheme.fontFamily,
+            fontWeight: FontWeight.w600,
+            fontSize: 14.0,
+          ),
+        ),
+        action: SnackBarAction(
+          label: undoLabel,
+          textColor: Colors.amberAccent,
+          onPressed: () async {
+            final deleteTx = ref.read(deleteTransactionUseCaseProvider);
+            for (final id in insertedIds) {
+              try {
+                await deleteTx(id);
+              } catch (_) {}
+            }
+            final now = DateTime.now().toUtc();
+            ref.invalidate(recentTransactionsProvider);
+            ref.invalidate(currentMonthRemainingProvider);
+            ref.invalidate(yearsWithDataProvider);
+            ref.invalidate(monthsWithDataProvider(now.year));
+            final currentYm = ArabicDateHelper.formatYearMonthKey(now.year, now.month);
+            ref.invalidate(monthCategoryTotalsProvider(currentYm));
+            ref.invalidate(categoriesProvider);
+          },
+        ),
+      ),
+    );
   }
 
   void _showVoiceFeedbackSnackBar({
